@@ -11,4 +11,4 @@
 
 ## Week2:
 - Launch Next.JS Front-End
-- Set up CI/CD testing
+- ~~Set up CI/CD testing~~ (DONE)

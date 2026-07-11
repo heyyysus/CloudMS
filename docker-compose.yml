@@ -23,7 +23,7 @@ services:
 
   app:
     build:
-      context: ./app
+      context: ./backend
       dockerfile: Dockerfile
     env_file:
       - .env

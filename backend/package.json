@@ -12,7 +12,11 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "ts-node src/db/seed.ts"
   },
   "keywords": [],
   "author": "",
@@ -21,7 +25,9 @@
     "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
     "@types/node": "^26.1.1",
+    "@types/pg": "^8.20.0",
     "@types/supertest": "^7.2.0",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^10.7.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.7.0",
@@ -34,6 +40,9 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
-    "express": "^5.2.1"
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "express": "^5.2.1",
+    "pg": "^8.22.0"
   }
 }

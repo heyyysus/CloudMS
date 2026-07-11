@@ -5,7 +5,7 @@ const app: Application = express()
 app.use(express.json())
 
 app.get("/health", (req: Request, res: Response) => {
-  res.json({ status: "ok" })
+  res.json({ status: "ok", timestamp: new Date().toISOString() })
 })
 
 export default app

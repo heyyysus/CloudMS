@@ -62,6 +62,7 @@ See [PROJECT.md](./PROJECT.md) for what this project is and where it's headed. T
 | `npm run start` | Run the compiled build (`dist/index.js`) |
 | `npm run db:generate` | Generate a new Drizzle migration from schema changes |
 | `npm run db:studio` | Open Drizzle Studio against the configured `DATABASE_URL` |
+| `npm run logs` | Print the last 100 lines of the app container's logs (`docker compose logs --tail 100 app`) |
 
 ## Option B: Run the full stack in Docker
 

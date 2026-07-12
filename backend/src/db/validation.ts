@@ -8,6 +8,7 @@ import {
   drivers,
   persons,
   policyDrivers,
+  users,
   vehicles,
 } from "./schema"
 
@@ -36,3 +37,6 @@ export const insertVehicleSchema = createInsertSchema(vehicles)
 export const updateVehicleSchema = insertVehicleSchema.partial()
 
 export const insertPolicyDriverSchema = createInsertSchema(policyDrivers)
+
+export const insertUserSchema = createInsertSchema(users)
+export const updateUserSchema = insertUserSchema.partial()

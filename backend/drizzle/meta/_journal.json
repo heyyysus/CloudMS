@@ -15,6 +15,13 @@
       "when": 1783822984256,
       "tag": "0001_groovy_speedball",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783873546063,
+      "tag": "0002_flowery_the_spike",
+      "breakpoints": true
     }
   ]
 }

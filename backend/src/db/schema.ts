@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  index,
   integer,
   pgEnum,
   pgTable,
@@ -39,6 +40,33 @@ export const policyStatusEnum = pgEnum("policy_status", [
   "cancelled",
   "expired",
 ])
+
+export const userRoleEnum = pgEnum("user_role", ["admin", "staff"])
+
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  name: varchar("name", { length: 150 }),
+  googleSub: varchar("google_sub", { length: 64 }).unique(),
+  role: userRoleEnum("role").notNull().default("staff"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+})
+
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("sessions_user_id_idx").on(table.userId)]
+)
 
 export const persons = pgTable("persons", {
   id: serial("id").primaryKey(),

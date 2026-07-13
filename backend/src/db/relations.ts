@@ -8,6 +8,8 @@ import {
   drivers,
   persons,
   policyDrivers,
+  sessions,
+  users,
   vehicles,
 } from "./schema"
 
@@ -64,4 +66,12 @@ export const vehiclesRelations = relations(vehicles, ({ one }) => ({
 export const policyDriversRelations = relations(policyDrivers, ({ one }) => ({
   policy: one(autoPolicies, { fields: [policyDrivers.policyId], references: [autoPolicies.id] }),
   driver: one(drivers, { fields: [policyDrivers.driverId], references: [drivers.id] }),
+}))
+
+export const usersRelations = relations(users, ({ many }) => ({
+  sessions: many(sessions),
+}))
+
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+  user: one(users, { fields: [sessions.userId], references: [users.id] }),
 }))

@@ -24,7 +24,8 @@ ENV NODE_ENV=production
 
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
+COPY drizzle ./drizzle
 COPY package*.json ./
 
-# This is what tells Docker how to start your app
-CMD ["npm", "start"]
+# Apply pending migrations (and bootstrap ADMIN_EMAIL if set) before serving
+CMD ["sh", "-c", "node dist/db/migrate.js && node dist/index.js"]

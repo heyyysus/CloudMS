@@ -12,6 +12,9 @@ import type {
   policyDrivers,
   policyStatusEnum,
   relationToInsuredEnum,
+  sessions,
+  userRoleEnum,
+  users,
   vehicles,
 } from "../db/schema"
 
@@ -24,6 +27,7 @@ export type MaritalStatus = (typeof maritalStatusEnum.enumValues)[number]
 export type RelationToInsured = (typeof relationToInsuredEnum.enumValues)[number]
 export type DriverRating = (typeof driverRatingEnum.enumValues)[number]
 export type PolicyStatus = (typeof policyStatusEnum.enumValues)[number]
+export type UserRole = (typeof userRoleEnum.enumValues)[number]
 
 export type Person = typeof persons.$inferSelect
 export type Driver = typeof drivers.$inferSelect
@@ -34,6 +38,8 @@ export type Carrier = typeof carriers.$inferSelect
 export type AutoPolicy = typeof autoPolicies.$inferSelect
 export type Vehicle = typeof vehicles.$inferSelect
 export type PolicyDriver = typeof policyDrivers.$inferSelect
+export type User = typeof users.$inferSelect
+export type Session = typeof sessions.$inferSelect
 
 export type NewPerson = typeof persons.$inferInsert
 export type NewDriver = typeof drivers.$inferInsert
@@ -44,3 +50,15 @@ export type NewCarrier = typeof carriers.$inferInsert
 export type NewAutoPolicy = typeof autoPolicies.$inferInsert
 export type NewVehicle = typeof vehicles.$inferInsert
 export type NewPolicyDriver = typeof policyDrivers.$inferInsert
+export type NewUser = typeof users.$inferInsert
+export type NewSession = typeof sessions.$inferInsert
+
+declare global {
+  // Declaration merging into Express's types requires a namespace.
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      user?: User
+    }
+  }
+}

@@ -10,10 +10,14 @@ import {
   drivers,
   persons,
   policyDrivers,
+  sessions,
+  users,
   vehicles,
 } from "./schema"
 
 async function main() {
+  await db.delete(sessions)
+  await db.delete(users)
   await db.delete(policyDrivers)
   await db.delete(vehicles)
   await db.delete(autoPolicies)
@@ -23,6 +27,13 @@ async function main() {
   await db.delete(drivers)
   await db.delete(persons)
   await db.delete(carriers)
+
+  // Login is invite-only, so at least one user must exist before anyone can sign in.
+  await db.insert(users).values({
+    email: "jesus.velarde07@gmail.com",
+    name: "Jesus Velarde",
+    role: "admin",
+  })
 
   const [carrier] = await db
     .insert(carriers)

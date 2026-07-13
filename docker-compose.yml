@@ -10,6 +10,7 @@ services:
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ./nginx/certs:/etc/nginx/certs:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
     depends_on:
       - app
     restart: always

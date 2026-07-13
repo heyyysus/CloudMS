@@ -161,6 +161,29 @@
   }
 }
 
+.auth-page {
+  text-align: center;
+}
+
+.auth-strip {
+  font-size: 15px;
+  color: var(--text);
+
+  a {
+    color: var(--accent);
+  }
+}
+
+.auth-error {
+  font-size: 15px;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 5px;
+  padding: 8px 16px;
+  max-width: 360px;
+}
+
 .ticks {
   position: relative;
   width: 100%;

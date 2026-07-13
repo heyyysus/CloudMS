@@ -38,7 +38,16 @@ reachable through the edge at `/api/v1/auth/*`:
 - `GET /api/v1/auth/me` — current session's user
 - `POST /api/v1/auth/logout` — clear the session
 
-The SPA's login page (calling these endpoints) is the first UI milestone.
+The SPA implements `/login` (Google Sign-In button) and `/logout`. Auth
+state is provided by `AuthProvider` (`src/auth/AuthContext.tsx`), which
+calls `GET /auth/me` on load; the typed API client lives in `src/api/`.
+
+## Environment
+
+Copy `.env.example` to `.env` and set `VITE_GOOGLE_CLIENT_ID` to the same
+value as the backend's `GOOGLE_CLIENT_ID`. For local development, add
+`http://localhost:5173` and `http://localhost` to the OAuth client's
+Authorized JavaScript origins in the Google Cloud Console.
 
 ## Local development
 
@@ -49,5 +58,5 @@ npm run storybook   # component stories
 
 ## Status
 
-This folder currently holds only this document and the docker-compose/nginx
-wiring to serve it. Scaffolding the actual Vite app is a follow-up.
+The Vite + React/TS app is scaffolded with Storybook and basic Google
+Sign-In auth (`/login`, `/logout`). No other resource pages exist yet.

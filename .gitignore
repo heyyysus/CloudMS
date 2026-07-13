@@ -30,11 +30,9 @@ certs/
 dist/
 build/
 
-# Next.js frontend
-frontend/.next/
-frontend/out/
-.next/
-out/
+# Vite/Storybook frontend
+frontend/dist/
+storybook-static/
 
 # Production build
 *.tsbuildinfo
@@ -100,3 +98,4 @@ Thumbs.db
 .temp/
 .tmp/
 *.local
+*storybook.log

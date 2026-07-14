@@ -22,3 +22,17 @@ export async function deletePhone(id: number): Promise<boolean> {
     .returning({ id: clientPhones.id })
   return deleted.length > 0
 }
+
+export async function replaceClientPhones(
+  clientId: number,
+  phoneNumbers: string[]
+): Promise<ClientPhone[]> {
+  return db.transaction(async (tx) => {
+    await tx.delete(clientPhones).where(eq(clientPhones.clientId, clientId))
+    if (phoneNumbers.length === 0) return []
+    return tx
+      .insert(clientPhones)
+      .values(phoneNumbers.map((phoneNumber) => ({ clientId, phoneNumber })))
+      .returning()
+  })
+}

@@ -3,6 +3,10 @@ import { db } from "../db"
 import { vehicles } from "../db/schema"
 import type { NewVehicle, Vehicle } from "../types"
 
+export async function listVehicles(): Promise<Vehicle[]> {
+  return db.select().from(vehicles)
+}
+
 export async function listVehiclesByPolicyId(policyId: number): Promise<Vehicle[]> {
   return db.select().from(vehicles).where(eq(vehicles.policyId, policyId))
 }

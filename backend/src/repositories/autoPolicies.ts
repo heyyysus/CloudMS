@@ -7,6 +7,10 @@ export async function listAutoPolicies(): Promise<AutoPolicy[]> {
   return db.select().from(autoPolicies)
 }
 
+export async function listAutoPoliciesByClientId(clientId: number): Promise<AutoPolicy[]> {
+  return db.select().from(autoPolicies).where(eq(autoPolicies.clientId, clientId))
+}
+
 export async function findAutoPolicyById(id: number): Promise<AutoPolicy | undefined> {
   const [row] = await db.select().from(autoPolicies).where(eq(autoPolicies.id, id))
   return row

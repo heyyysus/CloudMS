@@ -19,3 +19,14 @@ export async function deleteEmail(id: number): Promise<boolean> {
     .returning({ id: clientEmails.id })
   return deleted.length > 0
 }
+
+export async function replaceClientEmails(
+  clientId: number,
+  emails: string[]
+): Promise<ClientEmail[]> {
+  return db.transaction(async (tx) => {
+    await tx.delete(clientEmails).where(eq(clientEmails.clientId, clientId))
+    if (emails.length === 0) return []
+    return tx.insert(clientEmails).values(emails.map((email) => ({ clientId, email }))).returning()
+  })
+}

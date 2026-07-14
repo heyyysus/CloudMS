@@ -1,4 +1,4 @@
-import { Cloud, House } from 'lucide-react'
+import { Cloud, House, UserRound, X } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router'
 import {
   Sidebar,
@@ -8,14 +8,21 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar'
+import type { ClientTab } from '@/components/layout/client-tabs'
 
 const platformItems = [{ title: 'Home', url: '/home', icon: House }]
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  openTabs?: ClientTab[]
+  onCloseTab?: (id: number) => void
+}
+
+export function AppSidebar({ openTabs = [], onCloseTab }: AppSidebarProps) {
   const location = useLocation()
 
   return (
@@ -56,6 +63,39 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {openTabs.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Open Clients</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {openTabs.map((tab) => (
+                  <SidebarMenuItem key={tab.id}>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip={tab.label}
+                      isActive={location.pathname === `/clients/${tab.id}`}
+                    >
+                      <NavLink to={`/clients/${tab.id}`}>
+                        <UserRound />
+                        <span>{tab.label}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                    <SidebarMenuAction
+                      showOnHover
+                      aria-label={`Close ${tab.label}`}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        onCloseTab?.(tab.id)
+                      }}
+                    >
+                      <X />
+                    </SidebarMenuAction>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarRail />
     </Sidebar>

@@ -26,6 +26,8 @@ export default defineConfig({
       'react-hook-form',
       'storybook/test',
       'zod',
+      '@tanstack/react-query',
+      'cmdk',
     ],
   },
   server: {
@@ -39,6 +41,13 @@ export default defineConfig({
   },
   test: {
     projects: [{
+      extends: true,
+      test: {
+        name: 'unit',
+        environment: 'node',
+        include: ['src/**/*.test.ts'],
+      }
+    }, {
       extends: true,
       plugins: [
       // The plugin will run tests for the stories defined in your Storybook config

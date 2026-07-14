@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { useGoogleSignIn } from '../auth/useGoogleSignIn'
 import { loginWithGoogle } from '../api/auth'
 import { ApiError } from '../api/client'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 function errorMessage(err: unknown): string {
   if (err instanceof ApiError) {
@@ -24,7 +25,7 @@ function Login() {
       loginWithGoogle(idToken)
         .then((loggedInUser) => {
           setUser(loggedInUser)
-          navigate('/', { replace: true })
+          navigate('/home', { replace: true })
         })
         .catch((err) => setSignInError(errorMessage(err)))
     },
@@ -34,19 +35,27 @@ function Login() {
   const { buttonRef, error: scriptError } = useGoogleSignIn(handleCredential)
 
   if (loading) return null
-  if (user) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/home" replace />
 
   return (
-    <section id="center" className="auth-page">
-      <div>
-        <h1>Sign in</h1>
-        <p>Use your Google account to access CloudMS.</p>
-      </div>
-      <div ref={buttonRef} />
-      {(scriptError || signInError) && (
-        <p className="auth-error">{scriptError ?? signInError}</p>
-      )}
-    </section>
+    <div className="flex min-h-svh items-center justify-center bg-muted/40 p-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="text-center">
+          <CardTitle className="text-xl">Sign in to CloudMS</CardTitle>
+          <CardDescription>Use your Google account to access CloudMS.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3">
+            <div className="flex justify-center" ref={buttonRef} />
+          </div>
+          {(scriptError || signInError) && (
+            <p className="mt-4 text-center text-sm text-destructive">
+              {scriptError ?? signInError}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 

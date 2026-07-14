@@ -97,9 +97,7 @@ describe("DELETE /carriers/:id", () => {
     const cookie = await makeSessionCookie(user.id)
     const policy = await ctx.policy()
 
-    const res = await request(app)
-      .delete(`/carriers/${policy.carrierId}`)
-      .set("Cookie", cookie)
+    const res = await request(app).delete(`/carriers/${policy.carrierId}`).set("Cookie", cookie)
     expect(res.status).toBe(409)
   })
 })

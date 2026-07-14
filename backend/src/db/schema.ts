@@ -119,10 +119,7 @@ export const clients = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    index("clients_mailing_address_trgm_idx").using(
-      "gin",
-      table.mailingAddress.op("gin_trgm_ops")
-    ),
+    index("clients_mailing_address_trgm_idx").using("gin", table.mailingAddress.op("gin_trgm_ops")),
     index("clients_physical_address_trgm_idx").using(
       "gin",
       table.physicalAddress.op("gin_trgm_ops")
@@ -142,10 +139,7 @@ export const clientPhones = pgTable(
   },
   (table) => [
     index("client_phones_client_id_idx").on(table.clientId),
-    index("client_phones_phone_number_trgm_idx").using(
-      "gin",
-      table.phoneNumber.op("gin_trgm_ops")
-    ),
+    index("client_phones_phone_number_trgm_idx").using("gin", table.phoneNumber.op("gin_trgm_ops")),
   ]
 )
 

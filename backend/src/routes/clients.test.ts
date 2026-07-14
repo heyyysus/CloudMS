@@ -80,9 +80,7 @@ describe("PATCH /clients/:id", () => {
       .send({ mailingAddress: "2 New St" })
     expect(res.status).toBe(200)
     expect(res.body.mailingAddress).toBe("2 New St")
-    expect(res.body.phones.map((p: { phoneNumber: string }) => p.phoneNumber)).toEqual([
-      "111-1111",
-    ])
+    expect(res.body.phones.map((p: { phoneNumber: string }) => p.phoneNumber)).toEqual(["111-1111"])
   })
 
   it("replaces phones when an array is given", async () => {
@@ -99,9 +97,7 @@ describe("PATCH /clients/:id", () => {
       .set("Cookie", cookie)
       .send({ phones: ["222-2222"] })
     expect(res.status).toBe(200)
-    expect(res.body.phones.map((p: { phoneNumber: string }) => p.phoneNumber)).toEqual([
-      "222-2222",
-    ])
+    expect(res.body.phones.map((p: { phoneNumber: string }) => p.phoneNumber)).toEqual(["222-2222"])
   })
 
   it("clears phones when an empty array is given", async () => {

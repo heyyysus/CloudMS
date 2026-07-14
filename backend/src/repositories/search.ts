@@ -69,6 +69,8 @@ export async function searchPolicies(q: string, limit = 10) {
     .from(autoPolicies)
     .innerJoin(clients, eq(autoPolicies.clientId, clients.id))
     .innerJoin(persons, eq(clients.namedInsuredId, persons.id))
-    .where(or(ilike(autoPolicies.policyNumber, pattern), ilike(autoPolicies.policyAddress, pattern)))
+    .where(
+      or(ilike(autoPolicies.policyNumber, pattern), ilike(autoPolicies.policyAddress, pattern))
+    )
     .limit(limit)
 }

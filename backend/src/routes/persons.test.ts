@@ -121,9 +121,7 @@ describe("DELETE /persons/:id", () => {
     const cookie = await makeSessionCookie(user.id)
     const client = await ctx.client()
 
-    const res = await request(app)
-      .delete(`/persons/${client.namedInsuredId}`)
-      .set("Cookie", cookie)
+    const res = await request(app).delete(`/persons/${client.namedInsuredId}`).set("Cookie", cookie)
     expect(res.status).toBe(409)
   })
 })

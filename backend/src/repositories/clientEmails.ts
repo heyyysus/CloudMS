@@ -27,6 +27,9 @@ export async function replaceClientEmails(
   return db.transaction(async (tx) => {
     await tx.delete(clientEmails).where(eq(clientEmails.clientId, clientId))
     if (emails.length === 0) return []
-    return tx.insert(clientEmails).values(emails.map((email) => ({ clientId, email }))).returning()
+    return tx
+      .insert(clientEmails)
+      .values(emails.map((email) => ({ clientId, email })))
+      .returning()
   })
 }

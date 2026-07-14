@@ -37,14 +37,10 @@ describe("GET /search", () => {
     const cookie = await makeSessionCookie(user.id)
     const policy = await ctx.policy({ policyNumber: "ESC_98%TEST" })
 
-    const literalMatch = await request(app)
-      .get("/search?q=ESC_98%25TEST")
-      .set("Cookie", cookie)
+    const literalMatch = await request(app).get("/search?q=ESC_98%25TEST").set("Cookie", cookie)
     expect(literalMatch.body.policies.some((p: { id: number }) => p.id === policy.id)).toBe(true)
 
-    const wildcardAttempt = await request(app)
-      .get("/search?q=ESCX98YTEST")
-      .set("Cookie", cookie)
+    const wildcardAttempt = await request(app).get("/search?q=ESCX98YTEST").set("Cookie", cookie)
     expect(wildcardAttempt.body.policies.some((p: { id: number }) => p.id === policy.id)).toBe(
       false
     )

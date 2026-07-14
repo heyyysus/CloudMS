@@ -28,9 +28,7 @@ describe("GET /policies", () => {
     const policyA = await ctx.policy({ clientId: client.id })
     await ctx.policy()
 
-    const res = await request(app)
-      .get(`/policies?clientId=${client.id}`)
-      .set("Cookie", cookie)
+    const res = await request(app).get(`/policies?clientId=${client.id}`).set("Cookie", cookie)
     expect(res.status).toBe(200)
     expect(res.body.map((p: { id: number }) => p.id)).toEqual([policyA.id])
   })
@@ -64,16 +62,13 @@ describe("POST /policies", () => {
     const client = await ctx.client()
     const carrier = await ctx.carrier()
 
-    const res = await request(app)
-      .post("/policies")
-      .set("Cookie", cookie)
-      .send({
-        clientId: client.id,
-        carrierId: carrier.id,
-        policyNumber: "TESTPOL-001",
-        effectiveDate: "2026-01-01",
-        expirationDate: "2027-01-01",
-      })
+    const res = await request(app).post("/policies").set("Cookie", cookie).send({
+      clientId: client.id,
+      carrierId: carrier.id,
+      policyNumber: "TESTPOL-001",
+      effectiveDate: "2026-01-01",
+      expirationDate: "2027-01-01",
+    })
     expect(res.status).toBe(201)
     ctx.track("policy", res.body.id)
   })
@@ -85,16 +80,13 @@ describe("POST /policies", () => {
     const client = await ctx.client()
     const carrier = await ctx.carrier()
 
-    const res = await request(app)
-      .post("/policies")
-      .set("Cookie", cookie)
-      .send({
-        clientId: client.id,
-        carrierId: carrier.id,
-        policyNumber: policy.policyNumber,
-        effectiveDate: "2026-01-01",
-        expirationDate: "2027-01-01",
-      })
+    const res = await request(app).post("/policies").set("Cookie", cookie).send({
+      clientId: client.id,
+      carrierId: carrier.id,
+      policyNumber: policy.policyNumber,
+      effectiveDate: "2026-01-01",
+      expirationDate: "2027-01-01",
+    })
     expect(res.status).toBe(409)
   })
 
@@ -104,16 +96,13 @@ describe("POST /policies", () => {
     const client = await ctx.client()
     const carrier = await ctx.carrier()
 
-    const res = await request(app)
-      .post("/policies")
-      .set("Cookie", cookie)
-      .send({
-        clientId: client.id,
-        carrierId: carrier.id,
-        policyNumber: "TESTPOL-002",
-        effectiveDate: "not-a-date",
-        expirationDate: "2027-01-01",
-      })
+    const res = await request(app).post("/policies").set("Cookie", cookie).send({
+      clientId: client.id,
+      carrierId: carrier.id,
+      policyNumber: "TESTPOL-002",
+      effectiveDate: "not-a-date",
+      expirationDate: "2027-01-01",
+    })
     expect(res.status).toBe(400)
   })
 })
@@ -139,9 +128,9 @@ describe("DELETE /policies/:id", () => {
     const cookie = await makeSessionCookie(user.id)
     const policy = await ctx.policy()
 
-    expect(
-      (await request(app).delete(`/policies/${policy.id}`).set("Cookie", cookie)).status
-    ).toBe(403)
+    expect((await request(app).delete(`/policies/${policy.id}`).set("Cookie", cookie)).status).toBe(
+      403
+    )
   })
 
   it("allows admins and cascades vehicles", async () => {
@@ -150,9 +139,9 @@ describe("DELETE /policies/:id", () => {
     const policy = await ctx.policy()
     const vehicle = await ctx.vehicle({ policyId: policy.id })
 
-    expect(
-      (await request(app).delete(`/policies/${policy.id}`).set("Cookie", cookie)).status
-    ).toBe(204)
+    expect((await request(app).delete(`/policies/${policy.id}`).set("Cookie", cookie)).status).toBe(
+      204
+    )
 
     const check = await request(app).get(`/vehicles/${vehicle.id}`).set("Cookie", cookie)
     expect(check.status).toBe(404)

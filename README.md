@@ -86,3 +86,5 @@ This brings up nginx, the app, Postgres, Redis, and Certbot together — closer 
 ## Deployment
 
 Merges to `main` that pass CI (typecheck, lint, format check, tests, build) automatically trigger `.github/workflows/ci.yml`'s `deploy` job, which SSHes into the deploy host and runs `scripts/start.sh` (`git pull` + `docker compose up --build -d`). Deploy credentials (`DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PATH`) are configured as GitHub Actions secrets.
+
+Frontend changes deploy separately: `.github/workflows/frontend.yml` triggers on pushes to `main` under `frontend/**`, builds the Vite app in CI (using the `VITE_GOOGLE_CLIENT_ID` secret), rsyncs `frontend/dist/` to `${DEPLOY_PATH}/frontend/dist` on the deploy host, and restarts the `nginx` container so it picks up the new static files — no image to rebuild, since the frontend isn't containerized. The same workflow runs lint + build (no deploy) on PRs touching `frontend/**`.

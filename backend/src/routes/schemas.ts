@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { driverRatingEnum } from "../db/schema"
 import {
   insertAutoPolicySchema,
   insertCarrierSchema,
@@ -31,10 +32,67 @@ export const createClientBody = insertClientSchema.omit(omitMeta).extend({
 })
 export const updateClientBody = createClientBody.partial()
 
-export const createPolicyBody = insertAutoPolicySchema
+const policyCoreBody = insertAutoPolicySchema
   .omit(omitMeta)
   .extend({ effectiveDate: z.iso.date(), expirationDate: z.iso.date() })
-export const updatePolicyBody = createPolicyBody.partial()
+
+// Nested create: vehicles get policyId injected server-side; a driver either
+// references an existing person (reusing their drivers row when one exists)
+// or creates a new person + driver in the same transaction.
+export const createPolicyVehicle = insertVehicleSchema.omit({
+  ...omitMeta,
+  policyId: true,
+})
+
+export const createPolicyDriver = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("existing"),
+    personId: z.number().int().positive(),
+    // required only when the person has no drivers row yet (enforced in the repo)
+    dlNumber: z.string().trim().min(1).max(50).optional(),
+    rating: z.enum(driverRatingEnum.enumValues).optional(),
+    sr22: z.boolean().optional(),
+  }),
+  z.object({
+    kind: z.literal("new"),
+    person: createPersonBody,
+    dlNumber: z.string().trim().min(1).max(50),
+    rating: z.enum(driverRatingEnum.enumValues).default("rated"),
+    sr22: z.boolean().default(false),
+  }),
+])
+
+export const createPolicyBody = policyCoreBody
+  .extend({
+    vehicles: z.array(createPolicyVehicle).optional(),
+    drivers: z.array(createPolicyDriver).optional(),
+  })
+  .superRefine((body, ctx) => {
+    const vins = new Set<string>()
+    body.vehicles?.forEach((vehicle, i) => {
+      if (vins.has(vehicle.vin)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["vehicles", i, "vin"],
+          message: `Duplicate VIN in payload: ${vehicle.vin}`,
+        })
+      }
+      vins.add(vehicle.vin)
+    })
+    const personIds = new Set<number>()
+    body.drivers?.forEach((driver, i) => {
+      if (driver.kind !== "existing") return
+      if (personIds.has(driver.personId)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["drivers", i, "personId"],
+          message: `Duplicate driver personId in payload: ${driver.personId}`,
+        })
+      }
+      personIds.add(driver.personId)
+    })
+  })
+export const updatePolicyBody = policyCoreBody.partial()
 
 export const createVehicleBody = insertVehicleSchema.omit(omitMeta)
 export const updateVehicleBody = createVehicleBody.partial()

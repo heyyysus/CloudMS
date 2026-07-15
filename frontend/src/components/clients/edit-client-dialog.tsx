@@ -199,7 +199,7 @@ export function EditClientForm({
         )}
       </FieldGroup>
 
-      <DialogFooter>
+      <DialogFooter className="mt-2">
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
@@ -241,7 +241,7 @@ export function EditClientDialog({ client, updateClientFn = updateClient }: Edit
           Edit
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Edit client</DialogTitle>
           <DialogDescription>Update addresses and contact info.</DialogDescription>

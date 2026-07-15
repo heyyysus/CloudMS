@@ -1,12 +1,14 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import type { ReactNode } from 'react'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { clientDisplayName, type ClientDetail } from '@/api/clients'
 
 interface ClientSummaryCardProps {
   client: Omit<ClientDetail, 'policies'>
+  action?: ReactNode
 }
 
-export function ClientSummaryCard({ client }: ClientSummaryCardProps) {
+export function ClientSummaryCard({ client, action }: ClientSummaryCardProps) {
   const { namedInsured, secondNamedInsured, phones, emails, mailingAddress, physicalAddress } =
     client
 
@@ -14,6 +16,7 @@ export function ClientSummaryCard({ client }: ClientSummaryCardProps) {
     <Card>
       <CardHeader>
         <CardTitle>{clientDisplayName(client)}</CardTitle>
+        {action && <CardAction>{action}</CardAction>}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-2">

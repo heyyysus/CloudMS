@@ -83,6 +83,29 @@ This brings up nginx, the app, Postgres, Redis, and Certbot together — closer 
    docker compose logs -f app
    ```
 
+## Before opening a PR
+
+Run the same checks CI runs so a push doesn't fail in Actions. From `backend/`:
+
+```bash
+npm run typecheck
+npm run lint
+npm run format:check   # or `npm run format` to auto-fix
+npm run db:migrate     # if the change adds/changes a migration
+npm test
+npm run build
+```
+
+From `frontend/`:
+
+```bash
+npm run lint
+npm run build
+npm test               # runs the Storybook-based test suite
+```
+
+These mirror `.github/workflows/ci.yml` (backend) and `.github/workflows/frontend.yml` (frontend) step-for-step.
+
 ## Deployment
 
 Merges to `main` that pass CI (typecheck, lint, format check, tests, build) automatically trigger `.github/workflows/ci.yml`'s `deploy` job, which SSHes into the deploy host and runs `scripts/start.sh` (`git pull` + `docker compose up --build -d`). Deploy credentials (`DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PATH`) are configured as GitHub Actions secrets.

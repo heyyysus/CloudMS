@@ -1,12 +1,19 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fireEvent, fn, screen, userEvent, within } from 'storybook/test'
-import { AddPolicyForm, type ExistingDriverOption } from './add-policy-dialog'
+import { AddPolicyForm, type ClientAddressFields, type ExistingDriverOption } from './add-policy-dialog'
 import type { Carrier, Vehicle } from '@/api/policies'
-import type { ClientDetail } from '@/api/clients'
 
-const client: Pick<ClientDetail, 'mailingAddress' | 'physicalAddress'> = {
-  mailingAddress: '42 Wallaby Way, Sydney',
-  physicalAddress: '1 Ocean Ave, Sydney',
+const client: ClientAddressFields = {
+  mailingAddress1: '42 Wallaby Way, Sydney',
+  mailingAddress2: null,
+  mailingCity: null,
+  mailingState: null,
+  mailingZip: null,
+  physicalAddress1: '1 Ocean Ave, Sydney',
+  physicalAddress2: null,
+  physicalCity: null,
+  physicalState: null,
+  physicalZip: null,
 }
 
 const carriers: Carrier[] = [
@@ -102,7 +109,10 @@ type Story = StoryObj<typeof meta>
 export const Default: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await expect(canvas.getByLabelText(/policy address/i)).toHaveValue(client.physicalAddress)
+    const policyAddressGroup = within(canvas.getByRole('group', { name: /policy address/i }))
+    await expect(policyAddressGroup.getByLabelText(/address line 1/i)).toHaveValue(
+      client.physicalAddress1
+    )
     await expect(canvas.getByRole('combobox', { name: /term/i })).toHaveTextContent(/6 months/i)
     await expect(canvas.getByRole('checkbox', { name: /jane doe/i })).not.toBeChecked()
     await expect(canvas.getByRole('checkbox', { name: /john doe/i })).not.toBeChecked()
@@ -112,10 +122,15 @@ export const Default: Story = {
 export const AddressSwap: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
+    const policyAddressGroup = within(canvas.getByRole('group', { name: /policy address/i }))
     await userEvent.click(canvas.getByRole('button', { name: /use mailing/i }))
-    await expect(canvas.getByLabelText(/policy address/i)).toHaveValue(client.mailingAddress)
+    await expect(policyAddressGroup.getByLabelText(/address line 1/i)).toHaveValue(
+      client.mailingAddress1
+    )
     await userEvent.click(canvas.getByRole('button', { name: /use physical/i }))
-    await expect(canvas.getByLabelText(/policy address/i)).toHaveValue(client.physicalAddress)
+    await expect(policyAddressGroup.getByLabelText(/address line 1/i)).toHaveValue(
+      client.physicalAddress1
+    )
   },
 }
 

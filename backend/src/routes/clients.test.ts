@@ -77,10 +77,24 @@ describe("PATCH /clients/:id", () => {
     const res = await request(app)
       .patch(`/clients/${client.id}`)
       .set("Cookie", cookie)
-      .send({ mailingAddress: "2 New St" })
+      .send({ mailingAddress1: "2 New St", mailingCity: "Newtown", mailingState: "ca" })
     expect(res.status).toBe(200)
-    expect(res.body.mailingAddress).toBe("2 New St")
+    expect(res.body.mailingAddress1).toBe("2 New St")
+    expect(res.body.mailingCity).toBe("Newtown")
+    expect(res.body.mailingState).toBe("CA")
     expect(res.body.phones.map((p: { phoneNumber: string }) => p.phoneNumber)).toEqual(["111-1111"])
+  })
+
+  it("rejects an invalid state code", async () => {
+    const user = await ctx.user("clients-patch-invalid-state")
+    const cookie = await makeSessionCookie(user.id)
+    const client = await ctx.client()
+
+    const res = await request(app)
+      .patch(`/clients/${client.id}`)
+      .set("Cookie", cookie)
+      .send({ mailingState: "California" })
+    expect(res.status).toBe(400)
   })
 
   it("replaces phones when an array is given", async () => {

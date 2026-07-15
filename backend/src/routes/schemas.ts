@@ -21,20 +21,44 @@ export const searchQuery = z.object({ q: z.string().trim().min(2).max(100) })
 
 const omitMeta = { id: true, createdAt: true, updatedAt: true } as const
 
+// Address state/zip columns come back from drizzle-zod as bare nullable
+// strings; re-tighten them here so bad values are rejected before the DB.
+const stateCode = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^[A-Z]{2}$/, "State must be a 2-letter code")
+  .nullable()
+  .optional()
+
+const zipCode = z
+  .string()
+  .trim()
+  .regex(/^\d{5}(-\d{4})?$/, "Enter a 5-digit ZIP")
+  .nullable()
+  .optional()
+
 export const createPersonBody = insertPersonSchema
   .omit(omitMeta)
   .extend({ dateOfBirth: z.iso.date() })
 export const updatePersonBody = createPersonBody.partial()
 
 export const createClientBody = insertClientSchema.omit(omitMeta).extend({
+  mailingState: stateCode,
+  mailingZip: zipCode,
+  physicalState: stateCode,
+  physicalZip: zipCode,
   phones: z.array(z.string().trim().min(1).max(20)).optional(),
   emails: z.array(z.email().max(255)).optional(),
 })
 export const updateClientBody = createClientBody.partial()
 
-const policyCoreBody = insertAutoPolicySchema
-  .omit(omitMeta)
-  .extend({ effectiveDate: z.iso.date(), expirationDate: z.iso.date() })
+const policyCoreBody = insertAutoPolicySchema.omit(omitMeta).extend({
+  effectiveDate: z.iso.date(),
+  expirationDate: z.iso.date(),
+  policyState: stateCode,
+  policyZip: zipCode,
+})
 
 // Nested create: vehicles get policyId injected server-side; a driver either
 // references an existing person (reusing their drivers row when one exists)

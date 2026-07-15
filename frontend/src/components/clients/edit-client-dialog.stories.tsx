@@ -9,8 +9,16 @@ const fixture: Omit<ClientDetail, 'policies'> = {
   id: 155,
   namedInsuredId: 229,
   secondNamedInsuredId: null,
-  mailingAddress: '42 Wallaby Way, Sydney',
-  physicalAddress: '1 Ocean Ave, Sydney',
+  mailingAddress1: '42 Wallaby Way',
+  mailingAddress2: null,
+  mailingCity: 'Sydney',
+  mailingState: 'CA',
+  mailingZip: '90001',
+  physicalAddress1: '1 Ocean Ave',
+  physicalAddress2: null,
+  physicalCity: 'Sydney',
+  physicalState: 'CA',
+  physicalZip: '90002',
   createdAt: '2026-07-14T17:48:07.653Z',
   updatedAt: '2026-07-14T17:48:07.653Z',
   namedInsured: {
@@ -62,7 +70,10 @@ export const OpensAndPrefills: Story = {
     const canvas = within(canvasElement)
     await userEvent.click(canvas.getByRole('button', { name: /^edit$/i }))
     await expect(await screen.findByText(/edit client/i)).toBeInTheDocument()
-    await expect(screen.getByLabelText(/mailing address/i)).toHaveValue(fixture.mailingAddress)
+    const mailingGroup = within(screen.getByRole('group', { name: /mailing address/i }))
+    await expect(mailingGroup.getByLabelText(/address line 1/i)).toHaveValue(
+      fixture.mailingAddress1
+    )
   },
 }
 

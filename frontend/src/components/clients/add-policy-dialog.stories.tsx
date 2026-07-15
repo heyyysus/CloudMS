@@ -10,8 +10,16 @@ const client: ClientDetail = {
   id: 155,
   namedInsuredId: 229,
   secondNamedInsuredId: null,
-  mailingAddress: '42 Wallaby Way, Sydney',
-  physicalAddress: '1 Ocean Ave, Sydney',
+  mailingAddress1: '42 Wallaby Way, Sydney',
+  mailingAddress2: null,
+  mailingCity: null,
+  mailingState: null,
+  mailingZip: null,
+  physicalAddress1: '1 Ocean Ave, Sydney',
+  physicalAddress2: null,
+  physicalCity: null,
+  physicalState: null,
+  physicalZip: null,
   createdAt: '2026-07-14T17:48:07.653Z',
   updatedAt: '2026-07-14T17:48:07.653Z',
   namedInsured: {
@@ -46,7 +54,11 @@ const createdPolicy: PolicyDetail = {
   clientId: 155,
   carrierId: 7,
   policyNumber: 'POL-123',
-  policyAddress: '1 Ocean Ave, Sydney',
+  policyAddress1: '1 Ocean Ave, Sydney',
+  policyAddress2: null,
+  policyCity: null,
+  policyState: null,
+  policyZip: null,
   effectiveDate: '2026-07-14',
   expirationDate: '2027-01-14',
   status: 'pending',
@@ -56,8 +68,16 @@ const createdPolicy: PolicyDetail = {
     id: 155,
     namedInsuredId: 229,
     secondNamedInsuredId: null,
-    mailingAddress: '42 Wallaby Way, Sydney',
-    physicalAddress: '1 Ocean Ave, Sydney',
+    mailingAddress1: '42 Wallaby Way, Sydney',
+    mailingAddress2: null,
+    mailingCity: null,
+    mailingState: null,
+    mailingZip: null,
+    physicalAddress1: '1 Ocean Ave, Sydney',
+    physicalAddress2: null,
+    physicalCity: null,
+    physicalState: null,
+    physicalZip: null,
     createdAt: '2026-07-14T17:48:07.653Z',
     updatedAt: '2026-07-14T17:48:07.653Z',
   },
@@ -102,7 +122,10 @@ export const OpensAndPrefills: Story = {
     const canvas = within(canvasElement)
     await userEvent.click(canvas.getByRole('button', { name: /add policy/i }))
     await expect(await screen.findByRole('heading', { name: /add policy/i })).toBeInTheDocument()
-    await expect(screen.getByLabelText(/policy address/i)).toHaveValue(client.physicalAddress)
+    const policyAddressGroup = within(screen.getByRole('group', { name: /policy address/i }))
+    await expect(policyAddressGroup.getByLabelText(/address line 1/i)).toHaveValue(
+      client.physicalAddress1
+    )
     await expect(screen.getByRole('checkbox', { name: /jane doe/i })).toBeInTheDocument()
   },
 }
@@ -128,7 +151,11 @@ export const SubmitSavesAndCloses: Story = {
         carrierId: 7,
         policyNumber: 'POL-123',
         status: 'pending',
-        policyAddress: '1 Ocean Ave, Sydney',
+        policyAddress1: '1 Ocean Ave, Sydney',
+        policyAddress2: null,
+        policyCity: null,
+        policyState: null,
+        policyZip: null,
       })
     )
     await waitFor(() =>

@@ -36,6 +36,20 @@
       "when": 1784092546581,
       "tag": "0004_nervous_vulcan",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784153736930,
+      "tag": "0005_magical_annihilus",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784153765419,
+      "tag": "0006_rare_longshot",
+      "breakpoints": true
     }
   ]
 }

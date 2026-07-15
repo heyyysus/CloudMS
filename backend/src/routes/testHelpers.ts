@@ -95,8 +95,8 @@ export class TestContext {
   async client(overrides: Partial<NewClient> = {}) {
     const namedInsuredId = overrides.namedInsuredId ?? (await this.person()).id
     const c = await createClient({
-      mailingAddress: "1 Test St",
-      physicalAddress: "1 Test St",
+      mailingAddress1: "1 Test St",
+      physicalAddress1: "1 Test St",
       ...overrides,
       namedInsuredId,
     })

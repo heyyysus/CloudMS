@@ -1032,7 +1032,7 @@ export function AddPolicyForm({
         )}
       </FieldGroup>
 
-      <DialogFooter>
+      <DialogFooter className="mt-2">
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>

@@ -27,7 +27,7 @@ export function PolicyTabs({ policies, selectedId, onSelect, action, children }:
       className="gap-3"
     >
       <div className="flex items-end justify-between gap-2 border-b">
-        <TabsList className="h-auto justify-start gap-1 overflow-x-auto rounded-none bg-transparent p-0">
+        <TabsList className="-mb-px h-auto justify-start gap-1 overflow-x-auto overflow-y-hidden rounded-none bg-transparent p-0">
           {sorted.map((policy, index) => {
             const status = displayStatus(policy)
             return (
@@ -35,7 +35,7 @@ export function PolicyTabs({ policies, selectedId, onSelect, action, children }:
                 key={policy.id}
                 value={String(policy.id)}
                 className={cn(
-                  '-mb-px rounded-b-none rounded-t-md border border-b-0 border-transparent bg-transparent px-3 py-1.5 shadow-none',
+                  'rounded-b-none rounded-t-md border border-b-0 border-transparent bg-transparent px-3 py-1.5 shadow-none',
                   'data-active:border-border data-active:bg-background data-active:shadow-none',
                   status !== 'active' && 'text-muted-foreground data-active:text-muted-foreground'
                 )}

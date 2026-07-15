@@ -6,8 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { PlusIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Field, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
+import { Field, FieldError, FieldGroup, FieldLegend, FieldSet } from '@/components/ui/field'
 import {
   Dialog,
   DialogContent,
@@ -18,10 +17,12 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { updateClient, type ClientDetail, type UpdateClientBody } from '@/api/clients'
+import { AddressFields } from '@/components/clients/address-fields'
+import { addressFormSchema, flattenAddress, pickAddress, toAddressFormValues, toNullableAddress } from '@/lib/address'
 
 const editClientSchema = z.object({
-  mailingAddress: z.string(),
-  physicalAddress: z.string(),
+  mailing: addressFormSchema,
+  physical: addressFormSchema,
   phones: z.array(
     z.object({
       value: z.string().trim().min(1, 'Phone number is required').max(20, 'Max 20 characters'),
@@ -38,22 +39,17 @@ export type EditClientFormValues = z.infer<typeof editClientSchema>
 
 function toFormValues(client: Omit<ClientDetail, 'policies'>): EditClientFormValues {
   return {
-    mailingAddress: client.mailingAddress ?? '',
-    physicalAddress: client.physicalAddress ?? '',
+    mailing: toAddressFormValues(pickAddress(client, 'mailing')),
+    physical: toAddressFormValues(pickAddress(client, 'physical')),
     phones: client.phones.map((phone) => ({ value: phone.phoneNumber })),
     emails: client.emails.map((email) => ({ value: email.email })),
   }
 }
 
 function toUpdateBody(values: EditClientFormValues): UpdateClientBody {
-  const nullableTrim = (value: string) => {
-    const trimmed = value.trim()
-    return trimmed === '' ? null : trimmed
-  }
-
   return {
-    mailingAddress: nullableTrim(values.mailingAddress),
-    physicalAddress: nullableTrim(values.physicalAddress),
+    ...flattenAddress('mailing', toNullableAddress(values.mailing)),
+    ...flattenAddress('physical', toNullableAddress(values.physical)),
     phones: values.phones.map((phone) => phone.value.trim()),
     emails: values.emails.map((email) => email.value.trim()),
   }
@@ -93,17 +89,31 @@ export function EditClientForm({
       noValidate
     >
       <FieldGroup>
-        <Field data-invalid={!!errors.mailingAddress}>
-          <FieldLabel htmlFor="edit-client-mailing-address">Mailing Address</FieldLabel>
-          <Textarea id="edit-client-mailing-address" {...register('mailingAddress')} />
-          <FieldError errors={errors.mailingAddress ? [errors.mailingAddress] : undefined} />
-        </Field>
+        <FieldSet>
+          <FieldLegend variant="label">Mailing Address</FieldLegend>
+          <FieldGroup className="gap-3">
+            <AddressFields
+              register={register}
+              control={control}
+              errors={errors.mailing}
+              name="mailing"
+              idPrefix="edit-client-mailing"
+            />
+          </FieldGroup>
+        </FieldSet>
 
-        <Field data-invalid={!!errors.physicalAddress}>
-          <FieldLabel htmlFor="edit-client-physical-address">Physical Address</FieldLabel>
-          <Textarea id="edit-client-physical-address" {...register('physicalAddress')} />
-          <FieldError errors={errors.physicalAddress ? [errors.physicalAddress] : undefined} />
-        </Field>
+        <FieldSet>
+          <FieldLegend variant="label">Physical Address</FieldLegend>
+          <FieldGroup className="gap-3">
+            <AddressFields
+              register={register}
+              control={control}
+              errors={errors.physical}
+              name="physical"
+              idPrefix="edit-client-physical"
+            />
+          </FieldGroup>
+        </FieldSet>
 
         <FieldSet>
           <FieldLegend variant="label">Phones</FieldLegend>

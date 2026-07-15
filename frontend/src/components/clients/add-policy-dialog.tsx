@@ -7,7 +7,6 @@ import { PlusIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Combobox } from '@/components/ui/combobox'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -44,7 +43,17 @@ import {
   type Vehicle,
 } from '@/api/policies'
 import { COVERAGE_LABELS } from '@/components/clients/policy-card'
+import { AddressFields } from '@/components/clients/address-fields'
 import { localTodayIsoDate } from '@/lib/policy-status'
+import {
+  addressFormSchema,
+  flattenAddress,
+  isEmptyAddress,
+  pickAddress,
+  toAddressFormValues,
+  toNullableAddress,
+  type Address,
+} from '@/lib/address'
 
 // A person the client is already associated with (named insured, co-insured,
 // or a driver on another policy), offered as a checkable driver row.
@@ -75,7 +84,7 @@ const addPolicySchema = z
       .min(1, 'Policy number is required')
       .max(50, 'Max 50 characters'),
     status: z.enum(['pending', 'active', 'cancelled', 'expired']),
-    policyAddress: z.string(),
+    policyAddress: addressFormSchema,
     effectiveDate: z.iso.date('Enter a valid date'),
     term: z.enum(['1', '6', '12']),
     expirationDate: z.iso.date('Enter a valid date'),
@@ -181,10 +190,30 @@ function addMonths(isoDate: string, months: number): string {
 
 const DEFAULT_TERM = '6'
 
+export type ClientAddressFields = Pick<
+  ClientDetail,
+  | 'mailingAddress1'
+  | 'mailingAddress2'
+  | 'mailingCity'
+  | 'mailingState'
+  | 'mailingZip'
+  | 'physicalAddress1'
+  | 'physicalAddress2'
+  | 'physicalCity'
+  | 'physicalState'
+  | 'physicalZip'
+>
+
 interface ToFormValuesArgs {
-  client: Pick<ClientDetail, 'mailingAddress' | 'physicalAddress'>
+  client: ClientAddressFields
   existingDrivers: ExistingDriverOption[]
   initial?: PolicyDetail
+}
+
+function defaultPolicyAddress(client: ClientAddressFields, initial?: PolicyDetail): Address {
+  if (initial) return pickAddress(initial, 'policy')
+  const physical = pickAddress(client, 'physical')
+  return isEmptyAddress(physical) ? pickAddress(client, 'mailing') : physical
 }
 
 function toFormValues({ client, existingDrivers, initial }: ToFormValuesArgs): AddPolicyFormValues {
@@ -201,8 +230,7 @@ function toFormValues({ client, existingDrivers, initial }: ToFormValuesArgs): A
     carrierId: initial ? String(initial.carrierId) : '',
     policyNumber: initial?.policyNumber ?? '',
     status: initial?.status ?? 'pending',
-    policyAddress:
-      initial?.policyAddress ?? client.physicalAddress ?? client.mailingAddress ?? '',
+    policyAddress: toAddressFormValues(defaultPolicyAddress(client, initial)),
     effectiveDate,
     term: DEFAULT_TERM,
     expirationDate: initial?.expirationDate ?? addMonths(effectiveDate, Number(DEFAULT_TERM)),
@@ -280,7 +308,7 @@ function toBody(values: AddPolicyFormValues, clientId: number): CreatePolicyBody
     clientId,
     carrierId: Number(values.carrierId),
     policyNumber: values.policyNumber.trim(),
-    policyAddress: nullableTrim(values.policyAddress),
+    ...flattenAddress('policy', toNullableAddress(values.policyAddress)),
     effectiveDate: values.effectiveDate,
     expirationDate: values.expirationDate,
     status: values.status,
@@ -321,7 +349,7 @@ const EMPTY_VEHICLE_ROW = {
 
 interface AddPolicyFormProps {
   clientId: number
-  client: Pick<ClientDetail, 'mailingAddress' | 'physicalAddress'>
+  client: ClientAddressFields
   carriers: Carrier[]
   carriersLoading?: boolean
   existingVehicles: Vehicle[]
@@ -372,8 +400,8 @@ export function AddPolicyForm({
     }
   }
 
-  const setAddress = (value: string | null) => {
-    if (value !== null) setValue('policyAddress', value)
+  const setAddress = (value: Address) => {
+    setValue('policyAddress', toAddressFormValues(value))
   }
 
   return (
@@ -481,16 +509,15 @@ export function AddPolicyForm({
           </Field>
         </div>
 
-        <Field>
-          <FieldLabel htmlFor="add-policy-address">Policy Address</FieldLabel>
-          <Textarea id="add-policy-address" {...register('policyAddress')} />
+        <FieldSet>
+          <FieldLegend variant="label">Policy Address</FieldLegend>
           <div className="flex gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              disabled={client.physicalAddress === null}
-              onClick={() => setAddress(client.physicalAddress)}
+              disabled={isEmptyAddress(pickAddress(client, 'physical'))}
+              onClick={() => setAddress(pickAddress(client, 'physical'))}
             >
               Use physical
             </Button>
@@ -498,13 +525,22 @@ export function AddPolicyForm({
               type="button"
               variant="outline"
               size="sm"
-              disabled={client.mailingAddress === null}
-              onClick={() => setAddress(client.mailingAddress)}
+              disabled={isEmptyAddress(pickAddress(client, 'mailing'))}
+              onClick={() => setAddress(pickAddress(client, 'mailing'))}
             >
               Use mailing
             </Button>
           </div>
-        </Field>
+          <FieldGroup className="gap-3">
+            <AddressFields
+              register={register}
+              control={control}
+              errors={errors.policyAddress}
+              name="policyAddress"
+              idPrefix="add-policy-address"
+            />
+          </FieldGroup>
+        </FieldSet>
 
         <FieldSet>
           <FieldLegend variant="label">Coverage</FieldLegend>

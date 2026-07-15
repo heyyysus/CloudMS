@@ -51,8 +51,16 @@ export interface PolicyDetail extends AutoPolicy {
     id: number
     namedInsuredId: number
     secondNamedInsuredId: number | null
-    mailingAddress: string | null
-    physicalAddress: string | null
+    mailingAddress1: string | null
+    mailingAddress2: string | null
+    mailingCity: string | null
+    mailingState: string | null
+    mailingZip: string | null
+    physicalAddress1: string | null
+    physicalAddress2: string | null
+    physicalCity: string | null
+    physicalState: string | null
+    physicalZip: string | null
     createdAt: string
     updatedAt: string
   }
@@ -115,7 +123,11 @@ export interface CreatePolicyBody {
   clientId: number
   carrierId: number
   policyNumber: string
-  policyAddress: string | null
+  policyAddress1: string | null
+  policyAddress2: string | null
+  policyCity: string | null
+  policyState: string | null
+  policyZip: string | null
   effectiveDate: string
   expirationDate: string
   status: AutoPolicy['status']

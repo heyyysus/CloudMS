@@ -113,16 +113,27 @@ export const clients = pgTable(
       .notNull()
       .references(() => persons.id),
     secondNamedInsuredId: integer("second_named_insured_id").references(() => persons.id),
-    mailingAddress: text("mailing_address"),
-    physicalAddress: text("physical_address"),
+    mailingAddress1: text("mailing_address1"),
+    mailingAddress2: text("mailing_address2"),
+    mailingCity: varchar("mailing_city", { length: 100 }),
+    mailingState: varchar("mailing_state", { length: 2 }),
+    mailingZip: varchar("mailing_zip", { length: 10 }),
+    physicalAddress1: text("physical_address1"),
+    physicalAddress2: text("physical_address2"),
+    physicalCity: varchar("physical_city", { length: 100 }),
+    physicalState: varchar("physical_state", { length: 2 }),
+    physicalZip: varchar("physical_zip", { length: 10 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    index("clients_mailing_address_trgm_idx").using("gin", table.mailingAddress.op("gin_trgm_ops")),
-    index("clients_physical_address_trgm_idx").using(
+    index("clients_mailing_addr_trgm_idx").using(
       "gin",
-      table.physicalAddress.op("gin_trgm_ops")
+      sql`(coalesce(${table.mailingAddress1}, '') || ' ' || coalesce(${table.mailingAddress2}, '') || ' ' || coalesce(${table.mailingCity}, '') || ' ' || coalesce(${table.mailingState}, '') || ' ' || coalesce(${table.mailingZip}, '')) gin_trgm_ops`
+    ),
+    index("clients_physical_addr_trgm_idx").using(
+      "gin",
+      sql`(coalesce(${table.physicalAddress1}, '') || ' ' || coalesce(${table.physicalAddress2}, '') || ' ' || coalesce(${table.physicalCity}, '') || ' ' || coalesce(${table.physicalState}, '') || ' ' || coalesce(${table.physicalZip}, '')) gin_trgm_ops`
     ),
   ]
 )
@@ -178,7 +189,11 @@ export const autoPolicies = pgTable(
       .notNull()
       .references(() => carriers.id),
     policyNumber: varchar("policy_number", { length: 50 }).notNull().unique(),
-    policyAddress: text("policy_address"),
+    policyAddress1: text("policy_address1"),
+    policyAddress2: text("policy_address2"),
+    policyCity: varchar("policy_city", { length: 100 }),
+    policyState: varchar("policy_state", { length: 2 }),
+    policyZip: varchar("policy_zip", { length: 10 }),
     effectiveDate: date("effective_date").notNull(),
     expirationDate: date("expiration_date").notNull(),
     status: policyStatusEnum("status").notNull().default("pending"),
@@ -191,9 +206,9 @@ export const autoPolicies = pgTable(
       "gin",
       table.policyNumber.op("gin_trgm_ops")
     ),
-    index("auto_policies_policy_address_trgm_idx").using(
+    index("auto_policies_policy_addr_trgm_idx").using(
       "gin",
-      table.policyAddress.op("gin_trgm_ops")
+      sql`(coalesce(${table.policyAddress1}, '') || ' ' || coalesce(${table.policyAddress2}, '') || ' ' || coalesce(${table.policyCity}, '') || ' ' || coalesce(${table.policyState}, '') || ' ' || coalesce(${table.policyZip}, '')) gin_trgm_ops`
     ),
   ]
 )

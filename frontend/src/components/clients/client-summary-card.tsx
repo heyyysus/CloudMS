@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { clientDisplayName, type ClientDetail } from '@/api/clients'
+import { formatAddress, pickAddress } from '@/lib/address'
 
 interface ClientSummaryCardProps {
   client: Omit<ClientDetail, 'policies'>
@@ -9,8 +10,9 @@ interface ClientSummaryCardProps {
 }
 
 export function ClientSummaryCard({ client, action }: ClientSummaryCardProps) {
-  const { namedInsured, secondNamedInsured, phones, emails, mailingAddress, physicalAddress } =
-    client
+  const { namedInsured, secondNamedInsured, phones, emails } = client
+  const mailingAddress = formatAddress(pickAddress(client, 'mailing'))
+  const physicalAddress = formatAddress(pickAddress(client, 'physical'))
 
   return (
     <Card>

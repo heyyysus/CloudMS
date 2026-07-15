@@ -38,7 +38,11 @@ export interface AutoPolicy {
   clientId: number
   carrierId: number
   policyNumber: string
-  policyAddress: string | null
+  policyAddress1: string | null
+  policyAddress2: string | null
+  policyCity: string | null
+  policyState: string | null
+  policyZip: string | null
   effectiveDate: string
   expirationDate: string
   status: 'pending' | 'active' | 'cancelled' | 'expired'
@@ -50,8 +54,16 @@ export interface ClientDetail {
   id: number
   namedInsuredId: number
   secondNamedInsuredId: number | null
-  mailingAddress: string | null
-  physicalAddress: string | null
+  mailingAddress1: string | null
+  mailingAddress2: string | null
+  mailingCity: string | null
+  mailingState: string | null
+  mailingZip: string | null
+  physicalAddress1: string | null
+  physicalAddress2: string | null
+  physicalCity: string | null
+  physicalState: string | null
+  physicalZip: string | null
   createdAt: string
   updatedAt: string
   namedInsured: Person
@@ -68,8 +80,16 @@ export function getClient(id: number, signal?: AbortSignal): Promise<ClientDetai
 export interface UpdateClientBody {
   namedInsuredId?: number
   secondNamedInsuredId?: number | null
-  mailingAddress?: string | null
-  physicalAddress?: string | null
+  mailingAddress1?: string | null
+  mailingAddress2?: string | null
+  mailingCity?: string | null
+  mailingState?: string | null
+  mailingZip?: string | null
+  physicalAddress1?: string | null
+  physicalAddress2?: string | null
+  physicalCity?: string | null
+  physicalState?: string | null
+  physicalZip?: string | null
   /** Replace-all: omit to leave untouched, [] to delete all, [...] to replace the full set. */
   phones?: string[]
   /** Replace-all: omit to leave untouched, [] to delete all, [...] to replace the full set. */

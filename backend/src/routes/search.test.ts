@@ -32,6 +32,38 @@ describe("GET /search", () => {
     expect(byPolicy.body.policies.some((p: { id: number }) => p.id === policy.id)).toBe(true)
   })
 
+  it("matches a client by mailing city split across address fields", async () => {
+    const user = await ctx.user("search-client-city")
+    const cookie = await makeSessionCookie(user.id)
+    const client = await ctx.client({
+      mailingAddress1: "1 Test St",
+      mailingCity: "Hoosville77",
+      mailingState: "CA",
+      mailingZip: "98332",
+    })
+
+    const res = await request(app).get("/search?q=Hoosville77").set("Cookie", cookie)
+    expect(res.status).toBe(200)
+    expect(res.body.clients.some((c: { id: number }) => c.id === client.id)).toBe(true)
+  })
+
+  it("matches a policy by its city and zip", async () => {
+    const user = await ctx.user("search-policy-city")
+    const cookie = await makeSessionCookie(user.id)
+    const policy = await ctx.policy({
+      policyAddress1: "123 Main St",
+      policyCity: "Springvale77",
+      policyState: "IL",
+      policyZip: "62799",
+    })
+
+    const byCity = await request(app).get("/search?q=Springvale77").set("Cookie", cookie)
+    expect(byCity.body.policies.some((p: { id: number }) => p.id === policy.id)).toBe(true)
+
+    const byZip = await request(app).get("/search?q=62799").set("Cookie", cookie)
+    expect(byZip.body.policies.some((p: { id: number }) => p.id === policy.id)).toBe(true)
+  })
+
   it("escapes % and _ so they are not treated as wildcards", async () => {
     const user = await ctx.user("search-escape")
     const cookie = await makeSessionCookie(user.id)

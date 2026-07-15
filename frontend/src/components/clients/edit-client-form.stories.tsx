@@ -7,8 +7,16 @@ const fixture: Omit<ClientDetail, 'policies'> = {
   id: 155,
   namedInsuredId: 229,
   secondNamedInsuredId: null,
-  mailingAddress: '42 Wallaby Way, Sydney',
-  physicalAddress: '1 Ocean Ave, Sydney',
+  mailingAddress1: '42 Wallaby Way, Sydney',
+  mailingAddress2: null,
+  mailingCity: null,
+  mailingState: null,
+  mailingZip: null,
+  physicalAddress1: '1 Ocean Ave, Sydney',
+  physicalAddress2: null,
+  physicalCity: null,
+  physicalState: null,
+  physicalZip: null,
   createdAt: '2026-07-14T17:48:07.653Z',
   updatedAt: '2026-07-14T17:48:07.653Z',
   namedInsured: {
@@ -43,7 +51,10 @@ type Story = StoryObj<typeof meta>
 export const Default: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await expect(canvas.getByLabelText(/mailing address/i)).toHaveValue(fixture.mailingAddress)
+    const mailingGroup = within(canvas.getByRole('group', { name: /mailing address/i }))
+    await expect(mailingGroup.getByLabelText(/address line 1/i)).toHaveValue(
+      fixture.mailingAddress1
+    )
     await expect(canvas.getByLabelText(/phone 1/i)).toHaveValue('555-867-5309')
     await expect(canvas.getByLabelText(/email 1/i)).toHaveValue('jane@example.com')
   },
@@ -76,14 +87,24 @@ export const AddAndRemoveRows: Story = {
 export const SubmitTransformsValues: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement)
-    await userEvent.clear(canvas.getByLabelText(/mailing address/i))
-    await userEvent.clear(canvas.getByLabelText(/physical address/i))
-    await userEvent.type(canvas.getByLabelText(/physical address/i), '99 New St')
+    const mailingGroup = within(canvas.getByRole('group', { name: /mailing address/i }))
+    const physicalGroup = within(canvas.getByRole('group', { name: /physical address/i }))
+    await userEvent.clear(mailingGroup.getByLabelText(/address line 1/i))
+    await userEvent.clear(physicalGroup.getByLabelText(/address line 1/i))
+    await userEvent.type(physicalGroup.getByLabelText(/address line 1/i), '99 New St')
     await userEvent.click(canvas.getByRole('button', { name: /^save$/i }))
 
     await expect(args.onSubmit).toHaveBeenCalledWith({
-      mailingAddress: null,
-      physicalAddress: '99 New St',
+      mailingAddress1: null,
+      mailingAddress2: null,
+      mailingCity: null,
+      mailingState: null,
+      mailingZip: null,
+      physicalAddress1: '99 New St',
+      physicalAddress2: null,
+      physicalCity: null,
+      physicalState: null,
+      physicalZip: null,
       phones: ['555-867-5309'],
       emails: ['jane@example.com'],
     })

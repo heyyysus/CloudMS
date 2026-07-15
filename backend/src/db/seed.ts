@@ -96,8 +96,14 @@ async function main() {
     .values({
       namedInsuredId: johnPerson.id,
       secondNamedInsuredId: janePerson.id,
-      mailingAddress: "123 Main St, Springfield, IL 62701",
-      physicalAddress: "123 Main St, Springfield, IL 62701",
+      mailingAddress1: "123 Main St",
+      mailingCity: "Springfield",
+      mailingState: "IL",
+      mailingZip: "62701",
+      physicalAddress1: "123 Main St",
+      physicalCity: "Springfield",
+      physicalState: "IL",
+      physicalZip: "62701",
     })
     .returning()
 
@@ -110,7 +116,10 @@ async function main() {
       clientId: client.id,
       carrierId: carrier.id,
       policyNumber: "POL-000123",
-      policyAddress: "123 Main St, Springfield, IL 62701",
+      policyAddress1: "123 Main St",
+      policyCity: "Springfield",
+      policyState: "IL",
+      policyZip: "62701",
       effectiveDate: "2026-07-10",
       expirationDate: "2027-01-10",
       status: "active",

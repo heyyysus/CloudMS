@@ -1,5 +1,5 @@
 import { alias } from "drizzle-orm/pg-core"
-import { eq, ilike, inArray, or, sql } from "drizzle-orm"
+import { AnyColumn, eq, ilike, inArray, or, sql } from "drizzle-orm"
 import { db } from "../db"
 import { autoPolicies, clientEmails, clientPhones, clients, persons } from "../db/schema"
 
@@ -11,6 +11,18 @@ function escapeLikePattern(term: string): string {
 
 function likePattern(q: string): string {
   return `%${escapeLikePattern(q)}%`
+}
+
+// Must stay structurally identical to the matching *_addr_trgm_idx expression
+// index in schema.ts so Postgres can use the index for these ILIKE queries.
+function addressConcat(cols: {
+  address1: AnyColumn
+  address2: AnyColumn
+  city: AnyColumn
+  state: AnyColumn
+  zip: AnyColumn
+}) {
+  return sql`(coalesce(${cols.address1}, '') || ' ' || coalesce(${cols.address2}, '') || ' ' || coalesce(${cols.city}, '') || ' ' || coalesce(${cols.state}, '') || ' ' || coalesce(${cols.zip}, ''))`
 }
 
 export async function searchClients(q: string, limit = 10) {
@@ -32,8 +44,20 @@ export async function searchClients(q: string, limit = 10) {
         ilike(secondInsured.firstName, pattern),
         ilike(secondInsured.lastName, pattern),
         sql`(${secondInsured.firstName} || ' ' || ${secondInsured.lastName}) ILIKE ${pattern}`,
-        ilike(clients.mailingAddress, pattern),
-        ilike(clients.physicalAddress, pattern),
+        sql`${addressConcat({
+          address1: clients.mailingAddress1,
+          address2: clients.mailingAddress2,
+          city: clients.mailingCity,
+          state: clients.mailingState,
+          zip: clients.mailingZip,
+        })} ILIKE ${pattern}`,
+        sql`${addressConcat({
+          address1: clients.physicalAddress1,
+          address2: clients.physicalAddress2,
+          city: clients.physicalCity,
+          state: clients.physicalState,
+          zip: clients.physicalZip,
+        })} ILIKE ${pattern}`,
         ilike(clientPhones.phoneNumber, pattern),
         ilike(clientEmails.email, pattern)
       )
@@ -70,7 +94,16 @@ export async function searchPolicies(q: string, limit = 10) {
     .innerJoin(clients, eq(autoPolicies.clientId, clients.id))
     .innerJoin(persons, eq(clients.namedInsuredId, persons.id))
     .where(
-      or(ilike(autoPolicies.policyNumber, pattern), ilike(autoPolicies.policyAddress, pattern))
+      or(
+        ilike(autoPolicies.policyNumber, pattern),
+        sql`${addressConcat({
+          address1: autoPolicies.policyAddress1,
+          address2: autoPolicies.policyAddress2,
+          city: autoPolicies.policyCity,
+          state: autoPolicies.policyState,
+          zip: autoPolicies.policyZip,
+        })} ILIKE ${pattern}`
+      )
     )
     .limit(limit)
 }

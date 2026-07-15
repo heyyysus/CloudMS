@@ -4,6 +4,7 @@ import { useQuery, useQueries } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ClientSummaryCard } from '@/components/clients/client-summary-card'
+import { EditClientDialog } from '@/components/clients/edit-client-dialog'
 import { PolicyCard } from '@/components/clients/policy-card'
 import { useClientTabs } from '@/components/layout/client-tabs'
 import { ApiError } from '@/api/client'
@@ -87,7 +88,7 @@ function ClientDetail() {
         <p className="text-muted-foreground">Client #{client.id}</p>
       </div>
 
-      <ClientSummaryCard client={client} />
+      <ClientSummaryCard client={client} action={<EditClientDialog client={client} />} />
 
       <div>
         <h2 className="mb-3 text-lg font-semibold tracking-tight">Policies</h2>

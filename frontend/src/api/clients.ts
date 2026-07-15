@@ -65,6 +65,21 @@ export function getClient(id: number, signal?: AbortSignal): Promise<ClientDetai
   return request(`/clients/${id}`, { signal })
 }
 
+export interface UpdateClientBody {
+  namedInsuredId?: number
+  secondNamedInsuredId?: number | null
+  mailingAddress?: string | null
+  physicalAddress?: string | null
+  /** Replace-all: omit to leave untouched, [] to delete all, [...] to replace the full set. */
+  phones?: string[]
+  /** Replace-all: omit to leave untouched, [] to delete all, [...] to replace the full set. */
+  emails?: string[]
+}
+
+export function updateClient(id: number, body: UpdateClientBody): Promise<ClientDetail> {
+  return request(`/clients/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
+}
+
 export function clientDisplayName(client: {
   namedInsured: Pick<Person, 'firstName' | 'lastName'>
 }): string {

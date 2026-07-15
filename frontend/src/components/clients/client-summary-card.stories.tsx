@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ClientSummaryCard } from './client-summary-card'
+import { Button } from '@/components/ui/button'
 import type { ClientDetail } from '@/api/clients'
 
 const fullClient: Omit<ClientDetail, 'policies'> = {
@@ -61,4 +62,15 @@ export const Default: Story = {
 
 export const Minimal: Story = {
   args: { client: minimalClient },
+}
+
+export const WithAction: Story = {
+  args: {
+    client: fullClient,
+    action: (
+      <Button size="sm" variant="outline">
+        Edit
+      </Button>
+    ),
+  },
 }

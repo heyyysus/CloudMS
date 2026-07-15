@@ -18,6 +18,8 @@ All design tokens live in `src/index.css`:
 
 To add a new token: add the raw variable to both `:root` and `.dark`, then map it in `@theme inline` if it needs a Tailwind utility.
 
+Semantic status tokens: `--success` (green) and `--warning` (amber) exist alongside shadcn's `--destructive`, with brighter dark-mode values, giving `text-success`/`bg-success`/`text-warning`/`bg-warning` utilities. Policy status coloring must go through `src/lib/policy-status.ts` (`displayStatus` plus the `STATUS_TEXT_CLASS`/`STATUS_DOT_CLASS` maps) rather than reading `policy.status` directly — `displayStatus` applies the derived-expired rule (an expiration date before local today displays as expired everywhere, regardless of stored status).
+
 ## Dark mode
 
 Dark mode is a manually-toggled `.dark` class on `<html>`, not `prefers-color-scheme` media queries — `color-scheme: light` / `color-scheme: dark` are set per-class so native form controls and scrollbars match the toggle.

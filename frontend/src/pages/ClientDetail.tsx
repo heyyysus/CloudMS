@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -10,10 +10,12 @@ import {
   type ExistingDriverOption,
 } from '@/components/clients/add-policy-dialog'
 import { PolicyCard } from '@/components/clients/policy-card'
+import { PolicyTabs } from '@/components/clients/policy-tabs'
 import { useClientTabs } from '@/components/layout/client-tabs'
 import { ApiError } from '@/api/client'
 import { clientDisplayName, getClient } from '@/api/clients'
 import { getPolicy, type Vehicle } from '@/api/policies'
+import { sortPoliciesByCreatedAt } from '@/lib/policy-status'
 
 function ClientDetail() {
   const params = useParams<{ clientId: string }>()
@@ -51,6 +53,24 @@ function ClientDetail() {
       queryFn: ({ signal }: { signal: AbortSignal }) => getPolicy(policy.id, signal),
     })),
   })
+
+  // Tab order is by creation time (oldest → newest); useQueries order still
+  // mirrors client.policies, so look queries up by id, never by sorted index.
+  const sortedPolicies = sortPoliciesByCreatedAt(client?.policies ?? [])
+  const newestPolicyId = sortedPolicies.at(-1)?.id
+  const queryByPolicyId = new Map(
+    (client?.policies ?? []).map((policy, i) => [policy.id, policyQueries[i]])
+  )
+
+  // Selection defaults to the newest policy; a newly created policy becomes
+  // the newest and re-takes the selection (render-phase adjust, no effect).
+  const [userSelectedId, setUserSelectedId] = useState<number | null>(null)
+  const [prevNewestId, setPrevNewestId] = useState(newestPolicyId)
+  if (newestPolicyId !== prevNewestId) {
+    setPrevNewestId(newestPolicyId)
+    setUserSelectedId(null)
+  }
+  const selectedPolicyId = userSelectedId ?? newestPolicyId
 
   const policyDetails = policyQueries.map((query) => query.data)
 
@@ -129,28 +149,40 @@ function ClientDetail() {
       <ClientSummaryCard client={client} action={<EditClientDialog client={client} />} />
 
       <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold tracking-tight">Policies</h2>
-          <AddPolicyDialog
-            client={client}
-            existingVehicles={existingVehicles}
-            existingDrivers={existingDrivers}
-          />
-        </div>
-        {client.policies.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No policies.</p>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {client.policies.map((policy, i) => (
-              <PolicyCard
-                key={policy.id}
-                policy={policy}
-                detail={policyQueries[i]?.data}
-                isLoading={policyQueries[i]?.isPending}
-                isError={policyQueries[i]?.isError}
-              />
-            ))}
+        {sortedPolicies.length === 0 || selectedPolicyId === undefined ? (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">No policies.</p>
+            <AddPolicyDialog
+              client={client}
+              existingVehicles={existingVehicles}
+              existingDrivers={existingDrivers}
+            />
           </div>
+        ) : (
+          <PolicyTabs
+            policies={sortedPolicies}
+            selectedId={selectedPolicyId}
+            onSelect={setUserSelectedId}
+            action={
+              <AddPolicyDialog
+                client={client}
+                existingVehicles={existingVehicles}
+                existingDrivers={existingDrivers}
+              />
+            }
+          >
+            {(policy) => {
+              const query = queryByPolicyId.get(policy.id)
+              return (
+                <PolicyCard
+                  policy={policy}
+                  detail={query?.data}
+                  isLoading={query?.isPending}
+                  isError={query?.isError}
+                />
+              )
+            }}
+          </PolicyTabs>
         )}
       </div>
     </div>

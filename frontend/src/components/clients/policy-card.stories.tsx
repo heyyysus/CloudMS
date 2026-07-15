@@ -1,8 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
+import { expect, within } from 'storybook/test'
 import { PolicyCard } from './policy-card'
 import type { AutoPolicy } from '@/api/clients'
 import type { PolicyDetail } from '@/api/policies'
 
+// Expiration dates in fixtures must be far-future (or clearly past): the card
+// displays a policy as expired once its expiration date passes.
 const bare: AutoPolicy = {
   id: 104,
   clientId: 155,
@@ -10,7 +13,7 @@ const bare: AutoPolicy = {
   policyNumber: 'SMOKE-POL-001',
   policyAddress: null,
   effectiveDate: '2026-01-01',
-  expirationDate: '2027-01-01',
+  expirationDate: '2099-01-01',
   status: 'active',
   createdAt: '2026-07-14T17:48:07.653Z',
   updatedAt: '2026-07-14T17:48:07.653Z',
@@ -87,5 +90,28 @@ export const LoadingVehicles: Story = {
 export const VehicleFetchError: Story = {
   args: {
     isError: true,
+  },
+}
+
+export const DateExpired: Story = {
+  args: {
+    policy: { ...bare, status: 'active', expirationDate: '2020-01-01' },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByText('expired')).toBeInTheDocument()
+    await expect(canvas.queryByText('active')).not.toBeInTheDocument()
+  },
+}
+
+export const Pending: Story = {
+  args: {
+    policy: { ...bare, status: 'pending' },
+  },
+}
+
+export const Cancelled: Story = {
+  args: {
+    policy: { ...bare, status: 'cancelled' },
   },
 }

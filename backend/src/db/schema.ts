@@ -205,7 +205,7 @@ export const vehicles = pgTable(
     policyId: integer("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
-    vin: varchar("vin", { length: 17 }).notNull().unique(),
+    vin: varchar("vin", { length: 17 }).notNull(),
     make: varchar("make", { length: 100 }).notNull(),
     model: varchar("model", { length: 100 }).notNull(),
     year: integer("year").notNull(),
@@ -223,7 +223,10 @@ export const vehicles = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [index("vehicles_policy_id_idx").on(table.policyId)]
+  (table) => [
+    index("vehicles_policy_id_idx").on(table.policyId),
+    unique("vehicles_policy_id_vin_unique").on(table.policyId, table.vin),
+  ]
 )
 
 export const policyDrivers = pgTable(

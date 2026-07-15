@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { AutoPolicy } from '@/api/clients'
 import type { PolicyDetail, Vehicle } from '@/api/policies'
 
-const COVERAGE_LABELS: Record<
+export const COVERAGE_LABELS: Record<
   Extract<
     keyof Vehicle,
     | 'coverageBi'

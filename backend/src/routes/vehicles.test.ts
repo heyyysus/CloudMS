@@ -62,8 +62,24 @@ describe("POST /vehicles", () => {
     ctx.track("vehicle", res.body.id)
   })
 
-  it("returns 409 for a duplicate VIN", async () => {
+  it("returns 409 for a duplicate VIN on the same policy", async () => {
     const user = await ctx.user("vehicles-dupvin")
+    const cookie = await makeSessionCookie(user.id)
+    const vehicle = await ctx.vehicle()
+
+    const res = await request(app).post("/vehicles").set("Cookie", cookie).send({
+      policyId: vehicle.policyId,
+      vin: vehicle.vin,
+      make: "Honda",
+      model: "Civic",
+      year: 2020,
+      garagingZip: "12345",
+    })
+    expect(res.status).toBe(409)
+  })
+
+  it("allows the same VIN on a different policy", async () => {
+    const user = await ctx.user("vehicles-dupvin-otherpolicy")
     const cookie = await makeSessionCookie(user.id)
     const vehicle = await ctx.vehicle()
     const policy = await ctx.policy()
@@ -76,7 +92,8 @@ describe("POST /vehicles", () => {
       year: 2020,
       garagingZip: "12345",
     })
-    expect(res.status).toBe(409)
+    expect(res.status).toBe(201)
+    ctx.track("vehicle", res.body.id)
   })
 })
 

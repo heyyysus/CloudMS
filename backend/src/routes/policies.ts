@@ -1,15 +1,16 @@
 import { Request, Response, Router } from "express"
 import { requireAuth, requireRole } from "../auth/middleware"
 import {
-  createAutoPolicy,
+  createAutoPolicyWithDetails,
   deleteAutoPolicy,
   getPolicyWithDetails,
   listAutoPolicies,
   listAutoPoliciesByClientId,
+  PolicyCreateError,
   searchPolicies,
   updateAutoPolicy,
 } from "../repositories"
-import { firstIssue, parseId } from "./helpers"
+import { firstIssue, isPgForeignKeyViolation, isPgUniqueViolation, parseId } from "./helpers"
 import { createPolicyBody, idParam, searchQuery, updatePolicyBody } from "./schemas"
 
 export const policiesRouter = Router()
@@ -56,7 +57,28 @@ policiesRouter.post("/policies", requireAuth, async (req: Request, res: Response
     res.status(400).json({ error: firstIssue(parsed.error) })
     return
   }
-  res.status(201).json(await createAutoPolicy(parsed.data))
+
+  try {
+    res.status(201).json(await createAutoPolicyWithDetails(parsed.data))
+  } catch (err) {
+    if (err instanceof PolicyCreateError) {
+      res.status(400).json({ error: err.message })
+      return
+    }
+    if (isPgUniqueViolation(err, "auto_policies_policy_number_unique")) {
+      res.status(409).json({ error: "Policy number already exists" })
+      return
+    }
+    if (isPgUniqueViolation(err, "vehicles_policy_id_vin_unique")) {
+      res.status(409).json({ error: "Duplicate VIN on this policy" })
+      return
+    }
+    if (isPgForeignKeyViolation(err)) {
+      res.status(400).json({ error: "Invalid client or carrier" })
+      return
+    }
+    throw err
+  }
 })
 
 policiesRouter.patch("/policies/:id", requireAuth, async (req: Request, res: Response) => {

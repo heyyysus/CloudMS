@@ -5,11 +5,15 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ClientSummaryCard } from '@/components/clients/client-summary-card'
 import { EditClientDialog } from '@/components/clients/edit-client-dialog'
+import {
+  AddPolicyDialog,
+  type ExistingDriverOption,
+} from '@/components/clients/add-policy-dialog'
 import { PolicyCard } from '@/components/clients/policy-card'
 import { useClientTabs } from '@/components/layout/client-tabs'
 import { ApiError } from '@/api/client'
 import { clientDisplayName, getClient } from '@/api/clients'
-import { getPolicy } from '@/api/policies'
+import { getPolicy, type Vehicle } from '@/api/policies'
 
 function ClientDetail() {
   const params = useParams<{ clientId: string }>()
@@ -47,6 +51,40 @@ function ClientDetail() {
       queryFn: ({ signal }: { signal: AbortSignal }) => getPolicy(policy.id, signal),
     })),
   })
+
+  const policyDetails = policyQueries.map((query) => query.data)
+
+  // Vehicles and people from the client's other policies, offered as prefills
+  // in the add-policy dialog. Still-loading policy queries just mean a
+  // shorter list.
+  const vehiclesByVin = new Map<string, Vehicle>()
+  for (const detail of policyDetails) {
+    for (const vehicle of detail?.vehicles ?? []) {
+      if (!vehiclesByVin.has(vehicle.vin)) vehiclesByVin.set(vehicle.vin, vehicle)
+    }
+  }
+  const existingVehicles = [...vehiclesByVin.values()]
+
+  const driversByPersonId = new Map<number, ExistingDriverOption>()
+  if (client) {
+    driversByPersonId.set(client.namedInsuredId, {
+      personId: client.namedInsuredId,
+      person: client.namedInsured,
+    })
+    if (client.secondNamedInsured) {
+      driversByPersonId.set(client.secondNamedInsured.id, {
+        personId: client.secondNamedInsured.id,
+        person: client.secondNamedInsured,
+      })
+    }
+  }
+  for (const detail of policyDetails) {
+    for (const policyDriver of detail?.policyDrivers ?? []) {
+      const { personId, person, dlNumber, rating, sr22 } = policyDriver.driver
+      driversByPersonId.set(personId, { personId, person, driver: { dlNumber, rating, sr22 } })
+    }
+  }
+  const existingDrivers = [...driversByPersonId.values()]
 
   if (!isValidId || (error instanceof ApiError && error.status === 404)) {
     return (
@@ -91,7 +129,14 @@ function ClientDetail() {
       <ClientSummaryCard client={client} action={<EditClientDialog client={client} />} />
 
       <div>
-        <h2 className="mb-3 text-lg font-semibold tracking-tight">Policies</h2>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold tracking-tight">Policies</h2>
+          <AddPolicyDialog
+            client={client}
+            existingVehicles={existingVehicles}
+            existingDrivers={existingDrivers}
+          />
+        </div>
         {client.policies.length === 0 ? (
           <p className="text-sm text-muted-foreground">No policies.</p>
         ) : (

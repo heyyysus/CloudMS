@@ -29,6 +29,13 @@
       "when": 1784048382102,
       "tag": "0003_pg_trgm_search",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784092546581,
+      "tag": "0004_nervous_vulcan",
+      "breakpoints": true
     }
   ]
 }

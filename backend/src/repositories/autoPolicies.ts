@@ -1,13 +1,7 @@
 import { eq } from "drizzle-orm"
 import { db } from "../db"
 import { autoPolicies, drivers, persons, policyDrivers, vehicles } from "../db/schema"
-import type {
-  AutoPolicy,
-  DriverRating,
-  NewAutoPolicy,
-  NewPerson,
-  NewVehicle,
-} from "../types"
+import type { AutoPolicy, DriverRating, NewAutoPolicy, NewPerson, NewVehicle } from "../types"
 
 export async function listAutoPolicies(): Promise<AutoPolicy[]> {
   return db.select().from(autoPolicies)
@@ -120,10 +114,7 @@ export async function createAutoPolicyWithDetails(input: CreatePolicyInput) {
           driverId = created.id
         }
       } else {
-        const [person] = await tx
-          .insert(persons)
-          .values(spec.person)
-          .returning({ id: persons.id })
+        const [person] = await tx.insert(persons).values(spec.person).returning({ id: persons.id })
         const [created] = await tx
           .insert(drivers)
           .values({

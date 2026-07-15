@@ -77,9 +77,7 @@ describe("createAutoPolicyWithDetails", () => {
     expect(detail.policyNumber).toBe(`${POLICY_PREFIX}FULL`)
     expect(detail.carrier.id).toBe(carrier.id)
     expect(detail.vehicles).toHaveLength(2)
-    expect(detail.vehicles.find((v) => v.vin === "APRTVIN0000000001")?.coverageBi).toBe(
-      "100/300"
-    )
+    expect(detail.vehicles.find((v) => v.vin === "APRTVIN0000000001")?.coverageBi).toBe("100/300")
     expect(detail.policyDrivers).toHaveLength(2)
 
     const insuredDriver = detail.policyDrivers.find((pd) => pd.driver.personId === insured.id)

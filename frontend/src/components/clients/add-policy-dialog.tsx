@@ -44,6 +44,7 @@ import {
   type Vehicle,
 } from '@/api/policies'
 import { COVERAGE_LABELS } from '@/components/clients/policy-card'
+import { localTodayIsoDate } from '@/lib/policy-status'
 
 // A person the client is already associated with (named insured, co-insured,
 // or a driver on another policy), offered as a checkable driver row.
@@ -166,11 +167,6 @@ function pad(n: number): string {
   return String(n).padStart(2, '0')
 }
 
-function todayIsoDate(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
-}
-
 // Month arithmetic on the Y/M/D parts of a YYYY-MM-DD string, clamping the
 // day to the target month (Jan 31 + 1 month → Feb 28). Avoids Date-string
 // parsing, which is UTC-based and shifts the day in western timezones.
@@ -192,7 +188,7 @@ interface ToFormValuesArgs {
 }
 
 function toFormValues({ client, existingDrivers, initial }: ToFormValuesArgs): AddPolicyFormValues {
-  const effectiveDate = initial?.effectiveDate ?? todayIsoDate()
+  const effectiveDate = initial?.effectiveDate ?? localTodayIsoDate()
   // When editing, the shared coverages come from the first vehicle; the form
   // fans them back out on submit, so per-vehicle differences in those five
   // fields are not preserved.

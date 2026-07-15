@@ -1,8 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 import type { AutoPolicy } from '@/api/clients'
 import type { PolicyDetail, Vehicle } from '@/api/policies'
+import { displayStatus, STATUS_TEXT_CLASS } from '@/lib/policy-status'
 
 export const COVERAGE_LABELS: Record<
   Extract<
@@ -40,13 +42,15 @@ interface PolicyCardProps {
 }
 
 export function PolicyCard({ policy, detail, isLoading, isError }: PolicyCardProps) {
+  const status = displayStatus(policy)
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between text-base">
           <span>{policy.policyNumber}</span>
-          <span className="text-xs font-normal text-muted-foreground capitalize">
-            {policy.status}
+          <span className={cn('text-xs font-normal capitalize', STATUS_TEXT_CLASS[status])}>
+            {status}
           </span>
         </CardTitle>
       </CardHeader>

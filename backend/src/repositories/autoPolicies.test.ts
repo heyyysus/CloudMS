@@ -3,7 +3,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { db } from "../db"
 import { autoPolicies, carriers, clients, drivers, persons } from "../db/schema"
 import type { Carrier, Client, Person } from "../types"
-import { createAutoPolicyWithDetails, PolicyCreateError } from "./autoPolicies"
+import {
+  createAutoPolicyWithDetails,
+  PolicyWriteError,
+  updateAutoPolicyWithDetails,
+} from "./autoPolicies"
 
 const PERSON_PREFIX = "AutoPolicyRepoTest"
 const POLICY_PREFIX = "POL-APRT-"
@@ -32,29 +36,26 @@ function vehicleValues(vin: string) {
   return { vin, make: "Toyota", model: "Camry", year: 2020, garagingZip: "90001" }
 }
 
+let carrier: Carrier
+let insured: Person
+let client: Client
+
+beforeAll(async () => {
+  ;[carrier] = await db.insert(carriers).values({ name: PERSON_PREFIX, naic: "99901" }).returning()
+  ;[insured] = await db.insert(persons).values(personValues("Insured")).returning()
+  ;[client] = await db.insert(clients).values({ namedInsuredId: insured.id }).returning()
+})
+
+afterAll(async () => {
+  // Policies cascade-delete their vehicles and policy_drivers; persons
+  // cascade-delete their drivers rows.
+  await db.delete(autoPolicies).where(like(autoPolicies.policyNumber, `${POLICY_PREFIX}%`))
+  await db.delete(clients).where(eq(clients.id, client.id))
+  await db.delete(persons).where(like(persons.lastName, PERSON_PREFIX))
+  await db.delete(carriers).where(eq(carriers.id, carrier.id))
+})
+
 describe("createAutoPolicyWithDetails", () => {
-  let carrier: Carrier
-  let insured: Person
-  let client: Client
-
-  beforeAll(async () => {
-    ;[carrier] = await db
-      .insert(carriers)
-      .values({ name: PERSON_PREFIX, naic: "99901" })
-      .returning()
-    ;[insured] = await db.insert(persons).values(personValues("Insured")).returning()
-    ;[client] = await db.insert(clients).values({ namedInsuredId: insured.id }).returning()
-  })
-
-  afterAll(async () => {
-    // Policies cascade-delete their vehicles and policy_drivers; persons
-    // cascade-delete their drivers rows.
-    await db.delete(autoPolicies).where(like(autoPolicies.policyNumber, `${POLICY_PREFIX}%`))
-    await db.delete(clients).where(eq(clients.id, client.id))
-    await db.delete(persons).where(like(persons.lastName, PERSON_PREFIX))
-    await db.delete(carriers).where(eq(carriers.id, carrier.id))
-  })
-
   it("creates a policy with vehicles and drivers atomically", async () => {
     const detail = await createAutoPolicyWithDetails({
       ...policyValues(carrier.id, client.id, "FULL"),
@@ -116,7 +117,7 @@ describe("createAutoPolicyWithDetails", () => {
         ...policyValues(carrier.id, client.id, "NODL"),
         drivers: [{ kind: "existing", personId: person.id }],
       })
-    ).rejects.toThrow(PolicyCreateError)
+    ).rejects.toThrow(PolicyWriteError)
 
     const orphaned = await db
       .select()
@@ -131,7 +132,7 @@ describe("createAutoPolicyWithDetails", () => {
         ...policyValues(carrier.id, client.id, "NOPERSON"),
         drivers: [{ kind: "existing", personId: 999999999, dlNumber: "D-APRT-X" }],
       })
-    ).rejects.toThrow(PolicyCreateError)
+    ).rejects.toThrow(PolicyWriteError)
   })
 
   it("rolls back the whole create when the policy number is taken", async () => {
@@ -186,5 +187,96 @@ describe("createAutoPolicyWithDetails", () => {
       .from(autoPolicies)
       .where(inArray(autoPolicies.policyNumber, [`${POLICY_PREFIX}VIN3`]))
     expect(orphaned).toHaveLength(0)
+  })
+})
+
+describe("updateAutoPolicyWithDetails", () => {
+  it("fully replaces vehicles and drivers, unlinking (not deleting) removed drivers", async () => {
+    const [keptPerson] = await db.insert(persons).values(personValues("UpdKeep")).returning()
+    const original = await createAutoPolicyWithDetails({
+      ...policyValues(carrier.id, client.id, "UPD-FULL"),
+      vehicles: [vehicleValues("APRTVIN0000000101")],
+      drivers: [{ kind: "existing", personId: keptPerson.id, dlNumber: "D-APRT-UPD1" }],
+    })
+    const removedDriverId = original.policyDrivers[0].driver.id
+
+    const updated = await updateAutoPolicyWithDetails(original.id, {
+      vehicles: [vehicleValues("APRTVIN0000000102")],
+      drivers: [
+        {
+          kind: "new",
+          person: personValues("UpdNew"),
+          dlNumber: "D-APRT-UPD2",
+          rating: "rated",
+          sr22: false,
+        },
+      ],
+    })
+
+    expect(updated?.vehicles).toHaveLength(1)
+    expect(updated?.vehicles[0].vin).toBe("APRTVIN0000000102")
+    expect(updated?.policyDrivers).toHaveLength(1)
+    expect(updated?.policyDrivers[0].driver.person.firstName).toBe("UpdNew")
+
+    // The removed driver's underlying drivers/persons rows must survive.
+    const [survivingDriver] = await db.select().from(drivers).where(eq(drivers.id, removedDriverId))
+    expect(survivingDriver).toBeDefined()
+    const [survivingPerson] = await db.select().from(persons).where(eq(persons.id, keptPerson.id))
+    expect(survivingPerson).toBeDefined()
+  })
+
+  it("leaves vehicles and drivers untouched when their keys are omitted", async () => {
+    const original = await createAutoPolicyWithDetails({
+      ...policyValues(carrier.id, client.id, "UPD-OMIT"),
+      vehicles: [vehicleValues("APRTVIN0000000201")],
+    })
+    const vehicleId = original.vehicles[0].id
+
+    const updated = await updateAutoPolicyWithDetails(original.id, { status: "active" })
+
+    expect(updated?.status).toBe("active")
+    expect(updated?.vehicles).toHaveLength(1)
+    expect(updated?.vehicles[0].id).toBe(vehicleId)
+  })
+
+  it("clears vehicles and drivers when given an empty array", async () => {
+    const [person] = await db.insert(persons).values(personValues("UpdClear")).returning()
+    const original = await createAutoPolicyWithDetails({
+      ...policyValues(carrier.id, client.id, "UPD-CLEAR"),
+      vehicles: [vehicleValues("APRTVIN0000000301")],
+      drivers: [{ kind: "existing", personId: person.id, dlNumber: "D-APRT-CLR" }],
+    })
+
+    const updated = await updateAutoPolicyWithDetails(original.id, { vehicles: [], drivers: [] })
+
+    expect(updated?.vehicles).toHaveLength(0)
+    expect(updated?.policyDrivers).toHaveLength(0)
+
+    const [survivingPerson] = await db.select().from(persons).where(eq(persons.id, person.id))
+    expect(survivingPerson).toBeDefined()
+  })
+
+  it("rolls back the whole update when a driver spec is invalid", async () => {
+    const original = await createAutoPolicyWithDetails({
+      ...policyValues(carrier.id, client.id, "UPD-RB"),
+      vehicles: [vehicleValues("APRTVIN0000000401")],
+    })
+
+    await expect(
+      updateAutoPolicyWithDetails(original.id, {
+        vehicles: [vehicleValues("APRTVIN0000000402")],
+        drivers: [{ kind: "existing", personId: 999999999, dlNumber: "D-APRT-X" }],
+      })
+    ).rejects.toThrow(PolicyWriteError)
+
+    const detail = await updateAutoPolicyWithDetails(original.id, {})
+    expect(detail?.vehicles).toHaveLength(1)
+    expect(detail?.vehicles[0].vin).toBe("APRTVIN0000000401")
+    expect(detail?.policyDrivers).toHaveLength(0)
+  })
+
+  it("returns undefined for an unknown policy id", async () => {
+    const result = await updateAutoPolicyWithDetails(999999999, { status: "active" })
+    expect(result).toBeUndefined()
   })
 })

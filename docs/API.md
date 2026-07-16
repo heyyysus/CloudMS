@@ -73,7 +73,8 @@ unless noted.
   `{ id, clientId, email, createdAt }`), `policies` (array of bare
   AutoPolicy rows).
 - **AutoPolicy** (bare, e.g. from plain `GET /policies`): `id`, `clientId`,
-  `carrierId`, `policyNumber`, `policyAddress` (nullable), `effectiveDate`,
+  `carrierId`, `policyNumber`, `policyAddress1`, `policyAddress2`,
+  `policyCity`, `policyState`, `policyZip` (all nullable), `effectiveDate`,
   `expirationDate`, `status`, `createdAt`, `updatedAt`.
 - **Policy detail** (`GET /policies/:id`): the bare AutoPolicy fields
   **plus** `client` (bare Client), `carrier` (bare Carrier), `vehicles`
@@ -196,15 +197,37 @@ see [Response shapes](#response-shapes)):
 |---|---|---|---|
 | GET | `/policies` | any | `listAutoPolicies()`; `?clientId=` filters to one client; `?q=` searches instead |
 | GET | `/policies/:id` | any | `getPolicyWithDetails(id)` — includes `client`, `carrier`, `vehicles`, and `policyDrivers` (each with its `driver` and that driver's `person`); 404 if missing |
-| POST | `/policies` | any | body validated against `createPolicyBody` |
-| PATCH | `/policies/:id` | any | partial |
+| POST | `/policies` | any | body validated against `createPolicyBody`; may include nested `vehicles`/`drivers` (see below), created atomically with the policy |
+| PATCH | `/policies/:id` | any | partial; may include `vehicles`/`drivers` (replace-all, see below); the whole update — parent fields plus both child collections — runs in one transaction |
 | DELETE | `/policies/:id` | **admin** | vehicles and policy-driver links cascade automatically |
 
-Body fields: `clientId`, `carrierId`, `policyNumber` (unique), `policyAddress`
-(optional), `effectiveDate`, `expirationDate` (`YYYY-MM-DD`), `status`
+Body fields: `clientId`, `carrierId`, `policyNumber` (unique),
+`policyAddress1`, `policyAddress2`, `policyCity`, `policyState`, `policyZip`
+(all optional), `effectiveDate`, `expirationDate` (`YYYY-MM-DD`), `status`
 (optional; `pending`/`active`/`cancelled`/`expired`, default `pending`).
 
-Example response (`GET /policies/:id`):
+Both POST and PATCH additionally accept:
+
+- `vehicles` (optional array): vehicle objects as in the [Vehicles](#vehicles)
+  body fields, minus `policyId` (injected server-side).
+- `drivers` (optional array): each entry is either
+  `{ "kind": "existing", "personId": number, "dlNumber"?: string, "rating"?: "rated"|"excluded", "sr22"?: boolean }`
+  — reusing that person's `drivers` row if one already exists (in which case
+  `dlNumber`/`rating`/`sr22` are ignored), or requiring `dlNumber` if it
+  doesn't — or `{ "kind": "new", "person": {...Person body fields...}, "dlNumber": string, "rating"?: ..., "sr22"?: ... }`,
+  which creates the person and driver in the same transaction.
+
+**On PATCH, `vehicles`/`drivers` are replace-all, not diffed**: omitting the
+key leaves that collection untouched; `[]` deletes every row in it;
+`[...]` replaces the full set (so vehicle row ids change on every PATCH that
+includes `vehicles`). Removing a driver only deletes its `policy_drivers`
+link — the underlying `drivers`/`persons` rows are never deleted, since a
+person may be a client, an insured, or linked to another policy. The parent
+field update and both child replacements happen inside one transaction, so a
+validation failure (e.g. an unknown `personId`) rolls back the whole PATCH.
+
+Example response (`GET /policies/:id`, `POST /policies`, and
+`PATCH /policies/:id` all return this same detail shape):
 
 ```json
 {
@@ -212,7 +235,11 @@ Example response (`GET /policies/:id`):
   "clientId": 155,
   "carrierId": 140,
   "policyNumber": "SMOKE-POL-001",
-  "policyAddress": null,
+  "policyAddress1": null,
+  "policyAddress2": null,
+  "policyCity": null,
+  "policyState": null,
+  "policyZip": null,
   "effectiveDate": "2026-01-01",
   "expirationDate": "2027-01-01",
   "status": "pending",

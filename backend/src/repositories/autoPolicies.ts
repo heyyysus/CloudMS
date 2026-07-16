@@ -33,9 +33,9 @@ export async function createAutoPolicy(input: NewAutoPolicy): Promise<AutoPolicy
   return row
 }
 
-// Validation failures inside the nested-create transaction that the route
-// should surface as a 400 rather than a 500.
-export class PolicyCreateError extends Error {}
+// Validation failures inside the nested create/update transaction that the
+// route should surface as a 400 rather than a 500.
+export class PolicyWriteError extends Error {}
 
 export type CreatePolicyVehicleInput = Omit<
   NewVehicle,
@@ -63,10 +63,81 @@ export interface CreatePolicyInput extends NewAutoPolicy {
   drivers?: CreatePolicyDriverInput[]
 }
 
+export interface UpdatePolicyInput extends Partial<NewAutoPolicy> {
+  vehicles?: CreatePolicyVehicleInput[]
+  drivers?: CreatePolicyDriverInput[]
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+// Resolves each spec to a drivers.id (creating persons/drivers rows as
+// needed), dedupes, and inserts policy_drivers links for policyId. An
+// "existing" driver spec reuses the person's drivers row when one exists
+// (drivers.personId is unique); otherwise it creates one, which requires a
+// dlNumber. Shared by create and update so both stay atomic with the caller's
+// transaction.
+async function linkPolicyDrivers(
+  tx: Tx,
+  policyId: number,
+  specs: CreatePolicyDriverInput[]
+): Promise<void> {
+  const linkedDriverIds = new Set<number>()
+  for (const spec of specs) {
+    let driverId: number
+    if (spec.kind === "existing") {
+      const [person] = await tx
+        .select({ id: persons.id })
+        .from(persons)
+        .where(eq(persons.id, spec.personId))
+      if (!person) {
+        throw new PolicyWriteError(`Person ${spec.personId} not found`)
+      }
+      const [existingDriver] = await tx
+        .select({ id: drivers.id })
+        .from(drivers)
+        .where(eq(drivers.personId, spec.personId))
+      if (existingDriver) {
+        driverId = existingDriver.id
+      } else {
+        if (!spec.dlNumber) {
+          throw new PolicyWriteError(
+            `dlNumber is required for person ${spec.personId}, who is not yet a driver`
+          )
+        }
+        const [created] = await tx
+          .insert(drivers)
+          .values({
+            personId: spec.personId,
+            dlNumber: spec.dlNumber,
+            rating: spec.rating,
+            sr22: spec.sr22,
+          })
+          .returning({ id: drivers.id })
+        driverId = created.id
+      }
+    } else {
+      const [person] = await tx.insert(persons).values(spec.person).returning({ id: persons.id })
+      const [created] = await tx
+        .insert(drivers)
+        .values({
+          personId: person.id,
+          dlNumber: spec.dlNumber,
+          rating: spec.rating,
+          sr22: spec.sr22,
+        })
+        .returning({ id: drivers.id })
+      driverId = created.id
+    }
+
+    if (!linkedDriverIds.has(driverId)) {
+      linkedDriverIds.add(driverId)
+      await tx.insert(policyDrivers).values({ policyId, driverId })
+    }
+  }
+}
+
 // Creates the policy plus its vehicles and drivers in one transaction, so a
-// failure anywhere leaves no partial policy behind. An "existing" driver spec
-// reuses the person's drivers row when one exists (drivers.personId is
-// unique); otherwise it creates one, which requires a dlNumber.
+// failure anywhere leaves no partial policy behind.
 export async function createAutoPolicyWithDetails(input: CreatePolicyInput) {
   const { vehicles: vehicleInputs, drivers: driverInputs, ...policyFields } = input
 
@@ -79,59 +150,7 @@ export async function createAutoPolicyWithDetails(input: CreatePolicyInput) {
         .values(vehicleInputs.map((vehicle) => ({ ...vehicle, policyId: policy.id })))
     }
 
-    const linkedDriverIds = new Set<number>()
-    for (const spec of driverInputs ?? []) {
-      let driverId: number
-      if (spec.kind === "existing") {
-        const [person] = await tx
-          .select({ id: persons.id })
-          .from(persons)
-          .where(eq(persons.id, spec.personId))
-        if (!person) {
-          throw new PolicyCreateError(`Person ${spec.personId} not found`)
-        }
-        const [existingDriver] = await tx
-          .select({ id: drivers.id })
-          .from(drivers)
-          .where(eq(drivers.personId, spec.personId))
-        if (existingDriver) {
-          driverId = existingDriver.id
-        } else {
-          if (!spec.dlNumber) {
-            throw new PolicyCreateError(
-              `dlNumber is required for person ${spec.personId}, who is not yet a driver`
-            )
-          }
-          const [created] = await tx
-            .insert(drivers)
-            .values({
-              personId: spec.personId,
-              dlNumber: spec.dlNumber,
-              rating: spec.rating,
-              sr22: spec.sr22,
-            })
-            .returning({ id: drivers.id })
-          driverId = created.id
-        }
-      } else {
-        const [person] = await tx.insert(persons).values(spec.person).returning({ id: persons.id })
-        const [created] = await tx
-          .insert(drivers)
-          .values({
-            personId: person.id,
-            dlNumber: spec.dlNumber,
-            rating: spec.rating,
-            sr22: spec.sr22,
-          })
-          .returning({ id: drivers.id })
-        driverId = created.id
-      }
-
-      if (!linkedDriverIds.has(driverId)) {
-        linkedDriverIds.add(driverId)
-        await tx.insert(policyDrivers).values({ policyId: policy.id, driverId })
-      }
-    }
+    await linkPolicyDrivers(tx, policy.id, driverInputs ?? [])
 
     return policy.id
   })
@@ -151,6 +170,46 @@ export async function updateAutoPolicy(
     .where(eq(autoPolicies.id, id))
     .returning()
   return row
+}
+
+// Updates the policy row plus (when the keys are present) full-replaces its
+// vehicles and policy_drivers links, all in one transaction. `vehicles` /
+// `drivers` absent leaves that collection untouched; [] clears it; [...]
+// replaces it (vehicle row ids change; removed drivers are unlinked, never
+// deleted, since a person/driver may be linked elsewhere). Returns undefined
+// when no policy has that id.
+export async function updateAutoPolicyWithDetails(id: number, input: UpdatePolicyInput) {
+  const { vehicles: vehicleInputs, drivers: driverInputs, ...policyFields } = input
+
+  const found = await db.transaction(async (tx) => {
+    const [policy] = await tx
+      .update(autoPolicies)
+      .set({ ...policyFields, updatedAt: new Date() })
+      .where(eq(autoPolicies.id, id))
+      .returning({ id: autoPolicies.id })
+    if (!policy) return false
+
+    if (vehicleInputs !== undefined) {
+      await tx.delete(vehicles).where(eq(vehicles.policyId, id))
+      if (vehicleInputs.length > 0) {
+        await tx
+          .insert(vehicles)
+          .values(vehicleInputs.map((vehicle) => ({ ...vehicle, policyId: id })))
+      }
+    }
+
+    if (driverInputs !== undefined) {
+      await tx.delete(policyDrivers).where(eq(policyDrivers.policyId, id))
+      await linkPolicyDrivers(tx, id, driverInputs)
+    }
+
+    return true
+  })
+
+  if (!found) return undefined
+  const detail = await getPolicyWithDetails(id)
+  if (!detail) throw new Error(`Policy ${id} missing after update`)
+  return detail
 }
 
 export async function deleteAutoPolicy(id: number): Promise<boolean> {

@@ -232,8 +232,8 @@ describe("PATCH /policies/:id", () => {
     expect(res.status).toBe(409)
   })
 
-  it("returns 400 when an existing driver spec is missing a required dlNumber", async () => {
-    const user = await ctx.user("policies-update-baddriver")
+  it("allows adding a driver without a dlNumber", async () => {
+    const user = await ctx.user("policies-update-nodl")
     const cookie = await makeSessionCookie(user.id)
     const policy = await ctx.policy()
     const person = await ctx.person()
@@ -242,6 +242,20 @@ describe("PATCH /policies/:id", () => {
       .patch(`/policies/${policy.id}`)
       .set("Cookie", cookie)
       .send({ drivers: [{ kind: "existing", personId: person.id }] })
+    expect(res.status).toBe(200)
+    expect(res.body.policyDrivers).toHaveLength(1)
+    expect(res.body.policyDrivers[0].driver.dlNumber).toBeNull()
+  })
+
+  it("returns 400 when an existing driver spec references an unknown person", async () => {
+    const user = await ctx.user("policies-update-baddriver")
+    const cookie = await makeSessionCookie(user.id)
+    const policy = await ctx.policy()
+
+    const res = await request(app)
+      .patch(`/policies/${policy.id}`)
+      .set("Cookie", cookie)
+      .send({ drivers: [{ kind: "existing", personId: 999999999 }] })
     expect(res.status).toBe(400)
   })
 

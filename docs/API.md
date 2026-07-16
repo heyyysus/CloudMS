@@ -213,9 +213,12 @@ Both POST and PATCH additionally accept:
 - `drivers` (optional array): each entry is either
   `{ "kind": "existing", "personId": number, "dlNumber"?: string, "rating"?: "rated"|"excluded", "sr22"?: boolean }`
   — reusing that person's `drivers` row if one already exists (in which case
-  `dlNumber`/`rating`/`sr22` are ignored), or requiring `dlNumber` if it
-  doesn't — or `{ "kind": "new", "person": {...Person body fields...}, "dlNumber": string, "rating"?: ..., "sr22"?: ... }`,
-  which creates the person and driver in the same transaction.
+  `dlNumber`/`rating`/`sr22` are ignored) — or
+  `{ "kind": "new", "person": {...Person body fields...}, "dlNumber"?: string, "rating"?: ..., "sr22"?: ... }`,
+  which creates the person and driver in the same transaction. `dlNumber` is
+  optional on both branches: an agency may not have a driver's license
+  number yet (e.g. a prospect client), so a `drivers` row can be created or
+  reused without one.
 
 **On PATCH, `vehicles`/`drivers` are replace-all, not diffed**: omitting the
 key leaves that collection untouched; `[]` deletes every row in it;

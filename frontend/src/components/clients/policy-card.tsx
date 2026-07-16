@@ -1,4 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import type { ReactNode } from 'react'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
@@ -39,20 +40,22 @@ interface PolicyCardProps {
   detail?: PolicyDetail
   isLoading?: boolean
   isError?: boolean
+  action?: ReactNode
 }
 
-export function PolicyCard({ policy, detail, isLoading, isError }: PolicyCardProps) {
+export function PolicyCard({ policy, detail, isLoading, isError, action }: PolicyCardProps) {
   const status = displayStatus(policy)
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between text-base">
+        <CardTitle className="flex flex-col text-base">
           <span>{policy.policyNumber}</span>
           <span className={cn('text-xs font-normal capitalize', STATUS_TEXT_CLASS[status])}>
             {status}
           </span>
         </CardTitle>
+        {action && <CardAction>{action}</CardAction>}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <div className="grid gap-4 sm:grid-cols-3 text-sm">

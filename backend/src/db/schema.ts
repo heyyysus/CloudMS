@@ -98,7 +98,7 @@ export const drivers = pgTable("drivers", {
     .notNull()
     .unique()
     .references(() => persons.id, { onDelete: "cascade" }),
-  dlNumber: varchar("dl_number", { length: 50 }).notNull(),
+  dlNumber: varchar("dl_number", { length: 50 }),
   rating: driverRatingEnum("rating").notNull().default("rated"),
   sr22: boolean("sr22").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),

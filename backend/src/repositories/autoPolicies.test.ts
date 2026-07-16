@@ -109,21 +109,16 @@ describe("createAutoPolicyWithDetails", () => {
     expect(detail.policyDrivers[0].driver.sr22).toBe(true)
   })
 
-  it("requires dlNumber for an existing person without a drivers row", async () => {
+  it("creates a drivers row without a dlNumber for a person that has none yet", async () => {
     const [person] = await db.insert(persons).values(personValues("NoDriverRow")).returning()
 
-    await expect(
-      createAutoPolicyWithDetails({
-        ...policyValues(carrier.id, client.id, "NODL"),
-        drivers: [{ kind: "existing", personId: person.id }],
-      })
-    ).rejects.toThrow(PolicyWriteError)
+    const detail = await createAutoPolicyWithDetails({
+      ...policyValues(carrier.id, client.id, "NODL"),
+      drivers: [{ kind: "existing", personId: person.id }],
+    })
 
-    const orphaned = await db
-      .select()
-      .from(autoPolicies)
-      .where(eq(autoPolicies.policyNumber, `${POLICY_PREFIX}NODL`))
-    expect(orphaned).toHaveLength(0)
+    expect(detail.policyDrivers).toHaveLength(1)
+    expect(detail.policyDrivers[0].driver.dlNumber).toBeNull()
   })
 
   it("rejects an existing driver spec for a person that does not exist", async () => {

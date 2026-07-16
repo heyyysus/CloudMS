@@ -53,7 +53,7 @@ export type CreatePolicyDriverInput =
   | {
       kind: "new"
       person: Omit<NewPerson, "id" | "createdAt" | "updatedAt">
-      dlNumber: string
+      dlNumber?: string
       rating: DriverRating
       sr22: boolean
     }
@@ -73,8 +73,9 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 // Resolves each spec to a drivers.id (creating persons/drivers rows as
 // needed), dedupes, and inserts policy_drivers links for policyId. An
 // "existing" driver spec reuses the person's drivers row when one exists
-// (drivers.personId is unique); otherwise it creates one, which requires a
-// dlNumber. Shared by create and update so both stay atomic with the caller's
+// (drivers.personId is unique); otherwise it creates one. dlNumber is
+// optional throughout — an agency may not have it yet (e.g. a prospect
+// client). Shared by create and update so both stay atomic with the caller's
 // transaction.
 async function linkPolicyDrivers(
   tx: Tx,
@@ -99,11 +100,6 @@ async function linkPolicyDrivers(
       if (existingDriver) {
         driverId = existingDriver.id
       } else {
-        if (!spec.dlNumber) {
-          throw new PolicyWriteError(
-            `dlNumber is required for person ${spec.personId}, who is not yet a driver`
-          )
-        }
         const [created] = await tx
           .insert(drivers)
           .values({

@@ -68,11 +68,12 @@ export const createPolicyVehicle = insertVehicleSchema.omit({
   policyId: true,
 })
 
+// dlNumber is optional on both branches — an agency may not have it yet
+// (e.g. a prospect client), so drivers can be recorded without one.
 export const createPolicyDriver = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("existing"),
     personId: z.number().int().positive(),
-    // required only when the person has no drivers row yet (enforced in the repo)
     dlNumber: z.string().trim().min(1).max(50).optional(),
     rating: z.enum(driverRatingEnum.enumValues).optional(),
     sr22: z.boolean().optional(),
@@ -80,7 +81,7 @@ export const createPolicyDriver = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("new"),
     person: createPersonBody,
-    dlNumber: z.string().trim().min(1).max(50),
+    dlNumber: z.string().trim().min(1).max(50).optional(),
     rating: z.enum(driverRatingEnum.enumValues).default("rated"),
     sr22: z.boolean().default(false),
   }),

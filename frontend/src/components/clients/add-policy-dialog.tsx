@@ -86,7 +86,8 @@ const addPolicySchema = z
     status: z.enum(['pending', 'active', 'cancelled', 'expired']),
     policyAddress: addressFormSchema,
     effectiveDate: z.iso.date('Enter a valid date'),
-    term: z.enum(['1', '6', '12']),
+    // '' = the policy's dates don't span a standard term (edit mode only)
+    term: z.enum(['1', '6', '12']).or(z.literal('')),
     expirationDate: z.iso.date('Enter a valid date'),
     defaultCoverages: z.object({
       bi: z.string(),
@@ -188,6 +189,14 @@ function addMonths(isoDate: string, months: number): string {
   return `${targetYear}-${pad(targetMonth + 1)}-${pad(Math.min(day, daysInTarget))}`
 }
 
+// '' when the dates don't span exactly one of the standard terms.
+function deriveTerm(effectiveDate: string, expirationDate: string): '1' | '6' | '12' | '' {
+  for (const term of ['1', '6', '12'] as const) {
+    if (addMonths(effectiveDate, Number(term)) === expirationDate) return term
+  }
+  return ''
+}
+
 const DEFAULT_TERM = '6'
 
 export type ClientAddressFields = Pick<
@@ -232,7 +241,7 @@ function toFormValues({ client, existingDrivers, initial }: ToFormValuesArgs): A
     status: initial?.status ?? 'pending',
     policyAddress: toAddressFormValues(defaultPolicyAddress(client, initial)),
     effectiveDate,
-    term: DEFAULT_TERM,
+    term: initial ? deriveTerm(effectiveDate, initial.expirationDate) : DEFAULT_TERM,
     expirationDate: initial?.expirationDate ?? addMonths(effectiveDate, Number(DEFAULT_TERM)),
     defaultCoverages: {
       bi: firstVehicle?.coverageBi ?? '',
@@ -395,7 +404,7 @@ export function AddPolicyForm({
   const watchedExistingDrivers = watch('existingDrivers')
 
   const syncExpiration = (effectiveDate: string, term: string) => {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
+    if (term !== '' && /^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
       setValue('expirationDate', addMonths(effectiveDate, Number(term)))
     }
   }
@@ -467,7 +476,7 @@ export function AddPolicyForm({
                   }}
                 >
                   <SelectTrigger id="add-policy-term">
-                    <SelectValue />
+                    <SelectValue placeholder="—" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="1">1 month</SelectItem>

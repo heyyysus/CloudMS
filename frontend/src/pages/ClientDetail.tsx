@@ -9,6 +9,7 @@ import {
   AddPolicyDialog,
   type ExistingDriverOption,
 } from '@/components/clients/add-policy-dialog'
+import { EditPolicyDialog } from '@/components/clients/edit-policy-dialog'
 import { PolicyCard } from '@/components/clients/policy-card'
 import { PolicyTabs } from '@/components/clients/policy-tabs'
 import { useClientTabs } from '@/components/layout/client-tabs'
@@ -179,6 +180,16 @@ function ClientDetail() {
                   detail={query?.data}
                   isLoading={query?.isPending}
                   isError={query?.isError}
+                  action={
+                    query?.data && (
+                      <EditPolicyDialog
+                        client={client}
+                        policy={query.data}
+                        existingVehicles={existingVehicles}
+                        existingDrivers={existingDrivers}
+                      />
+                    )
+                  }
                 />
               )
             }}

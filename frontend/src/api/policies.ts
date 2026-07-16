@@ -138,3 +138,11 @@ export interface CreatePolicyBody {
 export function createPolicy(body: CreatePolicyBody): Promise<PolicyDetail> {
   return request('/policies', { method: 'POST', body: JSON.stringify(body) })
 }
+
+// PATCH semantics: omitted fields are left unchanged; `vehicles`/`drivers`
+// are replace-all when present ([] clears, [...] replaces atomically).
+export type UpdatePolicyBody = Partial<CreatePolicyBody>
+
+export function updatePolicy(id: number, body: UpdatePolicyBody): Promise<PolicyDetail> {
+  return request(`/policies/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
+}

@@ -29,11 +29,10 @@ async function main() {
   await db.delete(carriers)
 
   // Login is invite-only, so at least one user must exist before anyone can sign in.
-  await db.insert(users).values({
-    email: "jesus.velarde07@gmail.com",
-    name: "Jesus Velarde",
-    role: "admin",
-  })
+  const adminEmail = process.env.ADMIN_EMAIL
+  if (adminEmail) {
+    await db.insert(users).values({ email: adminEmail.toLowerCase(), role: "admin" })
+  }
 
   const [carrier] = await db
     .insert(carriers)

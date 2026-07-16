@@ -39,7 +39,7 @@ services:
       - postgres_data:/var/lib/postgresql
     restart: always
     ports:
-      - "5433:5432" 
+      - "127.0.0.1:5433:5432"
 
   redis:
     image: redis:8.8

@@ -6,9 +6,11 @@ import { generateSessionToken, hashToken } from "../auth/tokens"
 import { db } from "../db"
 import { autoPolicies, carriers, clients, persons, users, vehicles } from "../db/schema"
 import {
+  addDriverToPolicy,
   createAutoPolicy,
   createCarrier,
   createClient,
+  createDriver,
   createPerson,
   createSession,
   createUser,
@@ -138,6 +140,16 @@ export class TestContext {
     })
     this.vehicleIds.push(v.id)
     return v
+  }
+
+  // Creates a person + drivers row and links it to policyId. Driver rows
+  // cascade-delete with their person, and policy_drivers links cascade-delete
+  // with either side, so tracking the person is enough for cleanup.
+  async driverLink(policyId: number, overrides: Partial<NewPerson> = {}) {
+    const person = await this.person(overrides)
+    const driver = await createDriver({ personId: person.id, dlNumber: unique("DL") })
+    await addDriverToPolicy(policyId, driver.id)
+    return { person, driver }
   }
 
   // Registers a row created some other way (e.g. through an API call under

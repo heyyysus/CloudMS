@@ -6,14 +6,36 @@ import {
   getPolicyWithDetails,
   listAutoPolicies,
   listAutoPoliciesByClientId,
-  PolicyCreateError,
+  PolicyWriteError,
   searchPolicies,
-  updateAutoPolicy,
+  updateAutoPolicyWithDetails,
 } from "../repositories"
 import { firstIssue, isPgForeignKeyViolation, isPgUniqueViolation, parseId } from "./helpers"
 import { createPolicyBody, idParam, searchQuery, updatePolicyBody } from "./schemas"
 
 export const policiesRouter = Router()
+
+// Maps known write errors from create/update to a response; returns false
+// when unrecognized so the caller can rethrow to the 500 handler.
+function handlePolicyWriteError(err: unknown, res: Response): boolean {
+  if (err instanceof PolicyWriteError) {
+    res.status(400).json({ error: err.message })
+    return true
+  }
+  if (isPgUniqueViolation(err, "auto_policies_policy_number_unique")) {
+    res.status(409).json({ error: "Policy number already exists" })
+    return true
+  }
+  if (isPgUniqueViolation(err, "vehicles_policy_id_vin_unique")) {
+    res.status(409).json({ error: "Duplicate VIN on this policy" })
+    return true
+  }
+  if (isPgForeignKeyViolation(err)) {
+    res.status(400).json({ error: "Invalid client or carrier" })
+    return true
+  }
+  return false
+}
 
 policiesRouter.get("/policies", requireAuth, async (req: Request, res: Response) => {
   if (typeof req.query.q === "string" && req.query.q.length > 0) {
@@ -61,23 +83,7 @@ policiesRouter.post("/policies", requireAuth, async (req: Request, res: Response
   try {
     res.status(201).json(await createAutoPolicyWithDetails(parsed.data))
   } catch (err) {
-    if (err instanceof PolicyCreateError) {
-      res.status(400).json({ error: err.message })
-      return
-    }
-    if (isPgUniqueViolation(err, "auto_policies_policy_number_unique")) {
-      res.status(409).json({ error: "Policy number already exists" })
-      return
-    }
-    if (isPgUniqueViolation(err, "vehicles_policy_id_vin_unique")) {
-      res.status(409).json({ error: "Duplicate VIN on this policy" })
-      return
-    }
-    if (isPgForeignKeyViolation(err)) {
-      res.status(400).json({ error: "Invalid client or carrier" })
-      return
-    }
-    throw err
+    if (!handlePolicyWriteError(err, res)) throw err
   }
 })
 
@@ -91,12 +97,16 @@ policiesRouter.patch("/policies/:id", requireAuth, async (req: Request, res: Res
     return
   }
 
-  const policy = await updateAutoPolicy(id, parsed.data)
-  if (!policy) {
-    res.status(404).json({ error: "Policy not found" })
-    return
+  try {
+    const policy = await updateAutoPolicyWithDetails(id, parsed.data)
+    if (!policy) {
+      res.status(404).json({ error: "Policy not found" })
+      return
+    }
+    res.json(policy)
+  } catch (err) {
+    if (!handlePolicyWriteError(err, res)) throw err
   }
-  res.json(policy)
 })
 
 policiesRouter.delete(

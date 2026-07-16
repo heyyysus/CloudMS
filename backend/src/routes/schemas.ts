@@ -86,37 +86,53 @@ export const createPolicyDriver = z.discriminatedUnion("kind", [
   }),
 ])
 
+const policyChildren = {
+  vehicles: z.array(createPolicyVehicle).optional(),
+  drivers: z.array(createPolicyDriver).optional(),
+}
+
+function checkPolicyChildren(
+  body: {
+    vehicles?: z.infer<typeof createPolicyVehicle>[]
+    drivers?: z.infer<typeof createPolicyDriver>[]
+  },
+  ctx: z.RefinementCtx
+) {
+  const vins = new Set<string>()
+  body.vehicles?.forEach((vehicle, i) => {
+    if (vins.has(vehicle.vin)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["vehicles", i, "vin"],
+        message: `Duplicate VIN in payload: ${vehicle.vin}`,
+      })
+    }
+    vins.add(vehicle.vin)
+  })
+  const personIds = new Set<number>()
+  body.drivers?.forEach((driver, i) => {
+    if (driver.kind !== "existing") return
+    if (personIds.has(driver.personId)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["drivers", i, "personId"],
+        message: `Duplicate driver personId in payload: ${driver.personId}`,
+      })
+    }
+    personIds.add(driver.personId)
+  })
+}
+
 export const createPolicyBody = policyCoreBody
-  .extend({
-    vehicles: z.array(createPolicyVehicle).optional(),
-    drivers: z.array(createPolicyDriver).optional(),
-  })
-  .superRefine((body, ctx) => {
-    const vins = new Set<string>()
-    body.vehicles?.forEach((vehicle, i) => {
-      if (vins.has(vehicle.vin)) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["vehicles", i, "vin"],
-          message: `Duplicate VIN in payload: ${vehicle.vin}`,
-        })
-      }
-      vins.add(vehicle.vin)
-    })
-    const personIds = new Set<number>()
-    body.drivers?.forEach((driver, i) => {
-      if (driver.kind !== "existing") return
-      if (personIds.has(driver.personId)) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["drivers", i, "personId"],
-          message: `Duplicate driver personId in payload: ${driver.personId}`,
-        })
-      }
-      personIds.add(driver.personId)
-    })
-  })
-export const updatePolicyBody = policyCoreBody.partial()
+  .extend(policyChildren)
+  .superRefine(checkPolicyChildren)
+
+// Partial like other update bodies, but vehicles/drivers are replace-all: key
+// absent leaves that collection untouched, [] clears it, [...] replaces it.
+export const updatePolicyBody = policyCoreBody
+  .partial()
+  .extend(policyChildren)
+  .superRefine(checkPolicyChildren)
 
 export const createVehicleBody = insertVehicleSchema.omit(omitMeta)
 export const updateVehicleBody = createVehicleBody.partial()

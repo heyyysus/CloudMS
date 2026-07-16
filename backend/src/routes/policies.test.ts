@@ -108,7 +108,7 @@ describe("POST /policies", () => {
 })
 
 describe("PATCH /policies/:id", () => {
-  it("updates a policy", async () => {
+  it("updates a scalar field and returns the detail shape", async () => {
     const user = await ctx.user("policies-update")
     const cookie = await makeSessionCookie(user.id)
     const policy = await ctx.policy({ status: "pending" })
@@ -119,6 +119,141 @@ describe("PATCH /policies/:id", () => {
       .send({ status: "active" })
     expect(res.status).toBe(200)
     expect(res.body.status).toBe("active")
+    expect(res.body.client.id).toBe(policy.clientId)
+    expect(res.body.carrier.id).toBe(policy.carrierId)
+    expect(res.body.vehicles).toEqual([])
+  })
+
+  it("replaces vehicles and drivers when both keys are present", async () => {
+    const user = await ctx.user("policies-update-nested")
+    const cookie = await makeSessionCookie(user.id)
+    const policy = await ctx.policy()
+    await ctx.vehicle({ policyId: policy.id })
+    const person = await ctx.person()
+
+    const res = await request(app)
+      .patch(`/policies/${policy.id}`)
+      .set("Cookie", cookie)
+      .send({
+        vehicles: [
+          {
+            vin: "PATCHVIN00000001",
+            make: "Ford",
+            model: "Focus",
+            year: 2019,
+            garagingZip: "10001",
+          },
+        ],
+        drivers: [{ kind: "existing", personId: person.id, dlNumber: "PATCH-DL-1" }],
+      })
+
+    expect(res.status).toBe(200)
+    expect(res.body.vehicles).toHaveLength(1)
+    expect(res.body.vehicles[0].vin).toBe("PATCHVIN00000001")
+    expect(res.body.policyDrivers).toHaveLength(1)
+    expect(res.body.policyDrivers[0].driver.person.id).toBe(person.id)
+  })
+
+  it("clears vehicles and drivers when given empty arrays, without deleting the underlying person", async () => {
+    const user = await ctx.user("policies-update-clear")
+    const cookie = await makeSessionCookie(user.id)
+    const policy = await ctx.policy()
+    await ctx.vehicle({ policyId: policy.id })
+    const { person } = await ctx.driverLink(policy.id)
+
+    const res = await request(app)
+      .patch(`/policies/${policy.id}`)
+      .set("Cookie", cookie)
+      .send({ vehicles: [], drivers: [] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.vehicles).toHaveLength(0)
+    expect(res.body.policyDrivers).toHaveLength(0)
+
+    const personCheck = await request(app).get(`/persons/${person.id}`).set("Cookie", cookie)
+    expect(personCheck.status).toBe(200)
+  })
+
+  it("leaves vehicles untouched when the key is omitted", async () => {
+    const user = await ctx.user("policies-update-omit")
+    const cookie = await makeSessionCookie(user.id)
+    const policy = await ctx.policy()
+    const vehicle = await ctx.vehicle({ policyId: policy.id })
+
+    const res = await request(app)
+      .patch(`/policies/${policy.id}`)
+      .set("Cookie", cookie)
+      .send({ status: "active" })
+
+    expect(res.status).toBe(200)
+    expect(res.body.vehicles).toHaveLength(1)
+    expect(res.body.vehicles[0].id).toBe(vehicle.id)
+  })
+
+  it("returns 400 for a duplicate VIN within the payload", async () => {
+    const user = await ctx.user("policies-update-dupvin")
+    const cookie = await makeSessionCookie(user.id)
+    const policy = await ctx.policy()
+
+    const res = await request(app)
+      .patch(`/policies/${policy.id}`)
+      .set("Cookie", cookie)
+      .send({
+        vehicles: [
+          {
+            vin: "PATCHVIN00000002",
+            make: "Ford",
+            model: "Focus",
+            year: 2019,
+            garagingZip: "10001",
+          },
+          {
+            vin: "PATCHVIN00000002",
+            make: "Ford",
+            model: "Focus",
+            year: 2019,
+            garagingZip: "10001",
+          },
+        ],
+      })
+    expect(res.status).toBe(400)
+  })
+
+  it("returns 409 when patched policyNumber collides with another policy", async () => {
+    const user = await ctx.user("policies-update-dupnum")
+    const cookie = await makeSessionCookie(user.id)
+    const existing = await ctx.policy()
+    const policy = await ctx.policy()
+
+    const res = await request(app)
+      .patch(`/policies/${policy.id}`)
+      .set("Cookie", cookie)
+      .send({ policyNumber: existing.policyNumber })
+    expect(res.status).toBe(409)
+  })
+
+  it("returns 400 when an existing driver spec is missing a required dlNumber", async () => {
+    const user = await ctx.user("policies-update-baddriver")
+    const cookie = await makeSessionCookie(user.id)
+    const policy = await ctx.policy()
+    const person = await ctx.person()
+
+    const res = await request(app)
+      .patch(`/policies/${policy.id}`)
+      .set("Cookie", cookie)
+      .send({ drivers: [{ kind: "existing", personId: person.id }] })
+    expect(res.status).toBe(400)
+  })
+
+  it("returns 404 for an unknown id", async () => {
+    const user = await ctx.user("policies-update-404")
+    const cookie = await makeSessionCookie(user.id)
+
+    const res = await request(app)
+      .patch("/policies/999999999")
+      .set("Cookie", cookie)
+      .send({ status: "active" })
+    expect(res.status).toBe(404)
   })
 })
 

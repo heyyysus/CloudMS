@@ -65,6 +65,7 @@ type Story = StoryObj<typeof meta>
 export const OpensAndPrefills: Story = {
   args: {
     updateClientFn: fn(async () => savedFixture),
+    updatePersonFn: fn(async () => fixture.namedInsured),
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
@@ -80,6 +81,7 @@ export const OpensAndPrefills: Story = {
 export const SubmitSavesAndCloses: Story = {
   args: {
     updateClientFn: fn(async () => savedFixture),
+    updatePersonFn: fn(async () => fixture.namedInsured),
   },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement)
@@ -88,6 +90,10 @@ export const SubmitSavesAndCloses: Story = {
 
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
+    await expect(args.updatePersonFn).toHaveBeenCalledWith(
+      229,
+      expect.objectContaining({ firstName: 'Jane', lastName: 'Doe', relationToInsured: 'self' })
+    )
     await expect(args.updateClientFn).toHaveBeenCalledWith(
       155,
       expect.objectContaining({ phones: ['555-867-5309'], emails: ['jane@example.com'] })
@@ -101,6 +107,7 @@ export const ServerError: Story = {
     updateClientFn: fn(async () => {
       throw new ApiError(400, 'Invalid email')
     }),
+    updatePersonFn: fn(async () => fixture.namedInsured),
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)

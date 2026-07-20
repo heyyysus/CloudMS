@@ -11,7 +11,8 @@ import { ClientTabsProvider, useClientTabs } from './client-tabs'
 import { useSearchShortcut } from '@/hooks/use-search-shortcut'
 import { SearchPalette } from '@/components/search/search-palette'
 import { SearchTriggerButton } from '@/components/search/search-trigger-button'
-import { clientDisplayName } from '@/api/clients'
+import { AddClientDialog } from '@/components/clients/add-client-dialog'
+import { clientDisplayName, type ClientDetail } from '@/api/clients'
 import type { SearchClientResult, SearchPolicyResult } from '@/api/search'
 
 export function AppLayout() {
@@ -40,6 +41,11 @@ function AppLayoutInner() {
     navigate(`/clients/${policy.clientId}`)
   }
 
+  function handleClientCreated(client: ClientDetail) {
+    openTab({ id: client.id, label: clientDisplayName(client) })
+    navigate(`/clients/${client.id}`)
+  }
+
   return (
     <TooltipProvider>
       <SidebarProvider>
@@ -49,6 +55,7 @@ function AppLayoutInner() {
             <SidebarTrigger />
             <Separator orientation="vertical" className="h-4" />
             <SearchTriggerButton onClick={() => setSearchOpen(true)} />
+            <AddClientDialog onCreated={handleClientCreated} />
             <div className="ml-auto flex items-center gap-1">
               <ThemeToggle />
               {user && <UserMenu user={user} />}

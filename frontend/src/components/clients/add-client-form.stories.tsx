@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, userEvent, within } from 'storybook/test'
-import { EditClientForm } from './edit-client-dialog'
+import { AddClientForm } from './add-client-dialog'
 import type { ClientDetail } from '@/api/clients'
 
 const fixture: Omit<ClientDetail, 'policies'> = {
@@ -36,44 +36,62 @@ const fixture: Omit<ClientDetail, 'policies'> = {
 }
 
 const meta = {
-  title: 'clients/EditClientForm',
-  component: EditClientForm,
+  title: 'clients/AddClientForm',
+  component: AddClientForm,
   tags: ['autodocs'],
   args: {
-    client: fixture,
     onSubmit: fn(),
   },
-} satisfies Meta<typeof EditClientForm>
+} satisfies Meta<typeof AddClientForm>
 
 export default meta
 type Story = StoryObj<typeof meta>
 
-export const Default: Story = {
+export const CreateMode: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
+    await expect(canvas.getByLabelText(/first name/i)).toHaveValue('')
+    await expect(canvas.getByLabelText(/last name/i)).toHaveValue('')
+    await expect(canvas.getByRole('button', { name: /^create client$/i })).toBeInTheDocument()
+    await expect(canvas.queryByLabelText(/phone 1/i)).not.toBeInTheDocument()
+  },
+}
+
+export const EditModePrefills: Story = {
+  args: {
+    initial: fixture,
+    submitLabel: 'Save',
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByLabelText(/first name/i)).toHaveValue('Jane')
+    await expect(canvas.getByLabelText(/last name/i)).toHaveValue('Doe')
+    await expect(canvas.getByLabelText(/date of birth/i)).toHaveValue('1987-07-22')
     const mailingGroup = within(canvas.getByRole('group', { name: /mailing address/i }))
     await expect(mailingGroup.getByLabelText(/address line 1/i)).toHaveValue(
       fixture.mailingAddress1
     )
     await expect(canvas.getByLabelText(/phone 1/i)).toHaveValue('555-867-5309')
     await expect(canvas.getByLabelText(/email 1/i)).toHaveValue('jane@example.com')
+    await expect(canvas.getByRole('button', { name: /^save$/i })).toBeInTheDocument()
   },
 }
 
 export const ValidationErrors: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement)
-    await userEvent.clear(canvas.getByLabelText(/phone 1/i))
-    await userEvent.clear(canvas.getByLabelText(/email 1/i))
-    await userEvent.type(canvas.getByLabelText(/email 1/i), 'not-an-email')
-    await userEvent.click(canvas.getByRole('button', { name: /^save$/i }))
-    await expect(await canvas.findByText(/phone number is required/i)).toBeInTheDocument()
-    await expect(await canvas.findByText(/enter a valid email address/i)).toBeInTheDocument()
+    await userEvent.click(canvas.getByRole('button', { name: /^create client$/i }))
+    await expect(await canvas.findByText(/first name is required/i)).toBeInTheDocument()
+    await expect(await canvas.findByText(/last name is required/i)).toBeInTheDocument()
+    await expect(await canvas.findByText(/enter a valid date/i)).toBeInTheDocument()
     await expect(args.onSubmit).not.toHaveBeenCalled()
   },
 }
 
 export const AddAndRemoveRows: Story = {
+  args: {
+    initial: fixture,
+  },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     await userEvent.click(canvas.getByRole('button', { name: /add phone/i }))
@@ -87,26 +105,34 @@ export const AddAndRemoveRows: Story = {
 export const SubmitTransformsValues: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement)
-    const mailingGroup = within(canvas.getByRole('group', { name: /mailing address/i }))
-    const physicalGroup = within(canvas.getByRole('group', { name: /physical address/i }))
-    await userEvent.clear(mailingGroup.getByLabelText(/address line 1/i))
-    await userEvent.clear(physicalGroup.getByLabelText(/address line 1/i))
-    await userEvent.type(physicalGroup.getByLabelText(/address line 1/i), '99 New St')
-    await userEvent.click(canvas.getByRole('button', { name: /^save$/i }))
+    await userEvent.type(canvas.getByLabelText(/first name/i), 'John')
+    await userEvent.type(canvas.getByLabelText(/last name/i), 'Smith')
+    await userEvent.type(canvas.getByLabelText(/date of birth/i), '1990-01-01')
+    await userEvent.click(canvas.getByRole('button', { name: /^create client$/i }))
 
     await expect(args.onSubmit).toHaveBeenCalledWith({
-      mailingAddress1: null,
-      mailingAddress2: null,
-      mailingCity: null,
-      mailingState: null,
-      mailingZip: null,
-      physicalAddress1: '99 New St',
-      physicalAddress2: null,
-      physicalCity: null,
-      physicalState: null,
-      physicalZip: null,
-      phones: ['555-867-5309'],
-      emails: ['jane@example.com'],
+      person: {
+        firstName: 'John',
+        lastName: 'Smith',
+        dateOfBirth: '1990-01-01',
+        gender: 'm',
+        maritalStatus: null,
+        relationToInsured: 'self',
+      },
+      client: {
+        mailingAddress1: null,
+        mailingAddress2: null,
+        mailingCity: null,
+        mailingState: null,
+        mailingZip: null,
+        physicalAddress1: null,
+        physicalAddress2: null,
+        physicalCity: null,
+        physicalState: null,
+        physicalZip: null,
+        phones: [],
+        emails: [],
+      },
     })
   },
 }

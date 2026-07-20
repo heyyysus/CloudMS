@@ -100,6 +100,14 @@ export function updateClient(id: number, body: UpdateClientBody): Promise<Client
   return request(`/clients/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
 }
 
+export interface CreateClientBody extends UpdateClientBody {
+  namedInsuredId: number
+}
+
+export function createClient(body: CreateClientBody): Promise<ClientDetail> {
+  return request('/clients', { method: 'POST', body: JSON.stringify(body) })
+}
+
 export function clientDisplayName(client: {
   namedInsured: Pick<Person, 'firstName' | 'lastName'>
 }): string {

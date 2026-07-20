@@ -1,5 +1,5 @@
 {
-  "id": "faa3c767-6a72-4b9d-b492-3ed4320a5f91",
+  "id": "f0175914-a7e3-4f21-a51e-5bce2aa774f4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -32,9 +32,33 @@
           "primaryKey": false,
           "notNull": true
         },
-        "policy_address": {
-          "name": "policy_address",
+        "policy_address1": {
+          "name": "policy_address1",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "policy_address2": {
+          "name": "policy_address2",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "policy_city": {
+          "name": "policy_city",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "policy_state": {
+          "name": "policy_state",
+          "type": "varchar(2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "policy_zip": {
+          "name": "policy_zip",
+          "type": "varchar(10)",
           "primaryKey": false,
           "notNull": false
         },
@@ -73,7 +97,54 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "auto_policies_client_id_idx": {
+          "name": "auto_policies_client_id_idx",
+          "columns": [
+            {
+              "expression": "client_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "auto_policies_policy_number_trgm_idx": {
+          "name": "auto_policies_policy_number_trgm_idx",
+          "columns": [
+            {
+              "expression": "policy_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "auto_policies_policy_addr_trgm_idx": {
+          "name": "auto_policies_policy_addr_trgm_idx",
+          "columns": [
+            {
+              "expression": "(coalesce(\"policy_address1\", '') || ' ' || coalesce(\"policy_address2\", '') || ' ' || coalesce(\"policy_city\", '') || ' ' || coalesce(\"policy_state\", '') || ' ' || coalesce(\"policy_zip\", '')) gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "auto_policies_client_id_clients_id_fk": {
           "name": "auto_policies_client_id_clients_id_fk",
@@ -199,7 +270,39 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "client_emails_client_id_idx": {
+          "name": "client_emails_client_id_idx",
+          "columns": [
+            {
+              "expression": "client_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "client_emails_email_trgm_idx": {
+          "name": "client_emails_email_trgm_idx",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "client_emails_client_id_clients_id_fk": {
           "name": "client_emails_client_id_clients_id_fk",
@@ -251,7 +354,39 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "client_phones_client_id_idx": {
+          "name": "client_phones_client_id_idx",
+          "columns": [
+            {
+              "expression": "client_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "client_phones_phone_number_trgm_idx": {
+          "name": "client_phones_phone_number_trgm_idx",
+          "columns": [
+            {
+              "expression": "phone_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "client_phones_client_id_clients_id_fk": {
           "name": "client_phones_client_id_clients_id_fk",
@@ -295,15 +430,63 @@
           "primaryKey": false,
           "notNull": false
         },
-        "mailing_address": {
-          "name": "mailing_address",
+        "mailing_address1": {
+          "name": "mailing_address1",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "physical_address": {
-          "name": "physical_address",
+        "mailing_address2": {
+          "name": "mailing_address2",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mailing_city": {
+          "name": "mailing_city",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mailing_state": {
+          "name": "mailing_state",
+          "type": "varchar(2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mailing_zip": {
+          "name": "mailing_zip",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "physical_address1": {
+          "name": "physical_address1",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "physical_address2": {
+          "name": "physical_address2",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "physical_city": {
+          "name": "physical_city",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "physical_state": {
+          "name": "physical_state",
+          "type": "varchar(2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "physical_zip": {
+          "name": "physical_zip",
+          "type": "varchar(10)",
           "primaryKey": false,
           "notNull": false
         },
@@ -322,7 +505,38 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "clients_mailing_addr_trgm_idx": {
+          "name": "clients_mailing_addr_trgm_idx",
+          "columns": [
+            {
+              "expression": "(coalesce(\"mailing_address1\", '') || ' ' || coalesce(\"mailing_address2\", '') || ' ' || coalesce(\"mailing_city\", '') || ' ' || coalesce(\"mailing_state\", '') || ' ' || coalesce(\"mailing_zip\", '')) gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "clients_physical_addr_trgm_idx": {
+          "name": "clients_physical_addr_trgm_idx",
+          "columns": [
+            {
+              "expression": "(coalesce(\"physical_address1\", '') || ' ' || coalesce(\"physical_address2\", '') || ' ' || coalesce(\"physical_city\", '') || ' ' || coalesce(\"physical_state\", '') || ' ' || coalesce(\"physical_zip\", '')) gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "clients_named_insured_id_persons_id_fk": {
           "name": "clients_named_insured_id_persons_id_fk",
@@ -377,7 +591,7 @@
           "name": "dl_number",
           "type": "varchar(50)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "rating": {
           "name": "rating",
@@ -503,7 +717,55 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "persons_first_name_trgm_idx": {
+          "name": "persons_first_name_trgm_idx",
+          "columns": [
+            {
+              "expression": "first_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "persons_last_name_trgm_idx": {
+          "name": "persons_last_name_trgm_idx",
+          "columns": [
+            {
+              "expression": "last_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "persons_full_name_trgm_idx": {
+          "name": "persons_full_name_trgm_idx",
+          "columns": [
+            {
+              "expression": "(\"first_name\" || ' ' || \"last_name\") gin_trgm_ops",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -578,6 +840,169 @@
           "columns": [
             "policy_id",
             "driver_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sessions": {
+      "name": "sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "sessions_user_id_idx": {
+          "name": "sessions_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sessions_user_id_users_id_fk": {
+          "name": "sessions_user_id_users_id_fk",
+          "tableFrom": "sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "sessions_token_hash_unique": {
+          "name": "sessions_token_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "google_sub": {
+          "name": "google_sub",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "role": {
+          "name": "role",
+          "type": "user_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'staff'"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        },
+        "users_google_sub_unique": {
+          "name": "users_google_sub_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "google_sub"
           ]
         }
       },
@@ -706,7 +1131,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "vehicles_policy_id_idx": {
+          "name": "vehicles_policy_id_idx",
+          "columns": [
+            {
+              "expression": "policy_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "vehicles_policy_id_auto_policies_id_fk": {
           "name": "vehicles_policy_id_auto_policies_id_fk",
@@ -724,10 +1165,11 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "vehicles_vin_unique": {
-          "name": "vehicles_vin_unique",
+        "vehicles_policy_id_vin_unique": {
+          "name": "vehicles_policy_id_vin_unique",
           "nullsNotDistinct": false,
           "columns": [
+            "policy_id",
             "vin"
           ]
         }
@@ -787,6 +1229,14 @@
         "significant-other",
         "other-related",
         "other"
+      ]
+    },
+    "public.user_role": {
+      "name": "user_role",
+      "schema": "public",
+      "values": [
+        "admin",
+        "staff"
       ]
     }
   },

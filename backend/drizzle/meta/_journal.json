@@ -5,57 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1783743358140,
-      "tag": "0000_flashy_madripoor",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1783822984256,
-      "tag": "0001_groovy_speedball",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1783873546063,
-      "tag": "0002_flowery_the_spike",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1784048382102,
-      "tag": "0003_pg_trgm_search",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1784092546581,
-      "tag": "0004_nervous_vulcan",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1784153736930,
-      "tag": "0005_magical_annihilus",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1784153765419,
-      "tag": "0006_rare_longshot",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1784178890909,
-      "tag": "0007_concerned_prism",
+      "when": 1784508309261,
+      "tag": "0000_past_trauma",
       "breakpoints": true
     }
   ]

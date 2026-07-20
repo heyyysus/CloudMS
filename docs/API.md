@@ -327,7 +327,7 @@ a combined `first_name || ' ' || last_name` expression (so a two-word query
 like `"john smi"` matches across both columns), `clients.mailing_address`,
 `clients.physical_address`, `client_phones.phone_number`,
 `client_emails.email`, `auto_policies.policy_number`, and
-`auto_policies.policy_address`. See migration `0003_pg_trgm_search.sql`.
+`auto_policies.policy_address`. See migration `0000_past_trauma.sql`.
 
 Search input is escaped (`%`, `_`, `\`) before being wrapped in `%...%`, so
 a literal `%` or `_` in a search term is treated literally, not as an SQL

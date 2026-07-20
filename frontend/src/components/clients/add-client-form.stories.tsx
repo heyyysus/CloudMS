@@ -67,7 +67,7 @@ export const EditModePrefills: Story = {
     await expect(canvas.getByLabelText(/first name/i)).toHaveValue('Jane')
     await expect(canvas.getByLabelText(/last name/i)).toHaveValue('Doe')
     await expect(canvas.getByLabelText(/date of birth/i)).toHaveValue('1987-07-22')
-    const mailingGroup = within(canvas.getByRole('group', { name: /mailing address/i }))
+    const mailingGroup = within(canvas.getByRole('group', { name: /^mailing address$/i }))
     await expect(mailingGroup.getByLabelText(/address line 1/i)).toHaveValue(
       fixture.mailingAddress1
     )
@@ -99,6 +99,33 @@ export const AddAndRemoveRows: Story = {
 
     await userEvent.click(canvas.getByRole('button', { name: /remove email/i }))
     await expect(canvas.queryByLabelText(/email 1/i)).not.toBeInTheDocument()
+  },
+}
+
+export const PhysicalSameAsMailing: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const mailingGroup = within(canvas.getByRole('group', { name: /^mailing address$/i }))
+    const physicalGroup = within(canvas.getByRole('group', { name: /physical address/i }))
+
+    await userEvent.type(mailingGroup.getByLabelText(/address line 1/i), '100 Main St')
+    await userEvent.type(mailingGroup.getByLabelText(/city/i), 'Springfield')
+    await userEvent.type(mailingGroup.getByLabelText(/zip/i), '62701')
+
+    await userEvent.click(canvas.getByRole('checkbox', { name: /same as mailing address/i }))
+
+    await expect(physicalGroup.getByLabelText(/address line 1/i)).toHaveValue('100 Main St')
+    await expect(physicalGroup.getByLabelText(/city/i)).toHaveValue('Springfield')
+    await expect(physicalGroup.getByLabelText(/zip/i)).toHaveValue('62701')
+    await expect(physicalGroup.getByLabelText(/address line 1/i)).toBeDisabled()
+
+    // Edits to mailing keep propagating while the checkbox stays checked.
+    await userEvent.clear(mailingGroup.getByLabelText(/city/i))
+    await userEvent.type(mailingGroup.getByLabelText(/city/i), 'Shelbyville')
+    await expect(physicalGroup.getByLabelText(/city/i)).toHaveValue('Shelbyville')
+
+    await userEvent.click(canvas.getByRole('checkbox', { name: /same as mailing address/i }))
+    await expect(physicalGroup.getByLabelText(/address line 1/i)).toBeEnabled()
   },
 }
 

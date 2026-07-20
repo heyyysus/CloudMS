@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -127,6 +127,9 @@ export function AddClientForm({
     register,
     control,
     handleSubmit,
+    setValue,
+    getValues,
+    watch,
     formState: { errors },
   } = useForm<ClientFormValues>({
     resolver: zodResolver(clientFormSchema),
@@ -135,6 +138,21 @@ export function AddClientForm({
 
   const phoneFields = useFieldArray({ control, name: 'phones' })
   const emailFields = useFieldArray({ control, name: 'emails' })
+
+  const [physicalSameAsMailing, setPhysicalSameAsMailing] = useState(false)
+  const mailing = watch('mailing')
+
+  // Keeps the physical address mirrored while the checkbox is on, so edits
+  // to mailing propagate without the user re-checking it.
+  useEffect(() => {
+    if (physicalSameAsMailing) setValue('physical', mailing)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [physicalSameAsMailing, mailing.address1, mailing.address2, mailing.city, mailing.state, mailing.zip])
+
+  function handlePhysicalSameAsMailingChange(checked: boolean) {
+    setPhysicalSameAsMailing(checked)
+    if (checked) setValue('physical', getValues('mailing'))
+  }
 
   return (
     <form onSubmit={handleSubmit((values) => onSubmit(toSubmit(values, initial)))} noValidate>
@@ -225,7 +243,17 @@ export function AddClientForm({
         </FieldSet>
 
         <FieldSet>
-          <FieldLegend variant="label">Physical Address</FieldLegend>
+          <FieldLegend variant="label" className="flex items-center justify-between gap-2">
+            <span>Physical Address</span>
+            <label className="flex items-center gap-2 text-sm font-normal text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={physicalSameAsMailing}
+                onChange={(event) => handlePhysicalSameAsMailingChange(event.target.checked)}
+              />
+              Same as mailing address
+            </label>
+          </FieldLegend>
           <FieldGroup className="gap-3">
             <AddressFields
               register={register}
@@ -233,6 +261,7 @@ export function AddClientForm({
               errors={errors.physical}
               name="physical"
               idPrefix="client-form-physical"
+              disabled={physicalSameAsMailing}
             />
           </FieldGroup>
         </FieldSet>

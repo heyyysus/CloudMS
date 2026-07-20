@@ -71,7 +71,7 @@ export const OpensAndPrefills: Story = {
     const canvas = within(canvasElement)
     await userEvent.click(canvas.getByRole('button', { name: /^edit$/i }))
     await expect(await screen.findByText(/edit client/i)).toBeInTheDocument()
-    const mailingGroup = within(screen.getByRole('group', { name: /mailing address/i }))
+    const mailingGroup = within(screen.getByRole('group', { name: /^mailing address$/i }))
     await expect(mailingGroup.getByLabelText(/address line 1/i)).toHaveValue(
       fixture.mailingAddress1
     )

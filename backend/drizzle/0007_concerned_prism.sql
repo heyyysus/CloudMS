@@ -1,1 +1,0 @@
-ALTER TABLE "drivers" ALTER COLUMN "dl_number" DROP NOT NULL;

@@ -18,6 +18,7 @@ interface AddressFieldsProps<T extends FieldValues> {
   errors?: FieldErrors<AddressFormValues>
   name: Path<T>
   idPrefix: string
+  disabled?: boolean
 }
 
 // Shared address1/address2/city/state/zip fieldset used by the client and
@@ -29,6 +30,7 @@ export function AddressFields<T extends FieldValues>({
   errors,
   name,
   idPrefix,
+  disabled,
 }: AddressFieldsProps<T>) {
   const fieldPath = (suffix: keyof AddressFormValues) => `${name}.${suffix}` as Path<T>
 
@@ -36,20 +38,20 @@ export function AddressFields<T extends FieldValues>({
     <>
       <Field data-invalid={!!errors?.address1}>
         <FieldLabel htmlFor={`${idPrefix}-address1`}>Address line 1</FieldLabel>
-        <Input id={`${idPrefix}-address1`} {...register(fieldPath('address1'))} />
+        <Input id={`${idPrefix}-address1`} disabled={disabled} {...register(fieldPath('address1'))} />
         <FieldError errors={errors?.address1 ? [errors.address1] : undefined} />
       </Field>
 
       <Field data-invalid={!!errors?.address2}>
         <FieldLabel htmlFor={`${idPrefix}-address2`}>Address line 2</FieldLabel>
-        <Input id={`${idPrefix}-address2`} {...register(fieldPath('address2'))} />
+        <Input id={`${idPrefix}-address2`} disabled={disabled} {...register(fieldPath('address2'))} />
         <FieldError errors={errors?.address2 ? [errors.address2] : undefined} />
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Field data-invalid={!!errors?.city}>
           <FieldLabel htmlFor={`${idPrefix}-city`}>City</FieldLabel>
-          <Input id={`${idPrefix}-city`} {...register(fieldPath('city'))} />
+          <Input id={`${idPrefix}-city`} disabled={disabled} {...register(fieldPath('city'))} />
           <FieldError errors={errors?.city ? [errors.city] : undefined} />
         </Field>
 
@@ -67,6 +69,7 @@ export function AddressFields<T extends FieldValues>({
                 placeholder="Select state"
                 searchPlaceholder="Search states…"
                 emptyText="No states found."
+                disabled={disabled}
                 aria-invalid={!!errors?.state}
               />
             )}
@@ -76,7 +79,7 @@ export function AddressFields<T extends FieldValues>({
 
         <Field data-invalid={!!errors?.zip}>
           <FieldLabel htmlFor={`${idPrefix}-zip`}>ZIP</FieldLabel>
-          <Input id={`${idPrefix}-zip`} {...register(fieldPath('zip'))} />
+          <Input id={`${idPrefix}-zip`} disabled={disabled} {...register(fieldPath('zip'))} />
           <FieldError errors={errors?.zip ? [errors.zip] : undefined} />
         </Field>
       </div>

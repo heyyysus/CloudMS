@@ -1,4 +1,4 @@
-# API Reference: Clients, Persons, Policies, Vehicles, Policy Logs, Carriers, Search
+# API Reference: Clients, Persons, Policies, Vehicles, Policy Logs, Carriers, Accounting, Search
 
 This documents the HTTP API for managing the personal-auto book of business:
 clients, persons, auto policies, vehicles, policy logs, carriers, and
@@ -357,6 +357,91 @@ endpoint there'd be no way to create a policy through the API.
 | POST | `/carriers` | any | `name`, `naic` (unique) |
 | PATCH | `/carriers/:id` | any | partial |
 | DELETE | `/carriers/:id` | **admin** | 409 if the carrier still has policies |
+
+## Accounting
+
+The agency runs a **trust-accounting** model. A client pays the agency, the
+money sits in the agency **trust account**, and once an invoice is paid in
+full the agency "sweeps" the carrier's share out to the carrier and keeps its
+fee. Every transaction is a policy-scoped **invoice** (one or more line items)
+plus the **payments** made against it; each payment mints a **receipt**. The
+**trust ledger** records every movement of money in/out of the trust account.
+
+All accounting records are **immutable** — there is no PATCH or DELETE.
+Corrections are made by **voiding**, which posts reversing trust-ledger entries
+rather than editing or deleting rows. All invoices, payments, and receipts are
+listable with just a `clientId` (or a `policyId`), per requirement.
+
+### Money format
+
+Monetary values are **decimal strings** backed by `numeric(12,2)` columns
+(e.g. `"400.00"`). Amounts nested inside a related object (e.g. `payment.amount`
+inside a receipt, or `items[].amount` inside an invoice) are canonical decimals
+and **may drop trailing zeros** (`"300"` == `"300.00"`); parse before comparing.
+Top-level computed fields (`total`, `amountPaid`, `amountApplied`, `changeGiven`,
+`amountDueAfter`, trust `balance`) always carry two decimals.
+
+### Invoices
+
+An invoice belongs to a policy and has one or more line items. Each item is one
+of two **categories**: `sweep` (the carrier's share — money that leaves trust to
+a carrier) or `agency` (the agency's fee). The item `type` fixes the category:
+
+- **sweep** types: `new_business_sweep`, `installment_payment_sweep`, `endorsement_sweep`
+- **agency** types: `new_business_fee`, `installment_payment_fee`, `endorsement_fee`
+
+A sweep item defaults its `carrierId` to the policy's carrier (overridable per
+item); an agency item never carries a carrier. `status` is `open` (amount still
+due), `closed` (paid in full), or `void`. `total`/`amountPaid` are server-managed.
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| GET | `/invoices?clientId=` or `?policyId=` | any | list, newest first; one filter required |
+| GET | `/invoices/:id` | any | full detail: items (+carrier), payments, receipts, client, creator |
+| POST | `/invoices` | any | `createInvoiceBody`; 404 if `policyId` missing; 201 with detail |
+| POST | `/invoices/:id/void` | any | 409 if it has active (non-voided) payments; void those first |
+
+Create body: `policyId` (required), `note` (optional), `items[]` (min 1) — each
+`{ category, type, carrierId?, description?, amount }`. `createdBy` is stamped
+from the session user, never accepted from the client.
+
+### Payments & receipts
+
+Recording a payment applies as much as the invoice still owes; any excess is
+**change handed back** (recorded on the receipt, never held in trust). When a
+payment settles the invoice, the invoice **closes** and the carrier/agency
+shares are swept out of trust. Invoices support **installments** — multiple
+payments over time until closed. Payment methods: `cash`, `check`,
+`credit_card`, `debit_card`.
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| GET | `/payments?clientId=` or `?policyId=` | any | list, newest first |
+| GET | `/payments/:id` | any | detail with receipt + invoice |
+| POST | `/payments` | any | `recordPaymentBody`; 404 unknown invoice; 409 if invoice not `open`; **201 returns the receipt** |
+| POST | `/payments/:id/void` | any | reverses trust entries, reopens the invoice, voids the receipt; 409 if already void |
+| GET | `/receipts?clientId=` or `?policyId=` | any | list, newest first |
+| GET | `/receipts/:id` | any | receipt detail |
+
+Payment body: `invoiceId`, `method`, `amount` (> 0), `note` (optional, on the
+payment), `receiptNote` (optional, on the receipt). `createdBy` is the session
+user. A receipt carries `amountApplied`, `changeGiven`, `amountDueAfter`, and
+`invoiceClosed` (whether this payment closed the invoice).
+
+### Trust ledger
+
+Every payment/sweep/fee (and their reversals) is a `trust_ledger` row with a
+`direction` of `in` or `out`. Balance = sum(in) − sum(out); reversals are
+opposite-direction rows that net out automatically.
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| GET | `/trust-ledger?clientId=` or `?policyId=` | any | ledger rows, newest first |
+| GET | `/trust-balance?clientId=` or `?policyId=` | any | `{ clientId\|policyId, balance }` |
+
+Entry types: `payment_received` (in), `carrier_sweep` (out, carries `carrierId`),
+`agency_fee` (out). A fully collected-and-settled transaction nets the trust
+balance back to `0.00`.
 
 ## Search
 

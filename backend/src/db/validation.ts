@@ -6,9 +6,14 @@ import {
   clientPhones,
   clients,
   drivers,
+  invoiceItems,
+  invoices,
+  payments,
   persons,
   policyDrivers,
   policyLogs,
+  receipts,
+  trustLedger,
   users,
   vehicles,
 } from "./schema"
@@ -40,6 +45,12 @@ export const updateVehicleSchema = insertVehicleSchema.partial()
 export const insertPolicyDriverSchema = createInsertSchema(policyDrivers)
 
 export const insertPolicyLogSchema = createInsertSchema(policyLogs)
+
+export const insertInvoiceSchema = createInsertSchema(invoices)
+export const insertInvoiceItemSchema = createInsertSchema(invoiceItems)
+export const insertPaymentSchema = createInsertSchema(payments)
+export const insertReceiptSchema = createInsertSchema(receipts)
+export const insertTrustLedgerSchema = createInsertSchema(trustLedger)
 
 export const insertUserSchema = createInsertSchema(users)
 export const updateUserSchema = insertUserSchema.partial()

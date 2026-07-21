@@ -69,7 +69,10 @@ jobs:
 
   deploy:
     needs: backend
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    # TEMPORARY: also allow claude/client-logging-feature-tecnse via manual
+    # dispatch, to verify a deploy of this branch before merge. Revert once
+    # verified.
+    if: (github.ref == 'refs/heads/main' || (github.ref == 'refs/heads/claude/client-logging-feature-tecnse' && github.event_name == 'workflow_dispatch')) && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
       - name: Deploy over SSH

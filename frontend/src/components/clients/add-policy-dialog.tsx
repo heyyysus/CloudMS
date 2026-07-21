@@ -54,6 +54,15 @@ import {
   toNullableAddress,
   type Address,
 } from '@/lib/address'
+import {
+  BI_LIMITS,
+  DEDUCTIBLES,
+  MEDPAY_LIMITS,
+  PD_LIMITS,
+  RENTAL_LIMITS,
+  TOWING_LIMITS,
+  UMPD_LIMITS,
+} from '@/lib/coverage-options'
 
 // A person the client is already associated with (named insured, co-insured,
 // or a driver on another policy), offered as a checkable driver row.
@@ -74,6 +83,46 @@ const RELATION_OPTIONS: { value: Person['relationToInsured']; label: string }[] 
 ]
 
 const MARITAL_OPTIONS = ['single', 'married', 'divorced', 'widowed', 'separated'] as const
+
+// Radix Select doesn't allow an empty-string item value, so the "None"
+// option is represented by this sentinel and translated back to '' here.
+const COVERAGE_NONE_VALUE = '__none__'
+
+// A limit/deductible dropdown for a coverage field. Coverage values are
+// free-text on the backend, so a stored value that isn't in `options` (a
+// legacy value entered before this dropdown existed) is preserved as an
+// extra selectable item rather than silently dropped.
+function CoverageSelect({
+  id,
+  value,
+  onChange,
+  options,
+}: {
+  id: string
+  value: string
+  onChange: (value: string) => void
+  options: string[]
+}) {
+  const items = value && !options.includes(value) ? [value, ...options] : options
+  return (
+    <Select
+      value={value === '' ? COVERAGE_NONE_VALUE : value}
+      onValueChange={(next) => onChange(next === COVERAGE_NONE_VALUE ? '' : next)}
+    >
+      <SelectTrigger id={id}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={COVERAGE_NONE_VALUE}>None</SelectItem>
+        {items.map((item) => (
+          <SelectItem key={item} value={item}>
+            {item}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
 
 const addPolicySchema = z
   .object({
@@ -109,7 +158,7 @@ const addPolicySchema = z
           .max(10, 'Max 10 characters'),
         coll: z.string(),
         comp: z.string(),
-        cdw: z.string(),
+        cdwWaived: z.boolean(),
         rental: z.string(),
         towing: z.string(),
       })
@@ -259,7 +308,7 @@ function toFormValues({ client, existingDrivers, initial }: ToFormValuesArgs): A
         garagingZip: vehicle.garagingZip,
         coll: vehicle.coverageColl ?? '',
         comp: vehicle.coverageComp ?? '',
-        cdw: vehicle.coverageCdw ?? '',
+        cdwWaived: Boolean(vehicle.coverageCdw),
         rental: vehicle.coverageRentalReimbursement ?? '',
         towing: vehicle.coverageTowing ?? '',
       })) ?? [],
@@ -335,7 +384,7 @@ function toBody(values: AddPolicyFormValues, clientId: number): CreatePolicyBody
       coverageMedpay: nullableTrim(values.defaultCoverages.medpay),
       coverageColl: nullableTrim(vehicle.coll),
       coverageComp: nullableTrim(vehicle.comp),
-      coverageCdw: nullableTrim(vehicle.cdw),
+      coverageCdw: vehicle.cdwWaived ? nullableTrim(vehicle.coll) : null,
       coverageRentalReimbursement: nullableTrim(vehicle.rental),
       coverageTowing: nullableTrim(vehicle.towing),
     })),
@@ -351,7 +400,7 @@ const EMPTY_VEHICLE_ROW = {
   garagingZip: '',
   coll: '',
   comp: '',
-  cdw: '',
+  cdwWaived: false,
   rental: '',
   towing: '',
 }
@@ -557,29 +606,84 @@ export function AddPolicyForm({
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <Field>
               <FieldLabel htmlFor="add-policy-coverage-bi">{COVERAGE_LABELS.coverageBi}</FieldLabel>
-              <Input id="add-policy-coverage-bi" {...register('defaultCoverages.bi')} />
+              <Controller
+                control={control}
+                name="defaultCoverages.bi"
+                render={({ field }) => (
+                  <CoverageSelect
+                    id="add-policy-coverage-bi"
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={BI_LIMITS}
+                  />
+                )}
+              />
             </Field>
             <Field>
               <FieldLabel htmlFor="add-policy-coverage-pd">{COVERAGE_LABELS.coveragePd}</FieldLabel>
-              <Input id="add-policy-coverage-pd" {...register('defaultCoverages.pd')} />
+              <Controller
+                control={control}
+                name="defaultCoverages.pd"
+                render={({ field }) => (
+                  <CoverageSelect
+                    id="add-policy-coverage-pd"
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={PD_LIMITS}
+                  />
+                )}
+              />
             </Field>
             <Field>
               <FieldLabel htmlFor="add-policy-coverage-umbi">
                 {COVERAGE_LABELS.coverageUmbi}
               </FieldLabel>
-              <Input id="add-policy-coverage-umbi" {...register('defaultCoverages.umbi')} />
+              <Controller
+                control={control}
+                name="defaultCoverages.umbi"
+                render={({ field }) => (
+                  <CoverageSelect
+                    id="add-policy-coverage-umbi"
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={BI_LIMITS}
+                  />
+                )}
+              />
             </Field>
             <Field>
               <FieldLabel htmlFor="add-policy-coverage-umpd">
                 {COVERAGE_LABELS.coverageUmpd}
               </FieldLabel>
-              <Input id="add-policy-coverage-umpd" {...register('defaultCoverages.umpd')} />
+              <Controller
+                control={control}
+                name="defaultCoverages.umpd"
+                render={({ field }) => (
+                  <CoverageSelect
+                    id="add-policy-coverage-umpd"
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={UMPD_LIMITS}
+                  />
+                )}
+              />
             </Field>
             <Field>
               <FieldLabel htmlFor="add-policy-coverage-medpay">
                 {COVERAGE_LABELS.coverageMedpay}
               </FieldLabel>
-              <Input id="add-policy-coverage-medpay" {...register('defaultCoverages.medpay')} />
+              <Controller
+                control={control}
+                name="defaultCoverages.medpay"
+                render={({ field }) => (
+                  <CoverageSelect
+                    id="add-policy-coverage-medpay"
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={MEDPAY_LIMITS}
+                  />
+                )}
+              />
             </Field>
           </div>
         </FieldSet>
@@ -603,7 +707,7 @@ export function AddPolicyForm({
                       garagingZip: vehicle.garagingZip,
                       coll: vehicle.coverageColl ?? '',
                       comp: vehicle.coverageComp ?? '',
-                      cdw: vehicle.coverageCdw ?? '',
+                      cdwWaived: Boolean(vehicle.coverageCdw),
                       rental: vehicle.coverageRentalReimbursement ?? '',
                       towing: vehicle.coverageTowing ?? '',
                     })
@@ -703,45 +807,93 @@ export function AddPolicyForm({
                     <FieldLabel htmlFor={`add-policy-vehicle-${index}-coll`}>
                       {COVERAGE_LABELS.coverageColl}
                     </FieldLabel>
-                    <Input
-                      id={`add-policy-vehicle-${index}-coll`}
-                      {...register(`vehicles.${index}.coll`)}
+                    <Controller
+                      control={control}
+                      name={`vehicles.${index}.coll`}
+                      render={({ field: collField }) => (
+                        <CoverageSelect
+                          id={`add-policy-vehicle-${index}-coll`}
+                          value={collField.value}
+                          onChange={collField.onChange}
+                          options={DEDUCTIBLES}
+                        />
+                      )}
                     />
                   </Field>
                   <Field>
                     <FieldLabel htmlFor={`add-policy-vehicle-${index}-comp`}>
                       {COVERAGE_LABELS.coverageComp}
                     </FieldLabel>
-                    <Input
-                      id={`add-policy-vehicle-${index}-comp`}
-                      {...register(`vehicles.${index}.comp`)}
+                    <Controller
+                      control={control}
+                      name={`vehicles.${index}.comp`}
+                      render={({ field }) => (
+                        <CoverageSelect
+                          id={`add-policy-vehicle-${index}-comp`}
+                          value={field.value}
+                          onChange={field.onChange}
+                          options={DEDUCTIBLES}
+                        />
+                      )}
                     />
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor={`add-policy-vehicle-${index}-cdw`}>
-                      {COVERAGE_LABELS.coverageCdw}
+                    <FieldLabel
+                      htmlFor={`add-policy-vehicle-${index}-cdw`}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span>{COVERAGE_LABELS.coverageCdw}</span>
+                      <span className="flex items-center gap-1.5 text-sm font-normal text-muted-foreground">
+                        <input
+                          id={`add-policy-vehicle-${index}-cdw`}
+                          type="checkbox"
+                          {...register(`vehicles.${index}.cdwWaived`)}
+                        />
+                        Waived
+                      </span>
                     </FieldLabel>
                     <Input
-                      id={`add-policy-vehicle-${index}-cdw`}
-                      {...register(`vehicles.${index}.cdw`)}
+                      value={
+                        watch(`vehicles.${index}.cdwWaived`)
+                          ? watch(`vehicles.${index}.coll`) || 'None'
+                          : 'None'
+                      }
+                      disabled
+                      readOnly
                     />
                   </Field>
                   <Field>
                     <FieldLabel htmlFor={`add-policy-vehicle-${index}-rental`}>
                       {COVERAGE_LABELS.coverageRentalReimbursement}
                     </FieldLabel>
-                    <Input
-                      id={`add-policy-vehicle-${index}-rental`}
-                      {...register(`vehicles.${index}.rental`)}
+                    <Controller
+                      control={control}
+                      name={`vehicles.${index}.rental`}
+                      render={({ field }) => (
+                        <CoverageSelect
+                          id={`add-policy-vehicle-${index}-rental`}
+                          value={field.value}
+                          onChange={field.onChange}
+                          options={RENTAL_LIMITS}
+                        />
+                      )}
                     />
                   </Field>
                   <Field>
                     <FieldLabel htmlFor={`add-policy-vehicle-${index}-towing`}>
                       {COVERAGE_LABELS.coverageTowing}
                     </FieldLabel>
-                    <Input
-                      id={`add-policy-vehicle-${index}-towing`}
-                      {...register(`vehicles.${index}.towing`)}
+                    <Controller
+                      control={control}
+                      name={`vehicles.${index}.towing`}
+                      render={({ field }) => (
+                        <CoverageSelect
+                          id={`add-policy-vehicle-${index}-towing`}
+                          value={field.value}
+                          onChange={field.onChange}
+                          options={TOWING_LIMITS}
+                        />
+                      )}
                     />
                   </Field>
                 </div>

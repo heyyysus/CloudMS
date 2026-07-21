@@ -85,6 +85,14 @@ unless noted.
   `coverageUmbi`, `coverageUmpd`, `coverageCdw`, `coverageMedpay`,
   `coverageColl`, `coverageComp`, `coverageRentalReimbursement`,
   `coverageTowing`, all nullable strings), `createdAt`, `updatedAt`.
+  These columns are free text; the frontend coverage dropdowns constrain
+  entry to a standard set of limit/deductible values defined in
+  `frontend/src/lib/coverage-options.ts` (a value outside that list, e.g. one
+  entered before the dropdown existed, is still accepted and displayed as-is).
+  `coverageCdw` (collision deductible waiver) is presented as a checkbox that
+  mirrors the vehicle's `coverageColl` value rather than being entered
+  directly: waived stores the current Collision deductible, unwaived stores
+  `null`.
 - **Carrier** (bare): `id`, `name`, `naic`, `createdAt`, `updatedAt`.
 
 **Important — search results are a different, narrower shape than the

@@ -154,7 +154,7 @@ export const CopyFromExistingVehicle: Story = {
     await userEvent.click(canvas.getByRole('button', { name: /2018 honda accord/i }))
     await expect(canvas.getByLabelText(/^vin$/i)).toHaveValue('1HGCM82633A004352')
     await expect(canvas.getByLabelText(/^year$/i)).toHaveValue('2018')
-    await expect(canvas.getByLabelText(/collision/i)).toHaveValue('500')
+    await expect(canvas.getByRole('combobox', { name: /collision/i })).toHaveTextContent('500')
   },
 }
 
@@ -178,9 +178,10 @@ export const SubmitFansOutCoverages: Story = {
     await userEvent.click(canvas.getByRole('combobox', { name: /carrier/i }))
     await userEvent.click(await screen.findByRole('option', { name: /acme insurance/i }))
     await userEvent.type(canvas.getByLabelText(/policy number/i), 'POL-123')
-    await userEvent.type(canvas.getByLabelText(/^bi$/i), '100/300')
+    await userEvent.click(canvas.getByRole('combobox', { name: /^bi$/i }))
+    await userEvent.click(await screen.findByRole('option', { name: '100/300' }))
 
-    await userEvent.click(canvas.getByRole('button', { name: /2018 honda accord/i }))
+    await userEvent.click(await canvas.findByRole('button', { name: /2018 honda accord/i }))
 
     // Existing person without a drivers row: DL fields appear when checked.
     await userEvent.click(canvas.getByRole('checkbox', { name: /jane doe/i }))

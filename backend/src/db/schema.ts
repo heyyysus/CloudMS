@@ -258,3 +258,28 @@ export const policyDrivers = pgTable(
   },
   (table) => [unique().on(table.policyId, table.driverId)]
 )
+
+// Append-only notes attached to a policy. logNumber is a per-policy counter
+// (1, 2, 3, ...) assigned in a transaction by the repository, not by the DB;
+// the unique constraint below just guards against a race producing
+// duplicates. There is no updatedAt and no update/delete path - logs are
+// immutable once created.
+export const policyLogs = pgTable(
+  "policy_logs",
+  {
+    id: serial("id").primaryKey(),
+    policyId: integer("policy_id")
+      .notNull()
+      .references(() => autoPolicies.id, { onDelete: "cascade" }),
+    logNumber: integer("log_number").notNull(),
+    authorId: integer("author_id")
+      .notNull()
+      .references(() => users.id),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("policy_logs_policy_id_idx").on(table.policyId),
+    unique("policy_logs_policy_id_log_number_unique").on(table.policyId, table.logNumber),
+  ]
+)

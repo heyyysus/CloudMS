@@ -12,6 +12,7 @@ import {
   createClient,
   createDriver,
   createPerson,
+  createPolicyLog,
   createSession,
   createUser,
   createVehicle,
@@ -150,6 +151,15 @@ export class TestContext {
     const driver = await createDriver({ personId: person.id, dlNumber: unique("DL") })
     await addDriverToPolicy(policyId, driver.id)
     return { person, driver }
+  }
+
+  // policy_logs cascade-deletes with its policy, so no separate tracking
+  // array is needed here - as long as the policy is tracked, cleanup() below
+  // removes its logs before it removes the author's user row.
+  async log(policyId: number, authorId: number, body = "Test log") {
+    const l = await createPolicyLog({ policyId, authorId, body })
+    if (!l) throw new Error(`Could not create log for policy ${policyId}`)
+    return l
   }
 
   // Registers a row created some other way (e.g. through an API call under

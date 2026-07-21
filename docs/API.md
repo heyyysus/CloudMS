@@ -1,7 +1,8 @@
-# API Reference: Clients, Persons, Policies, Vehicles, Carriers, Search
+# API Reference: Clients, Persons, Policies, Vehicles, Policy Logs, Carriers, Search
 
 This documents the HTTP API for managing the personal-auto book of business:
-clients, persons, auto policies, vehicles, carriers, and cross-entity search.
+clients, persons, auto policies, vehicles, policy logs, carriers, and
+cross-entity search.
 It complements [`AUTH_SESSIONS_EXPLAINED.md`](./AUTH_SESSIONS_EXPLAINED.md),
 which covers login/session mechanics and the `admin`/`staff` role model in
 depth — this doc assumes that context and focuses on the resource routes.
@@ -48,7 +49,7 @@ mechanics. What a frontend integration needs to know:
 ## No pagination
 
 None of the list endpoints below (`/persons`, `/clients`, `/policies`,
-`/vehicles`, `/carriers`) accept or return pagination params (`page`,
+`/vehicles`, `/policy-logs`, `/carriers`) accept or return pagination params (`page`,
 `cursor`, `limit`, etc.) — they always return the full table. Only the
 search endpoints (`?q=`) cap results (10 or 50, see below). A frontend
 should not build pagination UI against these list endpoints yet.
@@ -291,6 +292,58 @@ Body fields: `policyId`, `vin` (unique, 17 chars), `make`, `model`, `year`,
 `coveragePd`, `coverageUmbi`, `coverageUmpd`, `coverageCdw`,
 `coverageMedpay`, `coverageColl`, `coverageComp`,
 `coverageRentalReimbursement`, `coverageTowing`.
+
+## Policy Logs
+
+A `policy_logs` row is a free-text note attached to a policy — staff and
+admins use it to record a running history of calls, changes, and other
+activity on that policy. **Logs are append-only**: there is no PATCH or
+DELETE, only create and list.
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| GET | `/policy-logs?policyId=` | any | `listPolicyLogsByPolicyId(policyId)`; `policyId` is required; newest first (`logNumber` descending) |
+| POST | `/policy-logs` | any | body validated against `createPolicyLogBody`; 404 if `policyId` doesn't reference a policy |
+
+Body fields: `policyId` (required), `body` (required, 1-5000 characters,
+trimmed).
+
+`logNumber` and `authorId` are **never accepted from the client** — the
+server assigns them:
+
+- `logNumber` is a counter scoped to the policy, starting at 1 and counting
+  up (1, 2, 3, ... independently per `policyId`), computed inside the same
+  transaction as the insert.
+- `authorId` is always the session user (`req.user.id`) — the log records
+  who was actually authenticated when it was created, not a client-supplied
+  value.
+
+Example response (`GET /policy-logs?policyId=104`, `POST /policy-logs`):
+
+```json
+[
+  {
+    "id": 9,
+    "policyId": 104,
+    "logNumber": 2,
+    "body": "Sent updated declarations page to the client.",
+    "createdAt": "2026-07-15T14:00:00.000Z",
+    "author": { "id": 3, "name": "Jane Staff", "email": "jane@example.com" }
+  },
+  {
+    "id": 7,
+    "policyId": 104,
+    "logNumber": 1,
+    "body": "Called the client to confirm garaging address.",
+    "createdAt": "2026-07-14T17:48:07.653Z",
+    "author": { "id": 3, "name": "Jane Staff", "email": "jane@example.com" }
+  }
+]
+```
+
+Note the `author` field is a small joined object (`id`, `name`, `email`),
+not just an `authorId`, and there is no `updatedAt` — logs are immutable
+once created, so there is nothing to have been updated.
 
 ## Carriers
 

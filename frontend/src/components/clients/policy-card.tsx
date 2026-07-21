@@ -41,9 +41,17 @@ interface PolicyCardProps {
   isLoading?: boolean
   isError?: boolean
   action?: ReactNode
+  logs?: ReactNode
 }
 
-export function PolicyCard({ policy, detail, isLoading, isError, action }: PolicyCardProps) {
+export function PolicyCard({
+  policy,
+  detail,
+  isLoading,
+  isError,
+  action,
+  logs,
+}: PolicyCardProps) {
   const status = displayStatus(policy)
 
   return (
@@ -115,6 +123,13 @@ export function PolicyCard({ policy, detail, isLoading, isError, action }: Polic
               )
             })}
         </div>
+
+        {logs && (
+          <>
+            <Separator />
+            {logs}
+          </>
+        )}
       </CardContent>
     </Card>
   )

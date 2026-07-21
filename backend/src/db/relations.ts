@@ -8,6 +8,7 @@ import {
   drivers,
   persons,
   policyDrivers,
+  policyLogs,
   sessions,
   users,
   vehicles,
@@ -57,6 +58,7 @@ export const autoPoliciesRelations = relations(autoPolicies, ({ one, many }) => 
   carrier: one(carriers, { fields: [autoPolicies.carrierId], references: [carriers.id] }),
   vehicles: many(vehicles),
   policyDrivers: many(policyDrivers),
+  logs: many(policyLogs),
 }))
 
 export const vehiclesRelations = relations(vehicles, ({ one }) => ({
@@ -68,8 +70,14 @@ export const policyDriversRelations = relations(policyDrivers, ({ one }) => ({
   driver: one(drivers, { fields: [policyDrivers.driverId], references: [drivers.id] }),
 }))
 
+export const policyLogsRelations = relations(policyLogs, ({ one }) => ({
+  policy: one(autoPolicies, { fields: [policyLogs.policyId], references: [autoPolicies.id] }),
+  author: one(users, { fields: [policyLogs.authorId], references: [users.id] }),
+}))
+
 export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
+  policyLogs: many(policyLogs),
 }))
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({

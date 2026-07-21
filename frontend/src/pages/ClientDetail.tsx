@@ -10,9 +10,12 @@ import {
   type ExistingDriverOption,
 } from '@/components/clients/add-policy-dialog'
 import { EditPolicyDialog } from '@/components/clients/edit-policy-dialog'
+import { AddLogDialog } from '@/components/clients/add-log-dialog'
 import { PolicyCard } from '@/components/clients/policy-card'
+import { PolicyLogs } from '@/components/clients/policy-logs'
 import { PolicyTabs } from '@/components/clients/policy-tabs'
 import { useClientTabs } from '@/components/layout/client-tabs'
+import { useLogShortcut } from '@/hooks/use-log-shortcut'
 import { ApiError } from '@/api/client'
 import { clientDisplayName, getClient } from '@/api/clients'
 import { getPolicy, type Vehicle } from '@/api/policies'
@@ -72,6 +75,11 @@ function ClientDetail() {
     setUserSelectedId(null)
   }
   const selectedPolicyId = userSelectedId ?? newestPolicyId
+
+  const [logDialogOpen, setLogDialogOpen] = useState(false)
+  useLogShortcut(() => {
+    if (selectedPolicyId !== undefined) setLogDialogOpen(true)
+  })
 
   const policyDetails = policyQueries.map((query) => query.data)
 
@@ -190,12 +198,26 @@ function ClientDetail() {
                       />
                     )
                   }
+                  logs={
+                    <PolicyLogs
+                      policyId={policy.id}
+                      onAddLog={() => setLogDialogOpen(true)}
+                    />
+                  }
                 />
               )
             }}
           </PolicyTabs>
         )}
       </div>
+
+      {selectedPolicyId !== undefined && (
+        <AddLogDialog
+          policyId={selectedPolicyId}
+          open={logDialogOpen}
+          onOpenChange={setLogDialogOpen}
+        />
+      )}
     </div>
   )
 }

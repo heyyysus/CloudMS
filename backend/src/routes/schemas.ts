@@ -5,6 +5,7 @@ import {
   insertCarrierSchema,
   insertClientSchema,
   insertPersonSchema,
+  insertPolicyLogSchema,
   insertVehicleSchema,
 } from "../db/validation"
 
@@ -137,6 +138,16 @@ export const updatePolicyBody = policyCoreBody
 
 export const createVehicleBody = insertVehicleSchema.omit(omitMeta)
 export const updateVehicleBody = createVehicleBody.partial()
+
+// logNumber and authorId are assigned server-side (a per-policy counter and
+// the session user), never accepted from the client. Logs are immutable, so
+// there is no update body.
+export const createPolicyLogBody = insertPolicyLogSchema
+  .omit({ id: true, createdAt: true, logNumber: true, authorId: true })
+  .extend({
+    policyId: z.number().int().positive(),
+    body: z.string().trim().min(1).max(5000),
+  })
 
 export const createCarrierBody = insertCarrierSchema.omit(omitMeta)
 export const updateCarrierBody = createCarrierBody.partial()

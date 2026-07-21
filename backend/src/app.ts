@@ -7,6 +7,7 @@ import { carriersRouter } from "./routes/carriers"
 import { clientsRouter } from "./routes/clients"
 import { personsRouter } from "./routes/persons"
 import { policiesRouter } from "./routes/policies"
+import { policyLogsRouter } from "./routes/policyLogs"
 import { searchRouter } from "./routes/search"
 import { vehiclesRouter } from "./routes/vehicles"
 
@@ -20,6 +21,7 @@ app.use(authRouter)
 app.use(personsRouter)
 app.use(clientsRouter)
 app.use(policiesRouter)
+app.use(policyLogsRouter)
 app.use(vehiclesRouter)
 app.use(carriersRouter)
 app.use(searchRouter)

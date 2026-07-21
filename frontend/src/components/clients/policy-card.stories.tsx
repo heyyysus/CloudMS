@@ -93,6 +93,13 @@ export const Loaded: Story = {
   },
 }
 
+export const WithLogs: Story = {
+  args: {
+    detail,
+    logs: <p className="text-sm text-muted-foreground">Logs section (rendered by a parent).</p>,
+  },
+}
+
 export const LoadingVehicles: Story = {
   args: {
     isLoading: true,

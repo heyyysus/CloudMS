@@ -4,6 +4,7 @@ import {
   date,
   index,
   integer,
+  numeric,
   pgEnum,
   pgTable,
   serial,
@@ -281,5 +282,211 @@ export const policyLogs = pgTable(
   (table) => [
     index("policy_logs_policy_id_idx").on(table.policyId),
     unique("policy_logs_policy_id_log_number_unique").on(table.policyId, table.logNumber),
+  ]
+)
+
+// ---------------------------------------------------------------------------
+// Accounting
+//
+// The agency runs a trust-accounting model: a client pays the agency, the
+// money sits in the agency trust account, and on full payment the agency
+// "sweeps" the carrier's share out to the carrier and keeps its fee. Every
+// transaction is a policy-scoped invoice (one or more line items) plus the
+// payments made against it; each payment mints a receipt. Money is stored as
+// numeric(12,2) (exact decimal). Records are immutable - corrections are made
+// by voiding, which posts reversing trust-ledger entries rather than editing
+// or deleting rows.
+// ---------------------------------------------------------------------------
+
+export const invoiceStatusEnum = pgEnum("invoice_status", ["open", "closed", "void"])
+
+export const paymentMethodEnum = pgEnum("payment_method", [
+  "cash",
+  "check",
+  "credit_card",
+  "debit_card",
+])
+
+// Two line-item categories: "sweep" items are the carrier's share (money that
+// leaves the trust account to the carrier); "agency" items are the agency's
+// fee (money that goes to the agency).
+export const invoiceItemCategoryEnum = pgEnum("invoice_item_category", ["sweep", "agency"])
+
+export const invoiceItemTypeEnum = pgEnum("invoice_item_type", [
+  "new_business_sweep",
+  "installment_payment_sweep",
+  "endorsement_sweep",
+  "new_business_fee",
+  "installment_payment_fee",
+  "endorsement_fee",
+])
+
+// A trust-ledger row records one movement of money in or out of the agency
+// trust account. Balance = sum(in) - sum(out). Reversals are ordinary rows in
+// the opposite direction with reversalOfId set to the entry they cancel.
+export const trustLedgerEntryTypeEnum = pgEnum("trust_ledger_entry_type", [
+  "payment_received",
+  "carrier_sweep",
+  "agency_fee",
+])
+
+export const trustLedgerDirectionEnum = pgEnum("trust_ledger_direction", ["in", "out"])
+
+export const invoices = pgTable(
+  "invoices",
+  {
+    // id doubles as the agency-wide sequential invoice number.
+    id: serial("id").primaryKey(),
+    policyId: integer("policy_id")
+      .notNull()
+      .references(() => autoPolicies.id, { onDelete: "cascade" }),
+    // Denormalized from the policy so invoices are directly filterable by
+    // client without a join.
+    clientId: integer("client_id")
+      .notNull()
+      .references(() => clients.id),
+    createdBy: integer("created_by")
+      .notNull()
+      .references(() => users.id),
+    status: invoiceStatusEnum("status").notNull().default("open"),
+    total: numeric("total", { precision: 12, scale: 2 }).notNull(),
+    amountPaid: numeric("amount_paid", { precision: 12, scale: 2 }).notNull().default("0"),
+    note: text("note"),
+    voidedAt: timestamp("voided_at"),
+    voidedBy: integer("voided_by").references(() => users.id),
+    voidReason: text("void_reason"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("invoices_policy_id_idx").on(table.policyId),
+    index("invoices_client_id_idx").on(table.clientId),
+  ]
+)
+
+export const invoiceItems = pgTable(
+  "invoice_items",
+  {
+    id: serial("id").primaryKey(),
+    invoiceId: integer("invoice_id")
+      .notNull()
+      .references(() => invoices.id, { onDelete: "cascade" }),
+    category: invoiceItemCategoryEnum("category").notNull(),
+    type: invoiceItemTypeEnum("type").notNull(),
+    // Required for "sweep" items (which carrier the money goes to), null for
+    // "agency" items. Enforced in the repository/validation layer.
+    carrierId: integer("carrier_id").references(() => carriers.id),
+    description: text("description"),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("invoice_items_invoice_id_idx").on(table.invoiceId)]
+)
+
+export const payments = pgTable(
+  "payments",
+  {
+    id: serial("id").primaryKey(),
+    invoiceId: integer("invoice_id")
+      .notNull()
+      .references(() => invoices.id, { onDelete: "cascade" }),
+    policyId: integer("policy_id")
+      .notNull()
+      .references(() => autoPolicies.id, { onDelete: "cascade" }),
+    clientId: integer("client_id")
+      .notNull()
+      .references(() => clients.id),
+    method: paymentMethodEnum("method").notNull(),
+    // amount = what the client handed over; amountApplied = the part applied to
+    // the invoice; changeGiven = amount - amountApplied (returned to the
+    // client, never held in trust).
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    amountApplied: numeric("amount_applied", { precision: 12, scale: 2 }).notNull(),
+    changeGiven: numeric("change_given", { precision: 12, scale: 2 }).notNull().default("0"),
+    note: text("note"),
+    createdBy: integer("created_by")
+      .notNull()
+      .references(() => users.id),
+    voidedAt: timestamp("voided_at"),
+    voidedBy: integer("voided_by").references(() => users.id),
+    voidReason: text("void_reason"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("payments_invoice_id_idx").on(table.invoiceId),
+    index("payments_policy_id_idx").on(table.policyId),
+    index("payments_client_id_idx").on(table.clientId),
+  ]
+)
+
+export const receipts = pgTable(
+  "receipts",
+  {
+    // id doubles as the agency-wide sequential receipt number.
+    id: serial("id").primaryKey(),
+    // One receipt per payment.
+    paymentId: integer("payment_id")
+      .notNull()
+      .unique()
+      .references(() => payments.id, { onDelete: "cascade" }),
+    invoiceId: integer("invoice_id")
+      .notNull()
+      .references(() => invoices.id, { onDelete: "cascade" }),
+    policyId: integer("policy_id")
+      .notNull()
+      .references(() => autoPolicies.id, { onDelete: "cascade" }),
+    clientId: integer("client_id")
+      .notNull()
+      .references(() => clients.id),
+    createdBy: integer("created_by")
+      .notNull()
+      .references(() => users.id),
+    // Snapshot of the payment's effect on the invoice at receipt time.
+    amountApplied: numeric("amount_applied", { precision: 12, scale: 2 }).notNull(),
+    changeGiven: numeric("change_given", { precision: 12, scale: 2 }).notNull().default("0"),
+    amountDueAfter: numeric("amount_due_after", { precision: 12, scale: 2 }).notNull(),
+    invoiceClosed: boolean("invoice_closed").notNull(),
+    note: text("note"),
+    voidedAt: timestamp("voided_at"),
+    voidedBy: integer("voided_by").references(() => users.id),
+    voidReason: text("void_reason"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("receipts_invoice_id_idx").on(table.invoiceId),
+    index("receipts_policy_id_idx").on(table.policyId),
+    index("receipts_client_id_idx").on(table.clientId),
+  ]
+)
+
+export const trustLedger = pgTable(
+  "trust_ledger",
+  {
+    id: serial("id").primaryKey(),
+    policyId: integer("policy_id")
+      .notNull()
+      .references(() => autoPolicies.id, { onDelete: "cascade" }),
+    clientId: integer("client_id")
+      .notNull()
+      .references(() => clients.id),
+    invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }),
+    paymentId: integer("payment_id").references(() => payments.id, { onDelete: "cascade" }),
+    invoiceItemId: integer("invoice_item_id").references(() => invoiceItems.id, {
+      onDelete: "cascade",
+    }),
+    // Set on carrier_sweep entries (which carrier the money went to).
+    carrierId: integer("carrier_id").references(() => carriers.id),
+    entryType: trustLedgerEntryTypeEnum("entry_type").notNull(),
+    direction: trustLedgerDirectionEnum("direction").notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    // References another trust_ledger row this one reverses (void path).
+    reversalOfId: integer("reversal_of_id"),
+    note: text("note"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("trust_ledger_policy_id_idx").on(table.policyId),
+    index("trust_ledger_client_id_idx").on(table.clientId),
+    index("trust_ledger_invoice_id_idx").on(table.invoiceId),
   ]
 )

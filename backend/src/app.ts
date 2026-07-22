@@ -5,10 +5,14 @@ import { authRouter } from "./auth/routes"
 import { logger } from "./logger"
 import { carriersRouter } from "./routes/carriers"
 import { clientsRouter } from "./routes/clients"
+import { invoicesRouter } from "./routes/invoices"
+import { paymentsRouter } from "./routes/payments"
 import { personsRouter } from "./routes/persons"
 import { policiesRouter } from "./routes/policies"
 import { policyLogsRouter } from "./routes/policyLogs"
+import { receiptsRouter } from "./routes/receipts"
 import { searchRouter } from "./routes/search"
+import { trustLedgerRouter } from "./routes/trustLedger"
 import { vehiclesRouter } from "./routes/vehicles"
 
 const app: Application = express()
@@ -24,6 +28,10 @@ app.use(policiesRouter)
 app.use(policyLogsRouter)
 app.use(vehiclesRouter)
 app.use(carriersRouter)
+app.use(invoicesRouter)
+app.use(paymentsRouter)
+app.use(receiptsRouter)
+app.use(trustLedgerRouter)
 app.use(searchRouter)
 
 app.get("/health", (req: Request, res: Response) => {

@@ -1,5 +1,10 @@
 import { z } from "zod"
-import { driverRatingEnum } from "../db/schema"
+import {
+  driverRatingEnum,
+  invoiceItemCategoryEnum,
+  invoiceItemTypeEnum,
+  paymentMethodEnum,
+} from "../db/schema"
 import {
   insertAutoPolicySchema,
   insertCarrierSchema,
@@ -151,3 +156,76 @@ export const createPolicyLogBody = insertPolicyLogSchema
 
 export const createCarrierBody = insertCarrierSchema.omit(omitMeta)
 export const updateCarrierBody = createCarrierBody.partial()
+
+// Money arrives as a JSON number or a decimal string; normalize to a
+// 2-decimal string for the numeric(12,2) columns. `positiveMoney` rejects 0
+// and negatives.
+const positiveMoney = z.union([z.number(), z.string().trim().min(1)]).transform((value, ctx) => {
+  const n = typeof value === "number" ? value : Number(value)
+  if (!Number.isFinite(n) || n <= 0) {
+    ctx.addIssue({ code: "custom", message: "Must be a positive amount" })
+    return z.NEVER
+  }
+  return n.toFixed(2)
+})
+
+const SWEEP_TYPES: readonly string[] = [
+  "new_business_sweep",
+  "installment_payment_sweep",
+  "endorsement_sweep",
+]
+
+// A line item's type fixes its category and whether a carrier is allowed:
+// sweep types must be category "sweep" (money to a carrier); fee types must be
+// category "agency" (money to the agency, no carrier). The carrier on a sweep
+// item is optional here - the repository defaults it to the policy's carrier.
+export const createInvoiceItemBody = z
+  .object({
+    category: z.enum(invoiceItemCategoryEnum.enumValues),
+    type: z.enum(invoiceItemTypeEnum.enumValues),
+    carrierId: z.number().int().positive().nullable().optional(),
+    description: z.string().trim().max(500).nullable().optional(),
+    amount: positiveMoney,
+  })
+  .superRefine((item, ctx) => {
+    const isSweep = SWEEP_TYPES.includes(item.type)
+    if (isSweep && item.category !== "sweep") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["category"],
+        message: "Sweep types require category 'sweep'",
+      })
+    }
+    if (!isSweep && item.category !== "agency") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["category"],
+        message: "Fee types require category 'agency'",
+      })
+    }
+    if (!isSweep && item.carrierId != null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["carrierId"],
+        message: "Agency fee items must not have a carrier",
+      })
+    }
+  })
+
+export const createInvoiceBody = z.object({
+  policyId: z.number().int().positive(),
+  note: z.string().trim().max(2000).nullable().optional(),
+  items: z.array(createInvoiceItemBody).min(1),
+})
+
+export const recordPaymentBody = z.object({
+  invoiceId: z.number().int().positive(),
+  method: z.enum(paymentMethodEnum.enumValues),
+  amount: positiveMoney,
+  note: z.string().trim().max(2000).nullable().optional(),
+  receiptNote: z.string().trim().max(2000).nullable().optional(),
+})
+
+export const voidBody = z.object({
+  reason: z.string().trim().max(2000).nullable().optional(),
+})

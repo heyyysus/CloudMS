@@ -6,10 +6,15 @@ import {
   clientPhones,
   clients,
   drivers,
+  invoiceItems,
+  invoices,
+  payments,
   persons,
   policyDrivers,
   policyLogs,
+  receipts,
   sessions,
+  trustLedger,
   users,
   vehicles,
 } from "./schema"
@@ -59,6 +64,48 @@ export const autoPoliciesRelations = relations(autoPolicies, ({ one, many }) => 
   vehicles: many(vehicles),
   policyDrivers: many(policyDrivers),
   logs: many(policyLogs),
+  invoices: many(invoices),
+  payments: many(payments),
+  receipts: many(receipts),
+  trustLedger: many(trustLedger),
+}))
+
+export const invoicesRelations = relations(invoices, ({ one, many }) => ({
+  policy: one(autoPolicies, { fields: [invoices.policyId], references: [autoPolicies.id] }),
+  client: one(clients, { fields: [invoices.clientId], references: [clients.id] }),
+  createdByUser: one(users, { fields: [invoices.createdBy], references: [users.id] }),
+  items: many(invoiceItems),
+  payments: many(payments),
+  receipts: many(receipts),
+}))
+
+export const invoiceItemsRelations = relations(invoiceItems, ({ one }) => ({
+  invoice: one(invoices, { fields: [invoiceItems.invoiceId], references: [invoices.id] }),
+  carrier: one(carriers, { fields: [invoiceItems.carrierId], references: [carriers.id] }),
+}))
+
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  invoice: one(invoices, { fields: [payments.invoiceId], references: [invoices.id] }),
+  receipt: one(receipts, { fields: [payments.id], references: [receipts.paymentId] }),
+  createdByUser: one(users, { fields: [payments.createdBy], references: [users.id] }),
+}))
+
+export const receiptsRelations = relations(receipts, ({ one }) => ({
+  payment: one(payments, { fields: [receipts.paymentId], references: [payments.id] }),
+  invoice: one(invoices, { fields: [receipts.invoiceId], references: [invoices.id] }),
+  createdByUser: one(users, { fields: [receipts.createdBy], references: [users.id] }),
+}))
+
+export const trustLedgerRelations = relations(trustLedger, ({ one }) => ({
+  policy: one(autoPolicies, { fields: [trustLedger.policyId], references: [autoPolicies.id] }),
+  client: one(clients, { fields: [trustLedger.clientId], references: [clients.id] }),
+  invoice: one(invoices, { fields: [trustLedger.invoiceId], references: [invoices.id] }),
+  payment: one(payments, { fields: [trustLedger.paymentId], references: [payments.id] }),
+  invoiceItem: one(invoiceItems, {
+    fields: [trustLedger.invoiceItemId],
+    references: [invoiceItems.id],
+  }),
+  carrier: one(carriers, { fields: [trustLedger.carrierId], references: [carriers.id] }),
 }))
 
 export const vehiclesRelations = relations(vehicles, ({ one }) => ({

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useQuery, useQueries } from '@tanstack/react-query'
+import { ReceiptIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ClientSummaryCard } from '@/components/clients/client-summary-card'
@@ -11,6 +12,8 @@ import {
 } from '@/components/clients/add-policy-dialog'
 import { EditPolicyDialog } from '@/components/clients/edit-policy-dialog'
 import { AddLogDialog } from '@/components/clients/add-log-dialog'
+import { ClientInvoices } from '@/components/clients/client-invoices'
+import { InvoicePaymentDialog } from '@/components/clients/invoice-payment-dialog'
 import { PolicyCard } from '@/components/clients/policy-card'
 import { PolicyLogs } from '@/components/clients/policy-logs'
 import { PolicyTabs } from '@/components/clients/policy-tabs'
@@ -75,11 +78,19 @@ function ClientDetail() {
     setUserSelectedId(null)
   }
   const selectedPolicyId = userSelectedId ?? newestPolicyId
+  const selectedPolicy = sortedPolicies.find((policy) => policy.id === selectedPolicyId)
 
   const [logDialogOpen, setLogDialogOpen] = useState(false)
   useLogShortcut(() => {
     if (selectedPolicyId !== undefined) setLogDialogOpen(true)
   })
+
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false)
+  const [invoiceDialogTargetId, setInvoiceDialogTargetId] = useState<number | undefined>(undefined)
+  function openInvoiceDialog(invoiceId?: number) {
+    setInvoiceDialogTargetId(invoiceId)
+    setInvoiceDialogOpen(true)
+  }
 
   const policyDetails = policyQueries.map((query) => query.data)
 
@@ -155,7 +166,21 @@ function ClientDetail() {
         <p className="text-muted-foreground">Client #{client.id}</p>
       </div>
 
-      <ClientSummaryCard client={client} action={<EditClientDialog client={client} />} />
+      <ClientSummaryCard
+        client={client}
+        action={
+          <div className="flex gap-2">
+            {selectedPolicy && (
+              <Button size="sm" variant="outline" onClick={() => openInvoiceDialog()}>
+                <ReceiptIcon /> New invoice
+              </Button>
+            )}
+            <EditClientDialog client={client} />
+          </div>
+        }
+      />
+
+      <ClientInvoices clientId={client.id} onPay={(invoiceId) => openInvoiceDialog(invoiceId)} />
 
       <div>
         {sortedPolicies.length === 0 || selectedPolicyId === undefined ? (
@@ -216,6 +241,19 @@ function ClientDetail() {
           policyId={selectedPolicyId}
           open={logDialogOpen}
           onOpenChange={setLogDialogOpen}
+        />
+      )}
+
+      {selectedPolicy && (
+        <InvoicePaymentDialog
+          client={client}
+          policy={selectedPolicy}
+          open={invoiceDialogOpen}
+          onOpenChange={(next) => {
+            setInvoiceDialogOpen(next)
+            if (!next) setInvoiceDialogTargetId(undefined)
+          }}
+          initialInvoiceId={invoiceDialogTargetId}
         />
       )}
     </div>

@@ -136,3 +136,29 @@
     @apply font-sans;
     }
 }
+
+/* Printing an invoice receipt. The receipt lives in a Radix dialog that is
+   portaled onto <body> as a sibling of the app root (#root), so hiding #root
+   drops the whole app while the dialog survives. The dialog's fixed centering
+   and chrome (overlay, header, footer, close button) are then neutralised so
+   the receipt flows from the top of page 1 and paginates normally. */
+@media print {
+  #root,
+  [data-slot="dialog-overlay"],
+  [data-slot="dialog-close"] {
+    display: none !important;
+  }
+  [data-slot="dialog-content"] {
+    position: static !important;
+    /* Tailwind v4 centres the dialog with the standalone `translate` property
+       (not `transform`), which shifts even a static box — clear both. */
+    transform: none !important;
+    translate: none !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    padding: 24px !important;
+  }
+}

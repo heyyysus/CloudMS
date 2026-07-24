@@ -10,10 +10,16 @@ import { amountDueCents, getInvoices } from '@/api/invoices'
 interface ClientInvoicesProps {
   clientId: number
   onPay: (invoiceId: number) => void
+  onSelect: (invoiceId: number) => void
   getInvoicesFn?: typeof getInvoices
 }
 
-export function ClientInvoices({ clientId, onPay, getInvoicesFn = getInvoices }: ClientInvoicesProps) {
+export function ClientInvoices({
+  clientId,
+  onPay,
+  onSelect,
+  getInvoicesFn = getInvoices,
+}: ClientInvoicesProps) {
   const {
     data: invoices,
     isPending,
@@ -46,27 +52,42 @@ export function ClientInvoices({ clientId, onPay, getInvoicesFn = getInvoices }:
             return (
               <div
                 key={invoice.id}
-                className="flex items-center justify-between gap-3 rounded-lg border p-2 text-sm"
+                className="flex items-center justify-between gap-1 rounded-lg border pr-2 text-sm"
               >
-                <div>
-                  <p className="font-medium">Invoice #{invoice.id}</p>
-                  <p className={cn('text-xs capitalize', INVOICE_STATUS_TEXT_CLASS[invoice.status])}>
-                    {INVOICE_STATUS_LABEL[invoice.status]}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p>{formatMoney(invoice.total)}</p>
+                {/* The selectable area (opens the printable receipt) and the Pay
+                    button are siblings, never nested, so each is its own control. */}
+                <button
+                  type="button"
+                  onClick={() => onSelect(invoice.id)}
+                  className="flex flex-1 cursor-pointer items-center justify-between gap-3 rounded-lg p-2 text-left hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  <span>
+                    <span className="block font-medium">Invoice #{invoice.id}</span>
+                    <span
+                      className={cn('block text-xs capitalize', INVOICE_STATUS_TEXT_CLASS[invoice.status])}
+                    >
+                      {INVOICE_STATUS_LABEL[invoice.status]}
+                    </span>
+                  </span>
+                  <span className="text-right">
+                    <span className="block">{formatMoney(invoice.total)}</span>
                     {invoice.status === 'open' && (
-                      <p className="text-xs text-muted-foreground">{formatMoney(dueCents / 100)} due</p>
+                      <span className="block text-xs text-muted-foreground">
+                        {formatMoney(dueCents / 100)} due
+                      </span>
                     )}
-                  </div>
-                  {invoice.status === 'open' && (
-                    <Button type="button" size="sm" variant="outline" onClick={() => onPay(invoice.id)}>
-                      Pay
-                    </Button>
-                  )}
-                </div>
+                  </span>
+                </button>
+                {invoice.status === 'open' && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onPay(invoice.id)}
+                  >
+                    Pay
+                  </Button>
+                )}
               </div>
             )
           })}

@@ -49,6 +49,58 @@ export function getInvoices(clientId: number, signal?: AbortSignal): Promise<Inv
   return request(`/invoices?clientId=${clientId}`, { signal })
 }
 
+export interface InvoicePayment {
+  id: number
+  invoiceId: number
+  policyId: number
+  clientId: number
+  method: PaymentMethod
+  amount: string
+  amountApplied: string
+  changeGiven: string
+  note: string | null
+  voidedAt: string | null
+  voidedBy: number | null
+  voidReason: string | null
+  createdAt: string
+}
+
+export interface InvoiceReceipt {
+  id: number
+  paymentId: number
+  invoiceId: number
+  policyId: number
+  clientId: number
+  amountApplied: string
+  changeGiven: string
+  amountDueAfter: string
+  invoiceClosed: boolean
+  note: string | null
+  voidedAt: string | null
+  voidedBy: number | null
+  voidReason: string | null
+  createdAt: string
+}
+
+export interface InvoiceCreatedByUser {
+  id: number
+  name: string | null
+  email: string
+}
+
+// Detail shape (GET /invoices/:id): the list-row Invoice plus its payments,
+// receipts, and the user who created it. Amount due is still derived on the
+// client (total - amountPaid via amountDueCents); the API doesn't send it.
+export interface InvoiceDetail extends Invoice {
+  payments: InvoicePayment[]
+  receipts: InvoiceReceipt[]
+  createdByUser: InvoiceCreatedByUser | null
+}
+
+export function getInvoice(id: number, signal?: AbortSignal): Promise<InvoiceDetail> {
+  return request(`/invoices/${id}`, { signal })
+}
+
 export function amountDueCents(invoice: Pick<Invoice, 'total' | 'amountPaid'>): number {
   return toCents(invoice.total) - toCents(invoice.amountPaid)
 }

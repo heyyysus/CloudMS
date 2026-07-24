@@ -14,6 +14,7 @@ import { EditPolicyDialog } from '@/components/clients/edit-policy-dialog'
 import { AddLogDialog } from '@/components/clients/add-log-dialog'
 import { ClientInvoices } from '@/components/clients/client-invoices'
 import { InvoicePaymentDialog } from '@/components/clients/invoice-payment-dialog'
+import { InvoiceReceiptDialog } from '@/components/clients/invoice-receipt-dialog'
 import { PolicyCard } from '@/components/clients/policy-card'
 import { PolicyLogs } from '@/components/clients/policy-logs'
 import { PolicyTabs } from '@/components/clients/policy-tabs'
@@ -90,6 +91,13 @@ function ClientDetail() {
   function openInvoiceDialog(invoiceId?: number) {
     setInvoiceDialogTargetId(invoiceId)
     setInvoiceDialogOpen(true)
+  }
+
+  const [receiptDialogOpen, setReceiptDialogOpen] = useState(false)
+  const [receiptInvoiceId, setReceiptInvoiceId] = useState<number | undefined>(undefined)
+  function openReceiptDialog(invoiceId: number) {
+    setReceiptInvoiceId(invoiceId)
+    setReceiptDialogOpen(true)
   }
 
   const policyDetails = policyQueries.map((query) => query.data)
@@ -180,7 +188,11 @@ function ClientDetail() {
         }
       />
 
-      <ClientInvoices clientId={client.id} onPay={(invoiceId) => openInvoiceDialog(invoiceId)} />
+      <ClientInvoices
+        clientId={client.id}
+        onPay={(invoiceId) => openInvoiceDialog(invoiceId)}
+        onSelect={(invoiceId) => openReceiptDialog(invoiceId)}
+      />
 
       <div>
         {sortedPolicies.length === 0 || selectedPolicyId === undefined ? (
@@ -256,6 +268,17 @@ function ClientDetail() {
           initialInvoiceId={invoiceDialogTargetId}
         />
       )}
+
+      <InvoiceReceiptDialog
+        client={client}
+        policies={client.policies}
+        invoiceId={receiptInvoiceId}
+        open={receiptDialogOpen}
+        onOpenChange={(next) => {
+          setReceiptDialogOpen(next)
+          if (!next) setReceiptInvoiceId(undefined)
+        }}
+      />
     </div>
   )
 }

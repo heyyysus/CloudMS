@@ -73,6 +73,7 @@ const meta = {
   args: {
     clientId: 155,
     onPay: fn(),
+    onSelect: fn(),
   },
   decorators: [
     (Story) => (
@@ -97,8 +98,15 @@ export const ListsInvoicesWithDueAmount: Story = {
     await expect(canvas.getByText('Invoice #9')).toBeInTheDocument()
     await expect(canvas.queryByRole('button', { name: /pay/i })).toBeInTheDocument()
 
+    // Clicking a row (here the closed invoice, which has no Pay button) opens
+    // the receipt.
+    await userEvent.click(canvas.getByText('Invoice #9'))
+    await expect(args.onSelect).toHaveBeenCalledWith(9)
+
+    // Paying stops propagation, so it fires onPay without also selecting.
     await userEvent.click(canvas.getByRole('button', { name: /pay/i }))
     await expect(args.onPay).toHaveBeenCalledWith(10)
+    await expect(args.onSelect).toHaveBeenCalledTimes(1)
   },
 }
 

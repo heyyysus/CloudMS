@@ -136,3 +136,38 @@
     @apply font-sans;
     }
 }
+
+/* Printing an invoice receipt: hide everything except #receipt-print-area and
+   lift it out of the (fixed, centered) dialog so it prints alone at the top of
+   the page. The receipt lives inside a Radix dialog portaled onto <body>; the
+   overlay is dropped and the dialog container is neutralised to static flow so
+   the printable content isn't clipped by the dialog's max-width/height. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  [data-slot="dialog-overlay"] {
+    display: none !important;
+  }
+  [data-slot="dialog-content"] {
+    position: static !important;
+    transform: none !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    padding: 0 !important;
+  }
+  #receipt-print-area,
+  #receipt-print-area * {
+    visibility: visible;
+  }
+  #receipt-print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 24px;
+  }
+}

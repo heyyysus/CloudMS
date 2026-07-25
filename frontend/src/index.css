@@ -151,8 +151,14 @@
   [data-slot="dialog-content"] {
     position: static !important;
     /* Tailwind v4 centres the dialog with the standalone `translate` property
-       (not `transform`), which shifts even a static box — clear both. */
-    transform: none !important;
+       (not `transform` - nothing here sets that). Do NOT also add a
+       `transform: none !important` line: in production, Lightning CSS merges
+       adjacent `transform`/`translate` !important declarations into a single
+       `transform: translate(0) !important`, which does NOT cancel the
+       separate `translate` property - dev builds don't minify, so this only
+       breaks the deployed build (dialog ends up flung to the top-left,
+       shifted by -50%/-50% of its own size). Keep this as the only
+       transform-related override here. */
     translate: none !important;
     max-width: none !important;
     max-height: none !important;

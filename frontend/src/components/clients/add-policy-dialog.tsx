@@ -1,9 +1,15 @@
 import { useState } from 'react'
-import { useForm, useFieldArray, Controller } from 'react-hook-form'
+import {
+  useForm,
+  useFieldArray,
+  Controller,
+  type UseFormWatch,
+  type UseFormSetValue,
+} from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { PlusIcon, XIcon } from 'lucide-react'
+import { Loader2, PlusIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Combobox } from '@/components/ui/combobox'
 import { Input } from '@/components/ui/input'
@@ -44,6 +50,7 @@ import {
 } from '@/api/policies'
 import { COVERAGE_LABELS } from '@/components/clients/policy-card'
 import { AddressFields } from '@/components/clients/address-fields'
+import { decodeVIN } from '@/api/vinDecoder'
 import { localTodayIsoDate } from '@/lib/policy-status'
 import {
   addressFormSchema,
@@ -147,7 +154,7 @@ const addPolicySchema = z
     }),
     vehicles: z.array(
       z.object({
-        vin: z.string().trim().min(1, 'VIN is required').max(17, 'Max 17 characters'),
+        vin: z.string().trim().min(17, 'VIN is required').max(17, 'Max 17 characters'),
         make: z.string().trim().min(1, 'Make is required').max(100, 'Max 100 characters'),
         model: z.string().trim().min(1, 'Model is required').max(100, 'Max 100 characters'),
         year: z.string().trim().regex(/^\d{4}$/, 'Enter a 4-digit year'),
@@ -209,15 +216,7 @@ const addPolicySchema = z
       }
       vins.add(vin)
     })
-    values.existingDrivers.forEach((driver, index) => {
-      if (driver.checked && !driver.hasDriverRow && driver.dlNumber.trim() === '') {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['existingDrivers', index, 'dlNumber'],
-          message: 'DL number is required',
-        })
-      }
-    })
+    
   })
 
 export type AddPolicyFormValues = z.infer<typeof addPolicySchema>
@@ -225,6 +224,7 @@ export type AddPolicyFormValues = z.infer<typeof addPolicySchema>
 function pad(n: number): string {
   return String(n).padStart(2, '0')
 }
+
 
 // Month arithmetic on the Y/M/D parts of a YYYY-MM-DD string, clamping the
 // day to the target month (Jan 31 + 1 month → Feb 28). Avoids Date-string
@@ -390,6 +390,61 @@ function toBody(values: AddPolicyFormValues, clientId: number): CreatePolicyBody
     })),
     drivers,
   }
+}
+
+// Looks up year/make/model from the VIN decode API and fills them into the
+// vehicle row at `index`. Only enabled once the VIN is a full 17 characters.
+function VerifyVinButton({
+  index,
+  watch,
+  setValue,
+}: {
+  index: number
+  watch: UseFormWatch<AddPolicyFormValues>
+  setValue: UseFormSetValue<AddPolicyFormValues>
+}) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'notfound'>('idle')
+  const vin = (watch(`vehicles.${index}.vin`) ?? '').trim()
+  const canVerify = vin.length === 17
+
+  const handleVerify = async () => {
+    setStatus('loading')
+    try {
+      const result = await decodeVIN(vin)
+      if (result?.isValid) {
+        const opts = { shouldValidate: true, shouldDirty: true }
+        if (result.year) setValue(`vehicles.${index}.year`, result.year, opts)
+        if (result.make) setValue(`vehicles.${index}.make`, result.make, opts)
+        if (result.model) setValue(`vehicles.${index}.model`, result.model, opts)
+        setStatus('idle')
+      } else {
+        setStatus('notfound')
+      }
+    } catch {
+      setStatus('error')
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={!canVerify || status === 'loading'}
+        onClick={handleVerify}
+      >
+        {status === 'loading' ? <Loader2 className="animate-spin" /> : null}
+        Verify
+      </Button>
+      {status === 'notfound' && (
+        <p className="text-xs text-destructive">VIN not found.</p>
+      )}
+      {status === 'error' && (
+        <p className="text-xs text-destructive">Couldn't verify VIN. Try again.</p>
+      )}
+    </div>
+  )
 }
 
 const EMPTY_VEHICLE_ROW = {
@@ -736,10 +791,13 @@ export function AddPolicyForm({
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Field data-invalid={!!errors.vehicles?.[index]?.vin}>
                     <FieldLabel htmlFor={`add-policy-vehicle-${index}-vin`}>VIN</FieldLabel>
-                    <Input
-                      id={`add-policy-vehicle-${index}-vin`}
-                      {...register(`vehicles.${index}.vin`)}
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id={`add-policy-vehicle-${index}-vin`}
+                        {...register(`vehicles.${index}.vin`)}
+                      />
+                      <VerifyVinButton index={index} watch={watch} setValue={setValue} />
+                    </div>
                     <FieldError
                       errors={
                         errors.vehicles?.[index]?.vin ? [errors.vehicles[index]?.vin] : undefined

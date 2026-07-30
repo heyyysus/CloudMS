@@ -14,6 +14,7 @@ import { receiptsRouter } from "./routes/receipts"
 import { searchRouter } from "./routes/search"
 import { trustLedgerRouter } from "./routes/trustLedger"
 import { vehiclesRouter } from "./routes/vehicles"
+import { vinDecoderRouter } from "./routes/vinDecoder"
 
 const app: Application = express()
 
@@ -33,6 +34,7 @@ app.use(paymentsRouter)
 app.use(receiptsRouter)
 app.use(trustLedgerRouter)
 app.use(searchRouter)
+app.use(vinDecoderRouter)
 
 app.get("/health", (req: Request, res: Response) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() })

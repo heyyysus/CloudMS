@@ -9,8 +9,8 @@ export class ApiError extends Error {
   }
 }
 
-export async function request<T>(path: string, init?: RequestInit, base_url=BASE): Promise<T> {
-  const res = await fetch(`${base_url}${path}`, {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',

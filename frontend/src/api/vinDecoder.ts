@@ -1,43 +1,15 @@
-import { request } from "./client";
-
-const DECODE_BASE = "https://vpic.nhtsa.dot.gov/api";
-
-interface VinDecodeHttpResponse {
-    Count:          number;
-    Message:        string;
-    SearchCriteria: string;
-    Results:        { 
-        "ModelYear"?: string;
-        "Make"?: string;
-        "Model"?: string;
-     }[];
-}
+import { request } from './client'
 
 export interface VinDecodeResult {
-    isValid: boolean;
-    year?: string;
-    make?: string;
-    model?: string;
+  isValid: boolean
+  year?: string
+  make?: string
+  model?: string
 }
 
-
-export async function decodeVIN(vin: string): Promise<VinDecodeResult | null> {
-    
-    
-    const response = await request<VinDecodeHttpResponse>(
-    `/vehicles/decodevinvalues/${vin}?format=json`, 
-    { 'method': 'GET' }, 
-    DECODE_BASE );
-
-    if (response && response.Count > 0 && response.Results.length > 0){
-        return {
-            isValid: true,
-            year: response?.Results?.at(0)?.ModelYear,
-            make: response?.Results.at(0)?.Make,  
-            model: response?.Results.at(0)?.Model,    
-        }
-    }
-
-    return null;
-
-};
+// Decodes a VIN through the backend, which proxies the NHTSA vPIC lookup. An
+// unrecognized VIN comes back as `isValid: false` rather than an error, so only
+// a genuine failure (network, 502) throws.
+export function decodeVIN(vin: string, signal?: AbortSignal): Promise<VinDecodeResult> {
+  return request(`/vin-decode?vin=${encodeURIComponent(vin)}`, { signal })
+}

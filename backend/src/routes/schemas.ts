@@ -25,6 +25,17 @@ export const idParam = z.coerce.number().int().positive()
 
 export const searchQuery = z.object({ q: z.string().trim().min(2).max(100) })
 
+// A VIN is exactly 17 characters and never contains I, O, or Q (excluded by the
+// standard so they can't be misread as 1 and 0).
+export const vinDecodeQuery = z.object({
+  vin: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .length(17, "A VIN is 17 characters")
+    .regex(/^[A-HJ-NPR-Z0-9]+$/, "Invalid VIN"),
+})
+
 const omitMeta = { id: true, createdAt: true, updatedAt: true } as const
 
 // Address state/zip columns come back from drizzle-zod as bare nullable

@@ -1,8 +1,8 @@
-# API Reference: Clients, Persons, Policies, Vehicles, Policy Logs, Carriers, Accounting, Search
+# API Reference: Clients, Persons, Policies, Vehicles, Policy Logs, Carriers, Accounting, Search, VIN decode
 
 This documents the HTTP API for managing the personal-auto book of business:
-clients, persons, auto policies, vehicles, policy logs, carriers, and
-cross-entity search.
+clients, persons, auto policies, vehicles, policy logs, carriers,
+cross-entity search, and VIN decoding.
 It complements [`AUTH_SESSIONS_EXPLAINED.md`](./AUTH_SESSIONS_EXPLAINED.md),
 which covers login/session mechanics and the `admin`/`staff` role model in
 depth — this doc assumes that context and focuses on the resource routes.
@@ -543,4 +543,42 @@ Example error (`GET /search?q=a`, below the minimum length of 2):
 
 ```json
 { "error": "Too small: expected string to have >=2 characters" }
+```
+
+## VIN decode
+
+Decodes a VIN into year/make/model so vehicle entry can be prefilled. The
+lookup is served by the **NHTSA vPIC API**
+(`https://vpic.nhtsa.dot.gov/api/vehicles/decodevinvalues/:vin`), proxied
+through this route rather than called from the browser: it keeps the vendor URL
+and response shape out of the client, puts the call behind the same session
+auth as everything else, and gives caching one place to live. **Responses are
+not cached yet.**
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| GET | `/vin-decode?vin=` | any | `vin` is required: exactly 17 characters, `A-Z`/`0-9` excluding `I`, `O`, `Q`; lowercase input is upcased before the upstream call |
+
+Status codes specific to this route:
+
+- `200` — the lookup completed. `isValid` says whether vPIC recognized the VIN;
+  see below.
+- `400` — `vin` missing or malformed (`"A VIN is 17 characters"` / `"Invalid VIN"`).
+- `502` — vPIC was unreachable, timed out (5s), or answered with an error status.
+
+**An unrecognized VIN is a `200`, not a `404`** — the response carries
+`isValid: false`. A caller can then distinguish "no such VIN" from "the lookup
+itself failed" (`502`) without treating both as errors. Fields vPIC couldn't
+determine are omitted rather than returned as empty strings.
+
+Example response (`GET /vin-decode?vin=1HGCM82633A123456`):
+
+```json
+{ "isValid": true, "year": "2003", "make": "HONDA", "model": "Accord" }
+```
+
+Example response for a VIN vPIC can't identify:
+
+```json
+{ "isValid": false }
 ```

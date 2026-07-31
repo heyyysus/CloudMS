@@ -240,3 +240,12 @@ export const recordPaymentBody = z.object({
 export const voidBody = z.object({
   reason: z.string().trim().max(2000).nullable().optional(),
 })
+
+// `to` restricts the send to a subset of the client's on-file addresses; the
+// route rejects any address not already on the client record. Omitted means
+// every address on file.
+export const sendClientEmailBody = z.object({
+  subject: z.string().trim().min(1).max(200),
+  body: z.string().trim().min(1).max(20000),
+  to: z.array(z.email()).min(1).max(20).optional(),
+})

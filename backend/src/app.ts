@@ -6,6 +6,7 @@ import { logger } from "./logger"
 import { carriersRouter } from "./routes/carriers"
 import { clientsRouter } from "./routes/clients"
 import { invoicesRouter } from "./routes/invoices"
+import { mailRouter } from "./routes/mail"
 import { paymentsRouter } from "./routes/payments"
 import { personsRouter } from "./routes/persons"
 import { policiesRouter } from "./routes/policies"
@@ -32,6 +33,7 @@ app.use(carriersRouter)
 app.use(invoicesRouter)
 app.use(paymentsRouter)
 app.use(receiptsRouter)
+app.use(mailRouter)
 app.use(trustLedgerRouter)
 app.use(searchRouter)
 app.use(vinDecoderRouter)

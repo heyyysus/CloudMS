@@ -582,3 +582,34 @@ Example response for a VIN vPIC can't identify:
 ```json
 { "isValid": false }
 ```
+
+## Client email
+
+Sends an email to a client, via **Resend**'s HTTP API (see `backend/src/mailer.ts`).
+Admin-only, since it's a free-text send. Recipients are restricted to
+addresses already recorded on the client (`client_emails`) — `to` narrows
+which of those addresses receive the message, it never adds a new one, so a
+compromised session can't turn this into an open relay.
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| POST | `/clients/:clientId/send-email` | admin | body: `{ subject, body, to? }`; `to` (optional) is an array of addresses that must already be on file for the client — omit it to send to every address on file |
+
+Status codes specific to this route:
+
+- `201` — sent. Body is `{ id, to }`, where `id` is the Resend message id and
+  `to` is the resolved recipient list.
+- `400` — `subject`/`body` missing or invalid, or `to` includes an address not
+  on file for this client.
+- `404` — no client with that id.
+- `422` — the client has no email address on file.
+- `502` — Resend was unreachable, timed out (10s), or answered with an error
+  status (e.g. rate limited).
+- `503` — `RESEND_API_KEY` or `MAIL_FROM` isn't configured on the server.
+
+Example response (`POST /clients/42/send-email`, body
+`{ "subject": "Renewal", "body": "Your policy renews soon." }`):
+
+```json
+{ "id": "49a3999c-0ce1-4ea6-ab68-afcd6dc2e794", "to": ["client@example.com"] }
+```

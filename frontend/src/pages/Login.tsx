@@ -5,8 +5,6 @@ import { useGoogleSignIn } from '../auth/useGoogleSignIn'
 import { loginWithGoogle } from '../api/auth'
 import { ApiError } from '../api/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { cn } from '@/lib/utils'
 
 function errorMessage(err: unknown): string {
   if (err instanceof ApiError) {
@@ -34,7 +32,7 @@ function Login() {
     [navigate, setUser],
   )
 
-  const { buttonRef, ready, error: scriptError } = useGoogleSignIn(handleCredential)
+  const { buttonRef, error: scriptError } = useGoogleSignIn(handleCredential)
 
   if (loading) return null
   if (user) return <Navigate to="/home" replace />
@@ -48,20 +46,7 @@ function Login() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-3">
-            <div className="relative flex min-h-11 items-center">
-              {!ready && <Skeleton className="absolute inset-0" />}
-              {/* Kept laid out (transparent, not `hidden`) while GIS renders: it needs a
-                  measurable box, and the button width is read off this element. Its height
-                  is clamped until then so GIS's transient two-line render can't shift the
-                  card. */}
-              <div
-                ref={buttonRef}
-                className={cn(
-                  'flex w-full justify-center transition-opacity duration-150',
-                  ready ? 'opacity-100' : 'h-11 overflow-hidden opacity-0',
-                )}
-              />
-            </div>
+            <div className="flex justify-center" ref={buttonRef} />
           </div>
           {(scriptError || signInError) && (
             <p className="mt-4 text-center text-sm text-destructive">

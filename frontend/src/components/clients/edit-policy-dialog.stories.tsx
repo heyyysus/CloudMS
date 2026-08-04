@@ -175,6 +175,26 @@ export const OpensAndPrefills: Story = {
   },
 }
 
+// The BI/PD defaults applied to new policies must not leak into editing: a
+// policy stored without those coverages keeps showing "None".
+export const KeepsMissingCoveragesEmpty: Story = {
+  args: {
+    policy: {
+      ...policy,
+      vehicles: [{ ...policy.vehicles[0], coverageBi: null, coveragePd: null }],
+    },
+    updatePolicyFn: fn(async () => savedPolicy),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByRole('button', { name: /^edit$/i }))
+    await screen.findByLabelText(/policy number/i)
+
+    await expect(screen.getByRole('combobox', { name: /^bi$/i })).toHaveTextContent(/none/i)
+    await expect(screen.getByRole('combobox', { name: /^pd$/i })).toHaveTextContent(/none/i)
+  },
+}
+
 export const SubmitSavesAndCloses: Story = {
   args: {
     updatePolicyFn: fn(async () => savedPolicy),

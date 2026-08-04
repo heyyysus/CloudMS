@@ -64,6 +64,8 @@ import {
 import {
   BI_LIMITS,
   DEDUCTIBLES,
+  DEFAULT_BI_LIMIT,
+  DEFAULT_PD_LIMIT,
   MEDPAY_LIMITS,
   PD_LIMITS,
   RENTAL_LIMITS,
@@ -292,9 +294,11 @@ function toFormValues({ client, existingDrivers, initial }: ToFormValuesArgs): A
     effectiveDate,
     term: initial ? deriveTerm(effectiveDate, initial.expirationDate) : DEFAULT_TERM,
     expirationDate: initial?.expirationDate ?? addMonths(effectiveDate, Number(DEFAULT_TERM)),
+    // New policies start at the common baseline limits; editing keeps whatever
+    // the policy already has, so an existing policy without BI/PD stays "None".
     defaultCoverages: {
-      bi: firstVehicle?.coverageBi ?? '',
-      pd: firstVehicle?.coveragePd ?? '',
+      bi: initial ? (firstVehicle?.coverageBi ?? '') : DEFAULT_BI_LIMIT,
+      pd: initial ? (firstVehicle?.coveragePd ?? '') : DEFAULT_PD_LIMIT,
       umbi: firstVehicle?.coverageUmbi ?? '',
       umpd: firstVehicle?.coverageUmpd ?? '',
       medpay: firstVehicle?.coverageMedpay ?? '',

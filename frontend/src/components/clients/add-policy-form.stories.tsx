@@ -158,6 +158,18 @@ export const CopyFromExistingVehicle: Story = {
   },
 }
 
+// New policies prefill BI and PD; every other coverage starts at "None".
+export const DefaultCoverages: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByRole('combobox', { name: /^bi$/i })).toHaveTextContent('30/60')
+    await expect(canvas.getByRole('combobox', { name: /^pd$/i })).toHaveTextContent('15')
+    await expect(canvas.getByRole('combobox', { name: /^um\/bi$/i })).toHaveTextContent(/none/i)
+    await expect(canvas.getByRole('combobox', { name: /^um\/pd$/i })).toHaveTextContent(/none/i)
+    await expect(canvas.getByRole('combobox', { name: /med pay/i })).toHaveTextContent(/none/i)
+  },
+}
+
 export const ValidationErrors: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement)
@@ -201,7 +213,7 @@ export const SubmitFansOutCoverages: Story = {
             vin: '1HGCM82633A004352',
             year: 2018,
             coverageBi: '100/300',
-            coveragePd: null,
+            coveragePd: '15',
             coverageColl: '500',
           }),
         ],

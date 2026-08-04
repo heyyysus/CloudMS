@@ -18,6 +18,11 @@ export const BI_LIMITS = [
 
 export const PD_LIMITS = ['15', '25', '50', '100', '250', '500']
 
+// Prefilled on new policies. Must stay members of the arrays above, otherwise
+// the coverage select treats them as legacy values.
+export const DEFAULT_BI_LIMIT = '30/60'
+export const DEFAULT_PD_LIMIT = '15'
+
 export const MEDPAY_LIMITS = ['500', '1,000', '2,500', '5,000', '10,000', '25,000', '50,000']
 
 export const UMPD_LIMITS = ['3.5']

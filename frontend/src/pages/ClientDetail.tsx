@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useQuery, useQueries } from '@tanstack/react-query'
-import { ReceiptIcon } from 'lucide-react'
+import { CheckIcon, CopyIcon, ReceiptIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ClientSummaryCard } from '@/components/clients/client-summary-card'
 import { EditClientDialog } from '@/components/clients/edit-client-dialog'
 import {
@@ -21,9 +22,40 @@ import { PolicyTabs } from '@/components/clients/policy-tabs'
 import { useClientTabs } from '@/components/layout/client-tabs'
 import { useLogShortcut } from '@/hooks/use-log-shortcut'
 import { ApiError } from '@/api/client'
-import { clientDisplayName, getClient } from '@/api/clients'
+import { clientDisplayName, formatClientId, getClient } from '@/api/clients'
 import { getPolicy, type Vehicle } from '@/api/policies'
 import { sortPoliciesByCreatedAt } from '@/lib/policy-status'
+
+function ClientIdCopyButton({ id }: { id: number }) {
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (!copied) return
+    const timeout = setTimeout(() => setCopied(false), 1500)
+    return () => clearTimeout(timeout)
+  }, [copied])
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-auto gap-1.5 px-1.5 py-0.5 font-mono text-muted-foreground"
+          aria-label="Copy client ID"
+          onClick={() => {
+            navigator.clipboard.writeText(formatClientId(id))
+            setCopied(true)
+          }}
+        >
+          {copied ? <CheckIcon /> : <CopyIcon />}
+          {formatClientId(id)}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{copied ? 'Copied!' : 'Copy client ID'}</TooltipContent>
+    </Tooltip>
+  )
+}
 
 function ClientDetail() {
   const params = useParams<{ clientId: string }>()
@@ -160,7 +192,7 @@ function ClientDetail() {
   if (isPending || !client) {
     return (
       <div className="flex flex-col gap-6">
-        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-7 w-24" />
         <Skeleton className="h-40 w-full" />
         <Skeleton className="h-40 w-full" />
       </div>
@@ -169,10 +201,7 @@ function ClientDetail() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{clientDisplayName(client)}</h1>
-        <p className="text-muted-foreground">Client #{client.id}</p>
-      </div>
+      <ClientIdCopyButton id={client.id} />
 
       <ClientSummaryCard
         client={client}

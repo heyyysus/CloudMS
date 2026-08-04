@@ -113,3 +113,7 @@ export function clientDisplayName(client: {
 }): string {
   return `${client.namedInsured.firstName} ${client.namedInsured.lastName}`
 }
+
+export function formatClientId(id: number): string {
+  return String(id).padStart(5, '0')
+}

@@ -1,12 +1,46 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { CheckIcon, CopyIcon } from 'lucide-react'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { clientDisplayName, type ClientDetail } from '@/api/clients'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { clientDisplayName, formatClientId, type ClientDetail } from '@/api/clients'
 import { formatAddress, pickAddress } from '@/lib/address'
 
 interface ClientSummaryCardProps {
   client: Omit<ClientDetail, 'policies'>
   action?: ReactNode
+}
+
+function ClientIdCopyButton({ id }: { id: number }) {
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (!copied) return
+    const timeout = setTimeout(() => setCopied(false), 1500)
+    return () => clearTimeout(timeout)
+  }, [copied])
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 font-mono font-normal text-muted-foreground"
+          aria-label="Copy client ID"
+          onClick={() => {
+            navigator.clipboard.writeText(formatClientId(id))
+            setCopied(true)
+          }}
+        >
+          {copied ? <CheckIcon /> : <CopyIcon />}
+          {formatClientId(id)}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{copied ? 'Copied!' : 'Copy client ID'}</TooltipContent>
+    </Tooltip>
+  )
 }
 
 export function ClientSummaryCard({ client, action }: ClientSummaryCardProps) {
@@ -17,7 +51,10 @@ export function ClientSummaryCard({ client, action }: ClientSummaryCardProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{clientDisplayName(client)}</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          {clientDisplayName(client)}
+          <ClientIdCopyButton id={client.id} />
+        </CardTitle>
         {action && <CardAction>{action}</CardAction>}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">

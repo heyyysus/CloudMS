@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { ClientSummaryCard } from './client-summary-card'
 import { Button } from '@/components/ui/button'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import type { ClientDetail } from '@/api/clients'
 
 const fullClient: Omit<ClientDetail, 'policies'> = {
@@ -67,6 +68,13 @@ const meta = {
   title: 'clients/ClientSummaryCard',
   component: ClientSummaryCard,
   tags: ['autodocs'],
+  decorators: [
+    (Story) => (
+      <TooltipProvider>
+        <Story />
+      </TooltipProvider>
+    ),
+  ],
 } satisfies Meta<typeof ClientSummaryCard>
 
 export default meta

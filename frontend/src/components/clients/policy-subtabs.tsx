@@ -6,8 +6,8 @@ export type PolicySubtabValue = 'details' | 'accounting' | 'logs'
 
 const SUBTABS: { value: PolicySubtabValue; label: string }[] = [
   { value: 'details', label: 'Policy Details' },
-  { value: 'accounting', label: 'Accounting' },
   { value: 'logs', label: 'Logs' },
+  { value: 'accounting', label: 'Accounting' },
 ]
 
 interface PolicySubtabsProps {
@@ -37,7 +37,7 @@ export function PolicySubtabs({
             key={subtab.value}
             value={subtab.value}
             className={cn(
-              'rounded-md border bg-transparent px-3 py-1.5 text-muted-foreground shadow-none',
+              'rounded-sm border bg-transparent px-3 py-1.5 text-muted-foreground shadow-none',
               'hover:text-foreground',
               'data-active:border-primary data-active:bg-primary data-active:text-primary-foreground data-active:shadow-none'
             )}
@@ -47,8 +47,8 @@ export function PolicySubtabs({
         ))}
       </TabsList>
       <TabsContent value="details">{details}</TabsContent>
-      <TabsContent value="accounting">{accounting}</TabsContent>
       <TabsContent value="logs">{logs}</TabsContent>
+      <TabsContent value="accounting">{accounting}</TabsContent>
     </Tabs>
   )
 }

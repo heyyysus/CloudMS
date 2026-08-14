@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getPolicyLogs } from '@/api/policyLogs'
 
@@ -20,35 +21,40 @@ export function PolicyLogs({
   })
 
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs font-medium text-muted-foreground">Logs</p>
-        <Button type="button" variant="outline" size="sm" onClick={onAddLog}>
-          Add log
-        </Button>
-      </div>
-
-      {isError && <p className="text-sm text-destructive">Failed to load logs.</p>}
-      {isPending && (
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-full" />
-        </div>
-      )}
-      {!isPending && !isError && logs && logs.length === 0 && (
-        <p className="text-sm text-muted-foreground">No logs yet. Press ⌘L / Ctrl+L to add one.</p>
-      )}
-      {!isPending &&
-        !isError &&
-        logs?.map((log) => (
-          <div key={log.id} className="mb-2 rounded-md border p-2 text-sm last:mb-0">
-            <p className="text-xs text-muted-foreground">
-              #{log.logNumber} · {log.author.name ?? log.author.email} ·{' '}
-              {new Date(log.createdAt).toLocaleString()}
-            </p>
-            <p className="mt-1 whitespace-pre-wrap">{log.body}</p>
+    <Card>
+      <CardHeader>
+        <CardTitle>Logs</CardTitle>
+        <CardAction>
+          <Button type="button" variant="outline" size="sm" onClick={onAddLog}>
+            Add log
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">
+        {isError && <p className="text-sm text-destructive">Failed to load logs.</p>}
+        {isPending && (
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-full" />
           </div>
-        ))}
-    </div>
+        )}
+        {!isPending && !isError && logs && logs.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No logs yet. Press ⌘L / Ctrl+L to add one.
+          </p>
+        )}
+        {!isPending &&
+          !isError &&
+          logs?.map((log) => (
+            <div key={log.id} className="rounded-md border p-2 text-sm">
+              <p className="text-xs text-muted-foreground">
+                #{log.logNumber} · {log.author.name ?? log.author.email} ·{' '}
+                {new Date(log.createdAt).toLocaleString()}
+              </p>
+              <p className="mt-1 whitespace-pre-wrap">{log.body}</p>
+            </div>
+          ))}
+      </CardContent>
+    </Card>
   )
 }

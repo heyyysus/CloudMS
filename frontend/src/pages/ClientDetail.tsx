@@ -17,6 +17,7 @@ import { InvoicePaymentDialog } from '@/components/clients/invoice-payment-dialo
 import { InvoiceReceiptDialog } from '@/components/clients/invoice-receipt-dialog'
 import { PolicyCard } from '@/components/clients/policy-card'
 import { PolicyLogs } from '@/components/clients/policy-logs'
+import { PolicySubtabs, type PolicySubtabValue } from '@/components/clients/policy-subtabs'
 import { PolicyTabs } from '@/components/clients/policy-tabs'
 import { useClientTabs } from '@/components/layout/client-tabs'
 import { useLogShortcut } from '@/hooks/use-log-shortcut'
@@ -81,9 +82,16 @@ function ClientDetail() {
   const selectedPolicyId = userSelectedId ?? newestPolicyId
   const selectedPolicy = sortedPolicies.find((policy) => policy.id === selectedPolicyId)
 
+  // Shared across policy tabs (not reset per-policy), so switching policies
+  // keeps whichever subtab — Details, Accounting, or Logs — was selected.
+  const [subtab, setSubtab] = useState<PolicySubtabValue>('details')
+
   const [logDialogOpen, setLogDialogOpen] = useState(false)
   useLogShortcut(() => {
-    if (selectedPolicyId !== undefined) setLogDialogOpen(true)
+    if (selectedPolicyId !== undefined) {
+      setSubtab('logs')
+      setLogDialogOpen(true)
+    }
   })
 
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false)
@@ -169,25 +177,7 @@ function ClientDetail() {
 
   return (
     <div className="flex flex-col gap-6">
-      <ClientSummaryCard
-        client={client}
-        action={
-          <div className="flex gap-2">
-            {selectedPolicy && (
-              <Button size="sm" variant="outline" onClick={() => openInvoiceDialog()}>
-                <ReceiptIcon /> New invoice
-              </Button>
-            )}
-            <EditClientDialog client={client} />
-          </div>
-        }
-      />
-
-      <ClientInvoices
-        clientId={client.id}
-        onPay={(invoiceId) => openInvoiceDialog(invoiceId)}
-        onSelect={(invoiceId) => openReceiptDialog(invoiceId)}
-      />
+      <ClientSummaryCard client={client} action={<EditClientDialog client={client} />} />
 
       <div>
         {sortedPolicies.length === 0 || selectedPolicyId === undefined ? (
@@ -215,26 +205,42 @@ function ClientDetail() {
             {(policy) => {
               const query = queryByPolicyId.get(policy.id)
               return (
-                <PolicyCard
-                  policy={policy}
-                  detail={query?.data}
-                  isLoading={query?.isPending}
-                  isError={query?.isError}
-                  action={
-                    query?.data && (
-                      <EditPolicyDialog
-                        client={client}
-                        policy={query.data}
-                        existingVehicles={existingVehicles}
-                        existingDrivers={existingDrivers}
-                      />
-                    )
+                <PolicySubtabs
+                  value={subtab}
+                  onValueChange={setSubtab}
+                  details={
+                    <PolicyCard
+                      policy={policy}
+                      detail={query?.data}
+                      isLoading={query?.isPending}
+                      isError={query?.isError}
+                      action={
+                        query?.data && (
+                          <EditPolicyDialog
+                            client={client}
+                            policy={query.data}
+                            existingVehicles={existingVehicles}
+                            existingDrivers={existingDrivers}
+                          />
+                        )
+                      }
+                    />
+                  }
+                  accounting={
+                    <ClientInvoices
+                      clientId={client.id}
+                      policyId={policy.id}
+                      onPay={(invoiceId) => openInvoiceDialog(invoiceId)}
+                      onSelect={(invoiceId) => openReceiptDialog(invoiceId)}
+                      action={
+                        <Button size="sm" variant="outline" onClick={() => openInvoiceDialog()}>
+                          <ReceiptIcon /> New invoice
+                        </Button>
+                      }
+                    />
                   }
                   logs={
-                    <PolicyLogs
-                      policyId={policy.id}
-                      onAddLog={() => setLogDialogOpen(true)}
-                    />
+                    <PolicyLogs policyId={policy.id} onAddLog={() => setLogDialogOpen(true)} />
                   }
                 />
               )

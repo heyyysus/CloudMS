@@ -1,7 +1,6 @@
-import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { formatMoney } from '@/lib/money'
@@ -16,8 +15,6 @@ interface ClientInvoicesProps {
   policyId?: number
   onPay: (invoiceId: number) => void
   onSelect: (invoiceId: number) => void
-  // Rendered in the card header (e.g. the "New invoice" button).
-  action?: ReactNode
   getInvoicesFn?: typeof getInvoices
 }
 
@@ -26,7 +23,6 @@ export function ClientInvoices({
   policyId,
   onPay,
   onSelect,
-  action,
   getInvoicesFn = getInvoices,
 }: ClientInvoicesProps) {
   const {
@@ -45,7 +41,6 @@ export function ClientInvoices({
     <Card>
       <CardHeader>
         <CardTitle>Invoices</CardTitle>
-        {action && <CardAction>{action}</CardAction>}
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         {isError && <p className="text-sm text-destructive">Failed to load invoices.</p>}

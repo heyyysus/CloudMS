@@ -177,7 +177,19 @@ function ClientDetail() {
 
   return (
     <div className="flex flex-col gap-6">
-      <ClientSummaryCard client={client} action={<EditClientDialog client={client} />} />
+      <ClientSummaryCard
+        client={client}
+        action={
+          <div className="flex gap-2">
+            {selectedPolicy && (
+              <Button size="sm" variant="outline" onClick={() => openInvoiceDialog()}>
+                <ReceiptIcon /> New invoice
+              </Button>
+            )}
+            <EditClientDialog client={client} />
+          </div>
+        }
+      />
 
       <div>
         {sortedPolicies.length === 0 || selectedPolicyId === undefined ? (
@@ -232,11 +244,6 @@ function ClientDetail() {
                       policyId={policy.id}
                       onPay={(invoiceId) => openInvoiceDialog(invoiceId)}
                       onSelect={(invoiceId) => openReceiptDialog(invoiceId)}
-                      action={
-                        <Button size="sm" variant="outline" onClick={() => openInvoiceDialog()}>
-                          <ReceiptIcon /> New invoice
-                        </Button>
-                      }
                     />
                   }
                   logs={

@@ -2,7 +2,6 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test'
 import { ClientInvoices } from './client-invoices'
-import { Button } from '@/components/ui/button'
 import { ApiError } from '@/api/client'
 import type { Carrier } from '@/api/policies'
 import type { Invoice } from '@/api/invoices'
@@ -168,17 +167,5 @@ export const EmptyForPolicy: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     await expect(await canvas.findByText(/no invoices for this policy/i)).toBeInTheDocument()
-  },
-}
-
-export const WithHeaderAction: Story = {
-  args: {
-    getInvoicesFn: fn(async () => [openInvoice]),
-    action: <Button size="sm">New invoice</Button>,
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement)
-    await expect(await canvas.findByText('Invoice #10')).toBeInTheDocument()
-    await expect(canvas.getByRole('button', { name: 'New invoice' })).toBeInTheDocument()
   },
 }

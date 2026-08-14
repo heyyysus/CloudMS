@@ -66,7 +66,10 @@ export async function createPolicyAttachment(input: {
   sizeBytes: number
   createdBy: number
 }): Promise<PolicyAttachmentWithUploader> {
-  const [row] = await db.insert(policyAttachments).values(input).returning({ id: policyAttachments.id })
+  const [row] = await db
+    .insert(policyAttachments)
+    .values(input)
+    .returning({ id: policyAttachments.id })
   const created = await db.query.policyAttachments.findFirst({
     where: eq(policyAttachments.id, row.id),
     columns: {

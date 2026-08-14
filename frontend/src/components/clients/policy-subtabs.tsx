@@ -2,11 +2,12 @@ import type { ReactNode } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
-export type PolicySubtabValue = 'details' | 'accounting' | 'logs'
+export type PolicySubtabValue = 'details' | 'accounting' | 'logs' | 'attachments'
 
 const SUBTABS: { value: PolicySubtabValue; label: string }[] = [
   { value: 'details', label: 'Policy Details' },
   { value: 'logs', label: 'Logs' },
+  { value: 'attachments', label: 'Attachments' },
   { value: 'accounting', label: 'Accounting' },
 ]
 
@@ -16,6 +17,7 @@ interface PolicySubtabsProps {
   details: ReactNode
   accounting: ReactNode
   logs: ReactNode
+  attachments: ReactNode
 }
 
 export function PolicySubtabs({
@@ -24,6 +26,7 @@ export function PolicySubtabs({
   details,
   accounting,
   logs,
+  attachments,
 }: PolicySubtabsProps) {
   return (
     <Tabs
@@ -48,6 +51,7 @@ export function PolicySubtabs({
       </TabsList>
       <TabsContent value="details">{details}</TabsContent>
       <TabsContent value="logs">{logs}</TabsContent>
+      <TabsContent value="attachments">{attachments}</TabsContent>
       <TabsContent value="accounting">{accounting}</TabsContent>
     </Tabs>
   )

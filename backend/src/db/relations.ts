@@ -10,6 +10,7 @@ import {
   invoices,
   payments,
   persons,
+  policyAttachments,
   policyDrivers,
   policyLogs,
   receipts,
@@ -64,6 +65,7 @@ export const autoPoliciesRelations = relations(autoPolicies, ({ one, many }) => 
   vehicles: many(vehicles),
   policyDrivers: many(policyDrivers),
   logs: many(policyLogs),
+  attachments: many(policyAttachments),
   invoices: many(invoices),
   payments: many(payments),
   receipts: many(receipts),
@@ -122,9 +124,18 @@ export const policyLogsRelations = relations(policyLogs, ({ one }) => ({
   author: one(users, { fields: [policyLogs.authorId], references: [users.id] }),
 }))
 
+export const policyAttachmentsRelations = relations(policyAttachments, ({ one }) => ({
+  policy: one(autoPolicies, {
+    fields: [policyAttachments.policyId],
+    references: [autoPolicies.id],
+  }),
+  createdByUser: one(users, { fields: [policyAttachments.createdBy], references: [users.id] }),
+}))
+
 export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   policyLogs: many(policyLogs),
+  policyAttachments: many(policyAttachments),
 }))
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { Link, useParams } from 'react-router'
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { ReceiptIcon } from 'lucide-react'
@@ -11,10 +11,12 @@ import {
   type ExistingDriverOption,
 } from '@/components/clients/add-policy-dialog'
 import { EditPolicyDialog } from '@/components/clients/edit-policy-dialog'
+import { AddAttachmentDialog } from '@/components/clients/add-attachment-dialog'
 import { AddLogDialog } from '@/components/clients/add-log-dialog'
 import { ClientInvoices } from '@/components/clients/client-invoices'
 import { InvoicePaymentDialog } from '@/components/clients/invoice-payment-dialog'
 import { InvoiceReceiptDialog } from '@/components/clients/invoice-receipt-dialog'
+import { PolicyAttachments } from '@/components/clients/policy-attachments'
 import { PolicyCard } from '@/components/clients/policy-card'
 import { PolicyLogs } from '@/components/clients/policy-logs'
 import { PolicySubtabs, type PolicySubtabValue } from '@/components/clients/policy-subtabs'
@@ -95,6 +97,51 @@ function ClientDetail() {
       setLogDialogOpen(true)
     }
   })
+
+  // attachmentDialogKey forces a remount (and so a fresh upload flow) if a
+  // file is dropped again while the dialog is already open.
+  const [attachmentDialogOpen, setAttachmentDialogOpen] = useState(false)
+  const [attachmentDialogKey, setAttachmentDialogKey] = useState(0)
+  const [droppedFile, setDroppedFile] = useState<File | undefined>(undefined)
+  const [isDraggingOver, setIsDraggingOver] = useState(false)
+  const dragDepthRef = useRef(0)
+
+  function openAttachmentDialog(file?: File) {
+    setDroppedFile(file)
+    setAttachmentDialogKey((key) => key + 1)
+    setAttachmentDialogOpen(true)
+  }
+
+  function handleDragEnter(e: DragEvent) {
+    if (selectedPolicyId === undefined || !e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+    dragDepthRef.current += 1
+    setIsDraggingOver(true)
+  }
+
+  function handleDragOver(e: DragEvent) {
+    if (selectedPolicyId === undefined || !e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+  }
+
+  function handleDragLeave(e: DragEvent) {
+    if (selectedPolicyId === undefined || !e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
+    if (dragDepthRef.current === 0) setIsDraggingOver(false)
+  }
+
+  function handleDrop(e: DragEvent) {
+    if (selectedPolicyId === undefined) return
+    e.preventDefault()
+    dragDepthRef.current = 0
+    setIsDraggingOver(false)
+    const file = e.dataTransfer.files[0]
+    if (file) {
+      setSubtab('attachments')
+      openAttachmentDialog(file)
+    }
+  }
 
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false)
   const [invoiceDialogTargetId, setInvoiceDialogTargetId] = useState<number | undefined>(undefined)
@@ -178,7 +225,18 @@ function ClientDetail() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div
+      className="relative flex flex-col gap-6"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDraggingOver && (
+        <div className="pointer-events-none fixed inset-0 z-40 m-4 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-primary/5">
+          <p className="text-sm font-medium text-primary">Drop to upload to the selected policy</p>
+        </div>
+      )}
       <ClientSummaryCard
         client={client}
         action={
@@ -255,6 +313,13 @@ function ClientDetail() {
                       currentUserId={user?.id}
                     />
                   }
+                  attachments={
+                    <PolicyAttachments
+                      policyId={policy.id}
+                      onAddAttachment={() => openAttachmentDialog()}
+                      currentUserId={user?.id}
+                    />
+                  }
                 />
               )
             }}
@@ -267,6 +332,19 @@ function ClientDetail() {
           policyId={selectedPolicyId}
           open={logDialogOpen}
           onOpenChange={setLogDialogOpen}
+        />
+      )}
+
+      {selectedPolicyId !== undefined && (
+        <AddAttachmentDialog
+          key={attachmentDialogKey}
+          policyId={selectedPolicyId}
+          open={attachmentDialogOpen}
+          onOpenChange={(next) => {
+            setAttachmentDialogOpen(next)
+            if (!next) setDroppedFile(undefined)
+          }}
+          initialFile={droppedFile}
         />
       )}
 

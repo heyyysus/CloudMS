@@ -20,6 +20,16 @@ import { vinDecoderRouter } from "./routes/vinDecoder"
 
 const app: Application = express()
 
+// API responses must never be cached by the browser (or Cloudflare):
+// stale reads after a mutation are worse than the re-fetch cost. Disabling
+// etag also stops Express from generating validators that would let
+// browsers hold 304-revalidated copies.
+app.set("etag", false)
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.set("Cache-Control", "no-store")
+  next()
+})
+
 app.use(pinoHttp({ logger }))
 app.use(express.json())
 app.use(cookieParser())

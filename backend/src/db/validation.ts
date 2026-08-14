@@ -10,6 +10,7 @@ import {
   invoices,
   payments,
   persons,
+  policyAttachments,
   policyDrivers,
   policyLogs,
   receipts,
@@ -45,6 +46,8 @@ export const updateVehicleSchema = insertVehicleSchema.partial()
 export const insertPolicyDriverSchema = createInsertSchema(policyDrivers)
 
 export const insertPolicyLogSchema = createInsertSchema(policyLogs)
+
+export const insertPolicyAttachmentSchema = createInsertSchema(policyAttachments)
 
 export const insertInvoiceSchema = createInsertSchema(invoices)
 export const insertInvoiceItemSchema = createInsertSchema(invoiceItems)

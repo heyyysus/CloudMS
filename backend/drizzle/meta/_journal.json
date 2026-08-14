@@ -22,6 +22,20 @@
       "when": 1784674403500,
       "tag": "0002_flippant_moondragon",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786690875729,
+      "tag": "0003_tiresome_mikhail_rasputin",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786693921623,
+      "tag": "0004_silky_invaders",
+      "breakpoints": true
     }
   ]
 }

@@ -23,6 +23,7 @@ function StatefulPolicySubtabs({
       details={<p className="text-sm">Policy details content.</p>}
       accounting={<p className="text-sm">Accounting content.</p>}
       logs={<p className="text-sm">Logs content.</p>}
+      attachments={<p className="text-sm">Attachments content.</p>}
     />
   )
 }
@@ -47,6 +48,7 @@ export const DefaultShowsDetails: Story = {
     await expect(tabs.map((tab) => tab.textContent)).toEqual([
       'Policy Details',
       'Logs',
+      'Attachments',
       'Accounting',
     ])
     const detailsTab = canvas.getByRole('tab', { name: 'Policy Details' })
@@ -109,6 +111,7 @@ function SharedSubtabAcrossPolicies() {
           details={<p className="text-sm">Details for {policy.policyNumber}</p>}
           accounting={<p className="text-sm">Accounting for {policy.policyNumber}</p>}
           logs={<p className="text-sm">Logs for {policy.policyNumber}</p>}
+          attachments={<p className="text-sm">Attachments for {policy.policyNumber}</p>}
         />
       )}
     </PolicyTabs>

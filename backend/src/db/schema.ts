@@ -285,6 +285,31 @@ export const policyLogs = pgTable(
   ]
 )
 
+// Files (declarations pages, ID cards, correspondence, etc.) uploaded direct
+// to R2 and linked to a policy. storageKey is the R2 object key; the actual
+// URL is never stored - download links are minted on demand as short-lived
+// presigned URLs. Immutable/append-only like policyLogs: no update path, and
+// no delete in this iteration.
+export const policyAttachments = pgTable(
+  "policy_attachments",
+  {
+    id: serial("id").primaryKey(),
+    policyId: integer("policy_id")
+      .notNull()
+      .references(() => autoPolicies.id, { onDelete: "cascade" }),
+    fileName: varchar("file_name", { length: 255 }).notNull(),
+    description: text("description"),
+    storageKey: text("storage_key").notNull().unique(),
+    mimeType: varchar("mime_type", { length: 100 }).notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdBy: integer("created_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("policy_attachments_policy_id_idx").on(table.policyId)]
+)
+
 // ---------------------------------------------------------------------------
 // Accounting
 //

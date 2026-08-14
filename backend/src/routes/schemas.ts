@@ -14,6 +14,11 @@ import {
   insertVehicleSchema,
 } from "../db/validation"
 
+// Presigned uploads only accept these three types; enforced both when
+// generating the upload URL (signed as the required Content-Type header) and
+// again here.
+export const ATTACHMENT_MIME_TYPES = ["application/pdf", "image/png", "image/jpeg"] as const
+
 // drizzle-zod includes an optional `id` and `z.date()` timestamp fields on
 // every insert schema (the latter can never pass a JSON body, since JSON has
 // no Date type), so every route body schema omits them. Date-only columns
@@ -164,6 +169,23 @@ export const createPolicyLogBody = insertPolicyLogSchema
     policyId: z.number().int().positive(),
     body: z.string().trim().min(1).max(5000),
   })
+
+// storageKey/fileName round-trip from the presign response back to confirm;
+// mimeType/sizeBytes are never trusted from the client at confirm time - the
+// route re-derives them from R2's HeadObject response instead.
+export const presignAttachmentBody = z.object({
+  policyId: z.number().int().positive(),
+  fileName: z.string().trim().min(1).max(255),
+  contentType: z.enum(ATTACHMENT_MIME_TYPES),
+  sizeBytes: z.number().int().positive(),
+})
+
+export const confirmAttachmentBody = z.object({
+  policyId: z.number().int().positive(),
+  storageKey: z.string().trim().min(1),
+  fileName: z.string().trim().min(1).max(255),
+  description: z.string().trim().max(2000).nullable().optional(),
+})
 
 export const createCarrierBody = insertCarrierSchema.omit(omitMeta)
 export const updateCarrierBody = createCarrierBody.partial()

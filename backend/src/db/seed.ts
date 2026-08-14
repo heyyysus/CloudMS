@@ -17,10 +17,14 @@ import {
 
 async function main() {
   await db.delete(sessions)
-  await db.delete(users)
   await db.delete(policyDrivers)
   await db.delete(vehicles)
+  // autoPolicies cascades away everything scoped to a policy (policyLogs,
+  // policyAttachments, invoices, payments, receipts, trustLedger), which is
+  // what lets the users delete below succeed despite those tables' non-cascading
+  // FKs to users (authorId/createdBy/etc.) - users must be deleted after this.
   await db.delete(autoPolicies)
+  await db.delete(users)
   await db.delete(clientPhones)
   await db.delete(clientEmails)
   await db.delete(clients)

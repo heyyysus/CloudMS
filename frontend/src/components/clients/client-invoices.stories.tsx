@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test'
 import { ClientInvoices } from './client-invoices'
+import { Button } from '@/components/ui/button'
 import { ApiError } from '@/api/client'
 import type { Carrier } from '@/api/policies'
 import type { Invoice } from '@/api/invoices'
@@ -60,6 +61,17 @@ const closedInvoice: Invoice = {
   status: 'closed',
   total: '50.00',
   amountPaid: '50.00',
+}
+
+// Belongs to a different policy than openInvoice/closedInvoice, to exercise
+// the policyId filter.
+const otherPolicyInvoice: Invoice = {
+  ...openInvoice,
+  id: 11,
+  policyId: 901,
+  status: 'open',
+  total: '75.00',
+  amountPaid: '0.00',
 }
 
 function createTestQueryClient() {
@@ -131,5 +143,42 @@ export const LoadError: Story = {
     await waitFor(async () =>
       expect(await canvas.findByText(/failed to load invoices/i)).toBeInTheDocument()
     )
+  },
+}
+
+export const FiltersByPolicy: Story = {
+  args: {
+    policyId: 900,
+    getInvoicesFn: fn(async () => [openInvoice, closedInvoice, otherPolicyInvoice]),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(await canvas.findByText('Invoice #10')).toBeInTheDocument()
+    await expect(canvas.getByText('Invoice #9')).toBeInTheDocument()
+    // Invoice #11 belongs to a different policy and is filtered out.
+    await expect(canvas.queryByText('Invoice #11')).not.toBeInTheDocument()
+  },
+}
+
+export const EmptyForPolicy: Story = {
+  args: {
+    policyId: 999,
+    getInvoicesFn: fn(async () => [openInvoice, closedInvoice]),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(await canvas.findByText(/no invoices for this policy/i)).toBeInTheDocument()
+  },
+}
+
+export const WithHeaderAction: Story = {
+  args: {
+    getInvoicesFn: fn(async () => [openInvoice]),
+    action: <Button size="sm">New invoice</Button>,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(await canvas.findByText('Invoice #10')).toBeInTheDocument()
+    await expect(canvas.getByRole('button', { name: 'New invoice' })).toBeInTheDocument()
   },
 }

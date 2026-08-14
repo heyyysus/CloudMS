@@ -41,7 +41,6 @@ interface PolicyCardProps {
   isLoading?: boolean
   isError?: boolean
   action?: ReactNode
-  logs?: ReactNode
 }
 
 export function PolicyCard({
@@ -50,7 +49,6 @@ export function PolicyCard({
   isLoading,
   isError,
   action,
-  logs,
 }: PolicyCardProps) {
   const status = displayStatus(policy)
 
@@ -123,13 +121,6 @@ export function PolicyCard({
               )
             })}
         </div>
-
-        {logs && (
-          <>
-            <Separator />
-            {logs}
-          </>
-        )}
       </CardContent>
     </Card>
   )

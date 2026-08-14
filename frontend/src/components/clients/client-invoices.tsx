@@ -1,6 +1,7 @@
+import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { formatMoney } from '@/lib/money'
@@ -9,19 +10,27 @@ import { amountDueCents, getInvoices } from '@/api/invoices'
 
 interface ClientInvoicesProps {
   clientId: number
+  // When set, only invoices for this policy are shown. The query still
+  // fetches all of the client's invoices (one shared cache entry across
+  // every policy's Accounting subtab); filtering happens client-side.
+  policyId?: number
   onPay: (invoiceId: number) => void
   onSelect: (invoiceId: number) => void
+  // Rendered in the card header (e.g. the "New invoice" button).
+  action?: ReactNode
   getInvoicesFn?: typeof getInvoices
 }
 
 export function ClientInvoices({
   clientId,
+  policyId,
   onPay,
   onSelect,
+  action,
   getInvoicesFn = getInvoices,
 }: ClientInvoicesProps) {
   const {
-    data: invoices,
+    data: allInvoices,
     isPending,
     isError,
   } = useQuery({
@@ -29,10 +38,14 @@ export function ClientInvoices({
     queryFn: ({ signal }) => getInvoicesFn(clientId, signal),
   })
 
+  const invoices =
+    policyId === undefined ? allInvoices : allInvoices?.filter((invoice) => invoice.policyId === policyId)
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Invoices</CardTitle>
+        {action && <CardAction>{action}</CardAction>}
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         {isError && <p className="text-sm text-destructive">Failed to load invoices.</p>}
@@ -43,7 +56,9 @@ export function ClientInvoices({
           </div>
         )}
         {!isPending && !isError && invoices && invoices.length === 0 && (
-          <p className="text-sm text-muted-foreground">No invoices.</p>
+          <p className="text-sm text-muted-foreground">
+            {policyId === undefined ? 'No invoices.' : 'No invoices for this policy.'}
+          </p>
         )}
         {!isPending &&
           !isError &&

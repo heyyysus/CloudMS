@@ -9,17 +9,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { initials } from '@/lib/initials'
 import type { User } from '@/api/auth'
-
-function initials(user: User): string {
-  const source = user.name ?? user.email
-  return source
-    .split(/[\s@.]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('')
-}
 
 export function UserMenu({ user }: { user: User }) {
   return (

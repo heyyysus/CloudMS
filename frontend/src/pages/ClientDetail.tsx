@@ -21,6 +21,7 @@ import { PolicySubtabs, type PolicySubtabValue } from '@/components/clients/poli
 import { PolicyTabs } from '@/components/clients/policy-tabs'
 import { useClientTabs } from '@/components/layout/client-tabs'
 import { useLogShortcut } from '@/hooks/use-log-shortcut'
+import { useAuth } from '@/auth/AuthContext'
 import { ApiError } from '@/api/client'
 import { clientDisplayName, getClient } from '@/api/clients'
 import { getPolicy, type Vehicle } from '@/api/policies'
@@ -31,6 +32,7 @@ function ClientDetail() {
   const clientId = Number(params.clientId)
   const isValidId = Number.isFinite(clientId)
   const { openTab, removeTab } = useClientTabs()
+  const { user } = useAuth()
 
   const {
     data: client,
@@ -247,7 +249,11 @@ function ClientDetail() {
                     />
                   }
                   logs={
-                    <PolicyLogs policyId={policy.id} onAddLog={() => setLogDialogOpen(true)} />
+                    <PolicyLogs
+                      policyId={policy.id}
+                      onAddLog={() => setLogDialogOpen(true)}
+                      currentUserId={user?.id}
+                    />
                   }
                 />
               )

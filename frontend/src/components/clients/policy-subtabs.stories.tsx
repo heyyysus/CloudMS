@@ -46,8 +46,8 @@ export const DefaultShowsDetails: Story = {
     const tabs = canvas.getAllByRole('tab')
     await expect(tabs.map((tab) => tab.textContent)).toEqual([
       'Policy Details',
-      'Accounting',
       'Logs',
+      'Accounting',
     ])
     const detailsTab = canvas.getByRole('tab', { name: 'Policy Details' })
     await expect(detailsTab).toHaveAttribute('aria-selected', 'true')

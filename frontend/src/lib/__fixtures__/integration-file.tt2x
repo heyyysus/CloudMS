@@ -1,0 +1,244 @@
+path:: c:\haw\launchhawksoft.exe
+userid::
+pwd::
+ratestate::TX
+bzpname::launchhawksoft.exe
+bzpdatetime::1/1/1753 12:00:00 AM
+producercode::
+insured::JOHN VAN DER BERG
+exportdatetime::1/1/2026 12:00:00 PM
+rateproductnum::00000
+testtransaction::1
+icebaseurl::https://autorating.turborater.com/ice/
+integrationbaseurl::https://autorating.turborater.com/integration/
+agencyuserguid::00000000-0000-0000-0000-000000000000
+agencylocationguid::00000000-0000-0000-0000-000000000000
+defaultoutputdirectory::c:\haw\transfer
+defaultoutputfilename::Transfer
+defaultoutputextension::XML
+autoexecute::True
+ext::.XML
+bridgedata::<?xml version="1.0" encoding="UTF-8"?>
+<ACORD>
+ <InsuranceSvcRq>
+  <PersAutoPolicyQuoteInqRq>
+   <PersPolicy>
+    <PolicyNumber/>
+    <PersApplicationInfo>
+     <InsuredOrPrincipal>
+      <GeneralPartyInfo>
+       <NameInfo>
+        <PersonName>
+         <Surname>VAN DER BERG</Surname>
+         <GivenName>JOHN</GivenName>
+         <OtherGivenName/>
+        </PersonName>
+       </NameInfo>
+       <Communications>
+        <PhoneInfo>
+         <PhoneTypeCd>Fax</PhoneTypeCd>
+         <CommunicationUseCd>Business</CommunicationUseCd>
+         <PhoneNumber/>
+        </PhoneInfo>
+        <PhoneInfo>
+         <PhoneTypeCd>Cell</PhoneTypeCd>
+         <CommunicationUseCd>Alternate</CommunicationUseCd>
+         <PhoneNumber>+1-555-0142</PhoneNumber>
+        </PhoneInfo>
+        <EmailInfo>
+         <CommunicationUseCd>Day</CommunicationUseCd>
+         <EmailAddr>john.sample@example.com</EmailAddr>
+        </EmailInfo>
+       </Communications>
+       <Addr>
+        <AddrTypeCd>StreetAddress</AddrTypeCd>
+        <Addr1>500 Fictional Ave</Addr1>
+        <Addr2>Apt 2</Addr2>
+        <City>Rivertown</City>
+        <StateProvCd>TX</StateProvCd>
+        <PostalCode>75001</PostalCode>
+        <County>Sample County</County>
+       </Addr>
+      </GeneralPartyInfo>
+      <InsuredOrPrincipalInfo>
+       <InsuredOrPrincipalRoleCd>Insured</InsuredOrPrincipalRoleCd>
+       <PersonInfo>
+        <BirthDt>1985-03-12</BirthDt>
+        <GenderCd>M</GenderCd>
+       </PersonInfo>
+      </InsuredOrPrincipalInfo>
+     </InsuredOrPrincipal>
+     <Addr>
+      <AddrTypeCd>StreetAddress</AddrTypeCd>
+      <Addr1/>
+      <Addr2/>
+      <City/>
+      <StateProvCd/>
+      <PostalCode>-</PostalCode>
+      <County/>
+     </Addr>
+    </PersApplicationInfo>
+    <ContractTerm>
+     <EffectiveDt>2026-09-01</EffectiveDt>
+     <ExpirationDt>2027-03-01</ExpirationDt>
+    </ContractTerm>
+   </PersPolicy>
+   <PersAutoLineBusiness>
+    <LOBCd>AUTOP</LOBCd>
+    <Coverage>
+     <CoverageCd>TPAC</CoverageCd>
+     <CoverageDesc>ATPA Fee</CoverageDesc>
+    </Coverage>
+    <Coverage>
+     <CoverageCd>POLFE</CoverageCd>
+     <CoverageDesc>Policy Fee</CoverageDesc>
+    </Coverage>
+    <Coverage>
+     <CoverageCd>LAWFE</CoverageCd>
+     <CoverageDesc>Law Enforcement Fee</CoverageDesc>
+    </Coverage>
+    <PersDriver id="Drv1">
+     <GeneralPartyInfo>
+      <NameInfo>
+       <PersonName>
+        <Surname>VAN DER BERG</Surname>
+        <GivenName>JOHN</GivenName>
+        <OtherGivenName/>
+       </PersonName>
+      </NameInfo>
+     </GeneralPartyInfo>
+     <DriverInfo>
+      <PersonInfo>
+       <GenderCd>M</GenderCd>
+       <BirthDt>1985-03-12</BirthDt>
+       <MaritalStatusCd>S</MaritalStatusCd>
+      </PersonInfo>
+      <DriversLicense>
+       <DriversLicenseNumber>Z9988776</DriversLicenseNumber>
+       <LicenseClassCd>Valid</LicenseClassCd>
+       <StateProvCd>TX</StateProvCd>
+      </DriversLicense>
+      <License>
+       <LicenseTypeCd>Driver</LicenseTypeCd>
+       <LicenseStatusCd>Active</LicenseStatusCd>
+       <LicensePermitNumber>Z9988776</LicensePermitNumber>
+       <LicenseClassCd>Valid</LicenseClassCd>
+       <StateProvCd>TX</StateProvCd>
+      </License>
+     </DriverInfo>
+     <PersDriverInfo VehPrincipallyDrivenRef="Veh1">
+      <DriverRelationshipToApplicantCd>IN</DriverRelationshipToApplicantCd>
+     </PersDriverInfo>
+    </PersDriver>
+    <PersDriver id="Drv2">
+     <GeneralPartyInfo>
+      <NameInfo>
+       <PersonName>
+        <Surname>VAN DER BERG</Surname>
+        <GivenName>MARY</GivenName>
+        <OtherGivenName/>
+       </PersonName>
+      </NameInfo>
+     </GeneralPartyInfo>
+     <DriverInfo>
+      <PersonInfo>
+       <GenderCd>F</GenderCd>
+       <BirthDt>1987-07-04</BirthDt>
+       <MaritalStatusCd>S</MaritalStatusCd>
+      </PersonInfo>
+      <DriversLicense>
+       <DriversLicenseNumber>Y1122334</DriversLicenseNumber>
+       <LicenseClassCd>Valid</LicenseClassCd>
+       <StateProvCd>TX</StateProvCd>
+      </DriversLicense>
+     </DriverInfo>
+     <PersDriverInfo VehPrincipallyDrivenRef="Veh2">
+      <DriverRelationshipToApplicantCd>SP</DriverRelationshipToApplicantCd>
+     </PersDriverInfo>
+    </PersDriver>
+    <PersVeh id="Veh1" LocationRef="Gar1" RatedDriverRef="Drv1">
+     <Manufacturer>HONDA</Manufacturer>
+     <Model>CIVIC</Model>
+     <ModelYear>2019</ModelYear>
+     <VehIdentificationNumber>1HGCM82633A123456</VehIdentificationNumber>
+     <Coverage>
+      <CoverageCd>BI</CoverageCd>
+      <CoverageDesc>Bodily Injury Liability</CoverageDesc>
+      <Limit>
+       <FormatInteger>50000</FormatInteger>
+       <LimitAppliesToCd>PerPerson</LimitAppliesToCd>
+      </Limit>
+      <Limit>
+       <FormatInteger>100000</FormatInteger>
+       <LimitAppliesToCd>PerAccident</LimitAppliesToCd>
+      </Limit>
+     </Coverage>
+     <Coverage>
+      <CoverageCd>PD</CoverageCd>
+      <CoverageDesc>Property Damage-Single Limit</CoverageDesc>
+      <Limit>
+       <FormatInteger>25000</FormatInteger>
+       <LimitAppliesToCd>PropDam</LimitAppliesToCd>
+      </Limit>
+     </Coverage>
+     <Coverage>
+      <CoverageCd>COLL</CoverageCd>
+      <CoverageDesc>Collision</CoverageDesc>
+      <Deductible>
+       <FormatInteger>500</FormatInteger>
+       <DeductibleTypeCd>CL</DeductibleTypeCd>
+      </Deductible>
+     </Coverage>
+     <Coverage>
+      <CoverageCd>COMP</CoverageCd>
+      <CoverageDesc>Comprehensive Coverage</CoverageDesc>
+      <Deductible>
+       <FormatInteger>500</FormatInteger>
+       <DeductibleTypeCd>CL</DeductibleTypeCd>
+      </Deductible>
+     </Coverage>
+    </PersVeh>
+    <PersVeh id="Veh2" LocationRef="Gar2" RatedDriverRef="Drv2">
+     <Manufacturer>FORD</Manufacturer>
+     <Model>F150</Model>
+     <ModelYear>2021</ModelYear>
+     <VehIdentificationNumber>1FTFW1E51MFA00001</VehIdentificationNumber>
+     <Coverage>
+      <CoverageCd>COLL</CoverageCd>
+      <CoverageDesc>Collision</CoverageDesc>
+      <Deductible>
+       <FormatInteger>1000</FormatInteger>
+       <DeductibleTypeCd>CL</DeductibleTypeCd>
+      </Deductible>
+     </Coverage>
+     <Coverage>
+      <CoverageCd>COMP</CoverageCd>
+      <CoverageDesc>Comprehensive Coverage</CoverageDesc>
+      <Deductible>
+       <FormatInteger>1000</FormatInteger>
+       <DeductibleTypeCd>CL</DeductibleTypeCd>
+      </Deductible>
+     </Coverage>
+    </PersVeh>
+   </PersAutoLineBusiness>
+   <Location id="Gar1">
+    <Addr>
+     <AddrTypeCd>StreetAddress</AddrTypeCd>
+     <Addr1>500 Fictional Ave</Addr1>
+     <City>Rivertown</City>
+     <StateProvCd>TX</StateProvCd>
+     <PostalCode>75001</PostalCode>
+    </Addr>
+   </Location>
+   <Location id="Gar2">
+    <Addr>
+     <AddrTypeCd>StreetAddress</AddrTypeCd>
+     <Addr1>77 Second Location Rd</Addr1>
+     <City>Rivertown</City>
+     <StateProvCd>TX</StateProvCd>
+     <PostalCode>75002</PostalCode>
+    </Addr>
+   </Location>
+  </PersAutoPolicyQuoteInqRq>
+ </InsuranceSvcRq>
+</ACORD>

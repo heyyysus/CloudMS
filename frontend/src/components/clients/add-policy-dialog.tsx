@@ -240,8 +240,10 @@ function addMonths(isoDate: string, months: number): string {
   return `${targetYear}-${pad(targetMonth + 1)}-${pad(Math.min(day, daysInTarget))}`
 }
 
-// '' when the dates don't span exactly one of the standard terms.
-function deriveTerm(effectiveDate: string, expirationDate: string): '1' | '6' | '12' | '' {
+// '' when the dates don't span exactly one of the standard terms. Exported
+// for the rater-file import dialog, which needs the same derivation to
+// compute a `term` for a parsed effective/expiration pair.
+export function deriveTerm(effectiveDate: string, expirationDate: string): '1' | '6' | '12' | '' {
   for (const term of ['1', '6', '12'] as const) {
     if (addMonths(effectiveDate, Number(term)) === expirationDate) return term
   }
@@ -472,6 +474,11 @@ interface AddPolicyFormProps {
   existingVehicles: Vehicle[]
   existingDrivers: ExistingDriverOption[]
   initial?: PolicyDetail
+  // Shallow-merged on top of the computed defaults — every top-level key is
+  // independently replaceable. Used by the rater-file import dialog to
+  // prefill from a parsed file, which has no server-shaped `PolicyDetail` to
+  // pass as `initial`.
+  initialValues?: Partial<AddPolicyFormValues>
   submitLabel?: string
   onSubmit: (body: CreatePolicyBody) => void
   onCancel?: () => void
@@ -487,6 +494,7 @@ export function AddPolicyForm({
   existingVehicles,
   existingDrivers,
   initial,
+  initialValues,
   submitLabel = 'Create policy',
   onSubmit,
   onCancel,
@@ -503,7 +511,7 @@ export function AddPolicyForm({
     formState: { errors },
   } = useForm<AddPolicyFormValues>({
     resolver: zodResolver(addPolicySchema),
-    defaultValues: toFormValues({ client, existingDrivers, initial }),
+    defaultValues: { ...toFormValues({ client, existingDrivers, initial }), ...initialValues },
   })
 
   const vehicleFields = useFieldArray({ control, name: 'vehicles' })

@@ -35,6 +35,31 @@ function vehicleLabel(vehicle: PolicyDetail["vehicles"][number]): string {
   return `${vehicle.year} ${vehicle.make} ${vehicle.model} (VIN ${vehicle.vin})`
 }
 
+// Fields compared on a vehicle that survives the edit (matched by VIN), so
+// changes like a deductible or coverage limit - or a make/model/year
+// correction - are reported even though the vehicle itself wasn't added or
+// removed.
+const VEHICLE_FIELD_LABELS: Record<string, string> = {
+  make: "Make",
+  model: "Model",
+  year: "Year",
+  garagingZip: "Garaging ZIP",
+  coverageBi: "Bodily injury coverage",
+  coveragePd: "Property damage coverage",
+  coverageUmbi: "UM/BI coverage",
+  coverageUmpd: "UM/PD coverage",
+  coverageCdw: "CDW",
+  coverageMedpay: "Med pay coverage",
+  coverageColl: "Collision deductible",
+  coverageComp: "Comprehensive deductible",
+  coverageRentalReimbursement: "Rental reimbursement",
+  coverageTowing: "Towing coverage",
+}
+
+const VEHICLE_FIELDS = Object.keys(VEHICLE_FIELD_LABELS) as Array<
+  keyof PolicyDetail["vehicles"][number]
+>
+
 // Compares `before` and `after` policy details, but only for the fields the
 // caller actually sent (`input`) - untouched fields never produce a line,
 // even if the two detail objects differ for unrelated reasons (they never
@@ -64,7 +89,19 @@ export function summarizePolicyChanges(
     const beforeByVin = new Map(before.vehicles.map((v) => [v.vin, v]))
     const afterByVin = new Map(after.vehicles.map((v) => [v.vin, v]))
     for (const vehicle of after.vehicles) {
-      if (!beforeByVin.has(vehicle.vin)) lines.push(`Vehicle added: ${vehicleLabel(vehicle)}`)
+      const prior = beforeByVin.get(vehicle.vin)
+      if (!prior) {
+        lines.push(`Vehicle added: ${vehicleLabel(vehicle)}`)
+        continue
+      }
+      for (const field of VEHICLE_FIELDS) {
+        const from = prior[field]
+        const to = vehicle[field]
+        if (from === to) continue
+        lines.push(
+          `${vehicleLabel(vehicle)} — ${VEHICLE_FIELD_LABELS[field]}: ${from ?? "(none)"} → ${to ?? "(none)"}`
+        )
+      }
     }
     for (const vehicle of before.vehicles) {
       if (!afterByVin.has(vehicle.vin)) lines.push(`Vehicle removed: ${vehicleLabel(vehicle)}`)

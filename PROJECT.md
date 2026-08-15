@@ -39,7 +39,7 @@ Vehicle entry decodes a VIN against the NHTSA vPIC API to prefill year, make, an
 - `autoPolicies` — a policy tying a client to a carrier, with policy number, term dates, and status
 - `vehicles` — vehicles on a policy, with coverage limits (BI, PD, UM/UIM, collision, comprehensive, rental, towing)
 - `policyDrivers` — the many-to-many link between policies and the drivers rated on them
-- `policyLogs` — append-only, per-policy numbered notes recording calls, changes, and other activity, each stamped with its author
+- `policyLogs` — append-only, per-policy numbered notes recording calls, changes, and other activity, each stamped with its author; accounting activity (invoices and payments, created and voided) writes its own entries here automatically
 - `invoices` / `invoiceItems` — policy-scoped charges, where each line item is either a `sweep` (the carrier's share) or an `agency` fee
 - `payments` / `receipts` — payments recorded against an invoice, each one minting a receipt
 - `trustLedger` — every movement of money in or out of the agency trust account

@@ -1,8 +1,10 @@
 import { and, desc, eq } from "drizzle-orm"
+import { paymentRecordedLogBody, paymentVoidedLogBody } from "../accountingLogs"
 import { db } from "../db"
 import { invoiceItems, invoices, payments, receipts, trustLedger } from "../db/schema"
 import { centsToAmount, toCents } from "../money"
 import type { PaymentMethod } from "../types"
+import { insertPolicyLogInTx, withLogNumberRetry } from "./policyLogs"
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -46,83 +48,101 @@ async function postSweepAndFeeEntries(tx: Tx, invoiceId: number): Promise<void> 
 
 // Records a client payment against an open invoice: applies as much as is owed
 // (the remainder is change handed back, never held in trust), mints a receipt,
-// posts the money into the trust account, and - if this payment settles the
-// invoice - closes it and sweeps the carrier/agency shares back out.
+// posts the money into the trust account, appends the policy log recording it,
+// and - if this payment settles the invoice - closes it and sweeps the
+// carrier/agency shares back out.
 export async function recordPayment(input: RecordPaymentInput): Promise<RecordPaymentResult> {
-  return db.transaction(async (tx) => {
-    const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, input.invoiceId))
-    if (!invoice) return { status: "invoice_not_found" }
-    if (invoice.status !== "open") return { status: "invoice_not_open" }
+  return withLogNumberRetry(async () =>
+    db.transaction(async (tx): Promise<RecordPaymentResult> => {
+      const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, input.invoiceId))
+      if (!invoice) return { status: "invoice_not_found" }
+      if (invoice.status !== "open") return { status: "invoice_not_open" }
 
-    const totalC = toCents(invoice.total)
-    const paidC = toCents(invoice.amountPaid)
-    const dueC = totalC - paidC
-    const amountC = toCents(input.amount)
-    const appliedC = Math.min(amountC, dueC)
-    const changeC = amountC - appliedC
-    const newPaidC = paidC + appliedC
-    const closed = totalC - newPaidC <= 0
+      const totalC = toCents(invoice.total)
+      const paidC = toCents(invoice.amountPaid)
+      const dueC = totalC - paidC
+      const amountC = toCents(input.amount)
+      const appliedC = Math.min(amountC, dueC)
+      const changeC = amountC - appliedC
+      const newPaidC = paidC + appliedC
+      const closed = totalC - newPaidC <= 0
+      const dueAfterC = Math.max(totalC - newPaidC, 0)
 
-    const [payment] = await tx
-      .insert(payments)
-      .values({
-        invoiceId: invoice.id,
+      const [payment] = await tx
+        .insert(payments)
+        .values({
+          invoiceId: invoice.id,
+          policyId: invoice.policyId,
+          clientId: invoice.clientId,
+          method: input.method,
+          amount: input.amount,
+          amountApplied: centsToAmount(appliedC),
+          changeGiven: centsToAmount(changeC),
+          note: input.note ?? null,
+          createdBy: input.createdBy,
+        })
+        .returning({ id: payments.id })
+
+      // Money into the trust account = the applied portion (change never lands
+      // in trust).
+      if (appliedC > 0) {
+        await tx.insert(trustLedger).values({
+          policyId: invoice.policyId,
+          clientId: invoice.clientId,
+          invoiceId: invoice.id,
+          paymentId: payment.id,
+          entryType: "payment_received",
+          direction: "in",
+          amount: centsToAmount(appliedC),
+        })
+      }
+
+      const [receipt] = await tx
+        .insert(receipts)
+        .values({
+          paymentId: payment.id,
+          invoiceId: invoice.id,
+          policyId: invoice.policyId,
+          clientId: invoice.clientId,
+          createdBy: input.createdBy,
+          amountApplied: centsToAmount(appliedC),
+          changeGiven: centsToAmount(changeC),
+          amountDueAfter: centsToAmount(dueAfterC),
+          invoiceClosed: closed,
+          note: input.receiptNote ?? null,
+        })
+        .returning({ id: receipts.id })
+
+      await tx
+        .update(invoices)
+        .set({
+          amountPaid: centsToAmount(newPaidC),
+          status: closed ? "closed" : "open",
+          updatedAt: new Date(),
+        })
+        .where(eq(invoices.id, invoice.id))
+
+      if (closed) {
+        await postSweepAndFeeEntries(tx, invoice.id)
+      }
+
+      await insertPolicyLogInTx(tx, {
         policyId: invoice.policyId,
-        clientId: invoice.clientId,
-        method: input.method,
-        amount: input.amount,
-        amountApplied: centsToAmount(appliedC),
-        changeGiven: centsToAmount(changeC),
-        note: input.note ?? null,
-        createdBy: input.createdBy,
+        authorId: input.createdBy,
+        body: paymentRecordedLogBody({
+          invoiceId: invoice.id,
+          method: input.method,
+          amount: input.amount,
+          amountApplied: centsToAmount(appliedC),
+          changeGiven: centsToAmount(changeC),
+          amountDueAfter: centsToAmount(dueAfterC),
+          invoiceClosed: closed,
+        }),
       })
-      .returning({ id: payments.id })
 
-    // Money into the trust account = the applied portion (change never lands
-    // in trust).
-    if (appliedC > 0) {
-      await tx.insert(trustLedger).values({
-        policyId: invoice.policyId,
-        clientId: invoice.clientId,
-        invoiceId: invoice.id,
-        paymentId: payment.id,
-        entryType: "payment_received",
-        direction: "in",
-        amount: centsToAmount(appliedC),
-      })
-    }
-
-    const [receipt] = await tx
-      .insert(receipts)
-      .values({
-        paymentId: payment.id,
-        invoiceId: invoice.id,
-        policyId: invoice.policyId,
-        clientId: invoice.clientId,
-        createdBy: input.createdBy,
-        amountApplied: centsToAmount(appliedC),
-        changeGiven: centsToAmount(changeC),
-        amountDueAfter: centsToAmount(Math.max(totalC - newPaidC, 0)),
-        invoiceClosed: closed,
-        note: input.receiptNote ?? null,
-      })
-      .returning({ id: receipts.id })
-
-    await tx
-      .update(invoices)
-      .set({
-        amountPaid: centsToAmount(newPaidC),
-        status: closed ? "closed" : "open",
-        updatedAt: new Date(),
-      })
-      .where(eq(invoices.id, invoice.id))
-
-    if (closed) {
-      await postSweepAndFeeEntries(tx, invoice.id)
-    }
-
-    return { status: "ok", receiptId: receipt.id }
-  })
+      return { status: "ok", receiptId: receipt.id }
+    })
+  )
 }
 
 // Reverses the sweep/agency "out" entries currently active for an invoice
@@ -173,66 +193,85 @@ export async function voidPayment(
   voidedBy: number,
   reason: string | null
 ): Promise<VoidPaymentResult> {
-  return db.transaction(async (tx) => {
-    const [payment] = await tx.select().from(payments).where(eq(payments.id, paymentId))
-    if (!payment) return { status: "not_found" }
-    if (payment.voidedAt) return { status: "already_void" }
+  return withLogNumberRetry(async () =>
+    db.transaction(async (tx): Promise<VoidPaymentResult> => {
+      const [payment] = await tx.select().from(payments).where(eq(payments.id, paymentId))
+      if (!payment) return { status: "not_found" }
+      if (payment.voidedAt) return { status: "already_void" }
 
-    const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, payment.invoiceId))
+      const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, payment.invoiceId))
 
-    const appliedC = toCents(payment.amountApplied)
-    if (appliedC > 0) {
-      const [originalIn] = await tx
-        .select({ id: trustLedger.id })
-        .from(trustLedger)
-        .where(
-          and(
-            eq(trustLedger.paymentId, payment.id),
-            eq(trustLedger.entryType, "payment_received"),
-            eq(trustLedger.direction, "in")
+      const appliedC = toCents(payment.amountApplied)
+      if (appliedC > 0) {
+        const [originalIn] = await tx
+          .select({ id: trustLedger.id })
+          .from(trustLedger)
+          .where(
+            and(
+              eq(trustLedger.paymentId, payment.id),
+              eq(trustLedger.entryType, "payment_received"),
+              eq(trustLedger.direction, "in")
+            )
           )
-        )
-      await tx.insert(trustLedger).values({
+        await tx.insert(trustLedger).values({
+          policyId: payment.policyId,
+          clientId: payment.clientId,
+          invoiceId: payment.invoiceId,
+          paymentId: payment.id,
+          entryType: "payment_received",
+          direction: "out",
+          amount: payment.amountApplied,
+          reversalOfId: originalIn?.id ?? null,
+          note: reason ?? "Payment voided",
+        })
+      }
+
+      if (invoice.status === "closed") {
+        await reverseSweepAndFeeEntries(tx, invoice.id, reason)
+      }
+
+      const newPaidC = Math.max(toCents(invoice.amountPaid) - appliedC, 0)
+      await tx
+        .update(invoices)
+        .set({
+          amountPaid: centsToAmount(newPaidC),
+          // Voiding an applied payment always drops the invoice below its total,
+          // so a closed invoice reopens. A void invoice stays void.
+          status: invoice.status === "void" ? "void" : "open",
+          updatedAt: new Date(),
+        })
+        .where(eq(invoices.id, invoice.id))
+
+      await tx
+        .update(receipts)
+        .set({ voidedAt: new Date(), voidedBy, voidReason: reason })
+        .where(eq(receipts.paymentId, payment.id))
+
+      await tx
+        .update(payments)
+        .set({ voidedAt: new Date(), voidedBy, voidReason: reason })
+        .where(eq(payments.id, payment.id))
+
+      await insertPolicyLogInTx(tx, {
         policyId: payment.policyId,
-        clientId: payment.clientId,
-        invoiceId: payment.invoiceId,
-        paymentId: payment.id,
-        entryType: "payment_received",
-        direction: "out",
-        amount: payment.amountApplied,
-        reversalOfId: originalIn?.id ?? null,
-        note: reason ?? "Payment voided",
+        authorId: voidedBy,
+        body: paymentVoidedLogBody({
+          paymentId: payment.id,
+          invoiceId: invoice.id,
+          method: payment.method,
+          amount: payment.amount,
+          amountApplied: payment.amountApplied,
+          amountDueAfter: centsToAmount(Math.max(toCents(invoice.total) - newPaidC, 0)),
+          // The invoice's status as of just before this void, which decides
+          // whether the log says it reopened or stayed void.
+          invoiceStatusBefore: invoice.status,
+          reason,
+        }),
       })
-    }
 
-    if (invoice.status === "closed") {
-      await reverseSweepAndFeeEntries(tx, invoice.id, reason)
-    }
-
-    const newPaidC = Math.max(toCents(invoice.amountPaid) - appliedC, 0)
-    await tx
-      .update(invoices)
-      .set({
-        amountPaid: centsToAmount(newPaidC),
-        // Voiding an applied payment always drops the invoice below its total,
-        // so a closed invoice reopens. A void invoice stays void.
-        status: invoice.status === "void" ? "void" : "open",
-        updatedAt: new Date(),
-      })
-      .where(eq(invoices.id, invoice.id))
-
-    await tx
-      .update(receipts)
-      .set({ voidedAt: new Date(), voidedBy, voidReason: reason })
-      .where(eq(receipts.paymentId, payment.id))
-
-    await tx
-      .update(payments)
-      .set({ voidedAt: new Date(), voidedBy, voidReason: reason })
-      .where(eq(payments.id, payment.id))
-
-    return { status: "ok" }
-  })
+      return { status: "ok" }
+    })
+  )
 }
 
 const paymentDetailWith = {

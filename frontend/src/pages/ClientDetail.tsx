@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react'
-import { Link, useParams } from 'react-router'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router'
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { ReceiptIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ import { EditPolicyDialog } from '@/components/clients/edit-policy-dialog'
 import { AddAttachmentDialog } from '@/components/clients/add-attachment-dialog'
 import { AddLogDialog } from '@/components/clients/add-log-dialog'
 import { ClientInvoices } from '@/components/clients/client-invoices'
+import { ImportQuoteDialog } from '@/components/clients/import-quote-dialog'
 import { InvoicePaymentDialog } from '@/components/clients/invoice-payment-dialog'
 import { InvoiceReceiptDialog } from '@/components/clients/invoice-receipt-dialog'
 import { PolicyAttachments } from '@/components/clients/policy-attachments'
@@ -22,6 +23,7 @@ import { PolicyLogs } from '@/components/clients/policy-logs'
 import { PolicySubtabs, type PolicySubtabValue } from '@/components/clients/policy-subtabs'
 import { PolicyTabs } from '@/components/clients/policy-tabs'
 import { useClientTabs } from '@/components/layout/client-tabs'
+import { useFileDrop, isRaterFile } from '@/hooks/use-file-drop'
 import { useLogShortcut } from '@/hooks/use-log-shortcut'
 import { useAuth } from '@/auth/AuthContext'
 import { ApiError } from '@/api/client'
@@ -34,6 +36,7 @@ function ClientDetail() {
   const clientId = Number(params.clientId)
   const isValidId = Number.isFinite(clientId)
   const { openTab, removeTab } = useClientTabs()
+  const navigate = useNavigate()
   const { user } = useAuth()
 
   const {
@@ -98,13 +101,11 @@ function ClientDetail() {
     }
   })
 
-  // attachmentDialogKey forces a remount (and so a fresh upload flow) if a
-  // file is dropped again while the dialog is already open.
+  // attachmentDialogKey/importDialogKey force a remount (and so a fresh
+  // flow) if a file is dropped again while a dialog is already open.
   const [attachmentDialogOpen, setAttachmentDialogOpen] = useState(false)
   const [attachmentDialogKey, setAttachmentDialogKey] = useState(0)
   const [droppedFile, setDroppedFile] = useState<File | undefined>(undefined)
-  const [isDraggingOver, setIsDraggingOver] = useState(false)
-  const dragDepthRef = useRef(0)
 
   function openAttachmentDialog(file?: File) {
     setDroppedFile(file)
@@ -112,36 +113,35 @@ function ClientDetail() {
     setAttachmentDialogOpen(true)
   }
 
-  function handleDragEnter(e: DragEvent) {
-    if (selectedPolicyId === undefined || !e.dataTransfer.types.includes('Files')) return
-    e.preventDefault()
-    dragDepthRef.current += 1
-    setIsDraggingOver(true)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importDialogKey, setImportDialogKey] = useState(0)
+  const [importFile, setImportFile] = useState<File | undefined>(undefined)
+  const [attachmentsHint, setAttachmentsHint] = useState(false)
+
+  function openImportDialog(file: File) {
+    setImportFile(file)
+    setImportDialogKey((key) => key + 1)
+    setImportDialogOpen(true)
   }
 
-  function handleDragOver(e: DragEvent) {
-    if (selectedPolicyId === undefined || !e.dataTransfer.types.includes('Files')) return
-    e.preventDefault()
-  }
-
-  function handleDragLeave(e: DragEvent) {
-    if (selectedPolicyId === undefined || !e.dataTransfer.types.includes('Files')) return
-    e.preventDefault()
-    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
-    if (dragDepthRef.current === 0) setIsDraggingOver(false)
-  }
-
-  function handleDrop(e: DragEvent) {
-    if (selectedPolicyId === undefined) return
-    e.preventDefault()
-    dragDepthRef.current = 0
-    setIsDraggingOver(false)
-    const file = e.dataTransfer.files[0]
-    if (file) {
+  // A rater file (.tt2x/.xml) always opens the import dialog, regardless of
+  // whether a policy is selected — importing a client's first policy is the
+  // most valuable case, and today's blank-slate ("No policies.") view has
+  // no drop target at all. Anything else falls back to the existing
+  // attach-to-policy flow, which still requires a selected policy.
+  const { isDraggingOver, dragHandlers } = useFileDrop((files) => {
+    const file = files[0]
+    if (!file) return
+    setAttachmentsHint(false)
+    if (isRaterFile(file)) {
+      openImportDialog(file)
+    } else if (selectedPolicyId !== undefined) {
       setSubtab('attachments')
       openAttachmentDialog(file)
+    } else {
+      setAttachmentsHint(true)
     }
-  }
+  })
 
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false)
   const [invoiceDialogTargetId, setInvoiceDialogTargetId] = useState<number | undefined>(undefined)
@@ -225,16 +225,14 @@ function ClientDetail() {
   }
 
   return (
-    <div
-      className="relative flex flex-col gap-6"
-      onDragEnter={handleDragEnter}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
+    <div className="relative flex flex-col gap-6" {...dragHandlers}>
       {isDraggingOver && (
         <div className="pointer-events-none fixed inset-0 z-40 m-4 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-primary/5">
-          <p className="text-sm font-medium text-primary">Drop to upload to the selected policy</p>
+          <p className="text-sm font-medium text-primary">
+            {selectedPolicyId !== undefined
+              ? 'Drop a rater file to import, or a document to attach to the selected policy'
+              : 'Drop a rater file to import'}
+          </p>
         </div>
       )}
       <ClientSummaryCard
@@ -250,6 +248,12 @@ function ClientDetail() {
           </div>
         }
       />
+
+      {attachmentsHint && (
+        <p className="text-sm text-muted-foreground">
+          This client has no policies yet — add one before attaching a document.
+        </p>
+      )}
 
       <div>
         {sortedPolicies.length === 0 || selectedPolicyId === undefined ? (
@@ -345,6 +349,27 @@ function ClientDetail() {
             if (!next) setDroppedFile(undefined)
           }}
           initialFile={droppedFile}
+        />
+      )}
+
+      {importFile && (
+        <ImportQuoteDialog
+          key={importDialogKey}
+          file={importFile}
+          defaultClient={client}
+          open={importDialogOpen}
+          onOpenChange={(next) => {
+            setImportDialogOpen(next)
+            if (!next) setImportFile(undefined)
+          }}
+          onImported={(importedClient) => {
+            // Usually the same client this page is already showing — the
+            // patched query data is enough. If the user switched to a
+            // different client (or created a new one) mid-import, follow
+            // them there.
+            openTab({ id: importedClient.id, label: clientDisplayName(importedClient) })
+            if (importedClient.id !== clientId) navigate(`/clients/${importedClient.id}`)
+          }}
         />
       )}
 

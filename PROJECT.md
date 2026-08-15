@@ -13,7 +13,7 @@ The project is built around four pillars:
 - **Integrations.** Native connections into the tools an agency already depends on — carrier rating/quoting APIs, payment processors, e-signature providers — so data flows in and out of the CMS instead of being manually copied between systems.
 - **Automated SMS/email.** Built-in, automated client communication — renewal reminders, document requests, policy status updates — sent by text or email without a staff member having to remember to send them.
 
-The AI and automated-communication pillars above describe where the product is headed — they are not yet built, and the integrations pillar so far extends only to VIN decoding against the NHTSA vPIC API. The section below describes what exists today.
+The AI and automated-communication pillars above describe where the product is headed — they are not yet built, and the integrations pillar so far extends only to VIN decoding against the NHTSA vPIC API and importing TurboRater rater bridge files (.tt2x) by drag-and-drop. The section below describes what exists today.
 
 ## Current State
 
@@ -50,7 +50,7 @@ Accounting follows a trust model: a client pays the agency, the funds sit in the
 
 CI/CD runs as two GitHub Actions workflows. `ci.yml` typechecks, lints, format-checks, tests, and builds the backend — path-filtered, so it only runs when backend or infrastructure files change — and deploys to the production host on merge to `main`. `frontend.yml` lints and builds the frontend on changes under `frontend/`, then deploys by rsyncing the built assets to the host and restarting nginx, since the frontend isn't containerized. One gap worth naming: the frontend's Vitest/Storybook suite isn't wired into CI yet — only lint and build run there.
 
-**Not yet built** — none of the AI, carrier/third-party integration, or automated SMS/email features described above exist in code yet, VIN decoding aside. The Home dashboard is still a placeholder, and personal auto remains the only line of business modeled. The domain model's `clientPhones`/`clientEmails` tables already capture the contact data those future features will need.
+**Not yet built** — none of the AI or automated SMS/email features described above exist in code yet, and third-party/carrier integration so far is limited to VIN decoding and TurboRater rater-file import. The Home dashboard's client/policy/activity summary cards are still placeholders — the only real content there today is the rater-file drop target — and personal auto remains the only line of business modeled. The domain model's `clientPhones`/`clientEmails` tables already capture the contact data those future features will need.
 
 ## Direction
 

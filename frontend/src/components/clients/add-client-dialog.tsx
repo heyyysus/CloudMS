@@ -108,6 +108,11 @@ function toSubmit(
 
 interface AddClientFormProps {
   initial?: Omit<ClientDetail, 'policies'>
+  // Shallow-merged on top of the computed defaults — every top-level key is
+  // independently replaceable. Used by the rater-file import dialog to
+  // prefill from a parsed file, which has no server-shaped `ClientDetail`
+  // to pass as `initial`.
+  initialValues?: Partial<ClientFormValues>
   submitLabel?: string
   onSubmit: (payload: ClientFormSubmit) => void
   onCancel?: () => void
@@ -117,6 +122,7 @@ interface AddClientFormProps {
 
 export function AddClientForm({
   initial,
+  initialValues,
   submitLabel = 'Create client',
   onSubmit,
   onCancel,
@@ -133,7 +139,7 @@ export function AddClientForm({
     formState: { errors },
   } = useForm<ClientFormValues>({
     resolver: zodResolver(clientFormSchema),
-    defaultValues: toFormValues(initial),
+    defaultValues: { ...toFormValues(initial), ...initialValues },
   })
 
   const phoneFields = useFieldArray({ control, name: 'phones' })

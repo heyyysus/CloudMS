@@ -33,9 +33,7 @@ function stubResend(body: unknown, init: { ok?: boolean; status?: number } = {})
 
 describe("POST /users/invite", () => {
   it("returns 401 without a cookie", async () => {
-    const res = await request(app)
-      .post("/users/invite")
-      .send({ email: "nobody@example.com" })
+    const res = await request(app).post("/users/invite").send({ email: "nobody@example.com" })
     expect(res.status).toBe(401)
   })
 
@@ -127,10 +125,7 @@ describe("POST /users/invite", () => {
     const cookie = await makeSessionCookie(admin.id)
     const email = `invitee-unconfigured-${Date.now()}@example.com`
 
-    const res = await request(app)
-      .post("/users/invite")
-      .set("Cookie", cookie)
-      .send({ email })
+    const res = await request(app).post("/users/invite").set("Cookie", cookie).send({ email })
 
     expect(res.status).toBe(201)
     expect(res.body.email.status).toBe("failed")
@@ -144,13 +139,13 @@ describe("POST /users/invite", () => {
     configureMail()
     const admin = await ctx.user("invite-5xx", "admin")
     const cookie = await makeSessionCookie(admin.id)
-    stubResend({ name: "rate_limit_exceeded", message: "Too many requests." }, { ok: false, status: 429 })
+    stubResend(
+      { name: "rate_limit_exceeded", message: "Too many requests." },
+      { ok: false, status: 429 }
+    )
     const email = `invitee-5xx-${Date.now()}@example.com`
 
-    const res = await request(app)
-      .post("/users/invite")
-      .set("Cookie", cookie)
-      .send({ email })
+    const res = await request(app).post("/users/invite").set("Cookie", cookie).send({ email })
 
     expect(res.status).toBe(201)
     expect(res.body.email.status).toBe("failed")

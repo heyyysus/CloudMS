@@ -1,4 +1,4 @@
-import { Cloud, House, UserRound, X } from 'lucide-react'
+import { Cloud, House, Shield, UserRound, X } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router'
 import {
   Sidebar,
@@ -20,10 +20,14 @@ const platformItems = [{ title: 'Home', url: '/home', icon: House }]
 interface AppSidebarProps {
   openTabs?: ClientTab[]
   onCloseTab?: (id: number) => void
+  isAdmin?: boolean
 }
 
-export function AppSidebar({ openTabs = [], onCloseTab }: AppSidebarProps) {
+export function AppSidebar({ openTabs = [], onCloseTab, isAdmin = false }: AppSidebarProps) {
   const location = useLocation()
+  const items = isAdmin
+    ? [...platformItems, { title: 'Admin', url: '/admin', icon: Shield }]
+    : platformItems
 
   return (
     <Sidebar collapsible="icon">
@@ -46,7 +50,7 @@ export function AppSidebar({ openTabs = [], onCloseTab }: AppSidebarProps) {
           <SidebarGroupLabel>Platform</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {platformItems.map((item) => (
+              {items.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
                     asChild

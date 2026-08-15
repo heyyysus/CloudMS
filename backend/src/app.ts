@@ -5,6 +5,7 @@ import { authRouter } from "./auth/routes"
 import { logger } from "./logger"
 import { carriersRouter } from "./routes/carriers"
 import { clientsRouter } from "./routes/clients"
+import { emailTemplatesRouter } from "./routes/emailTemplates"
 import { invoicesRouter } from "./routes/invoices"
 import { mailRouter } from "./routes/mail"
 import { paymentsRouter } from "./routes/payments"
@@ -15,6 +16,7 @@ import { policyLogsRouter } from "./routes/policyLogs"
 import { receiptsRouter } from "./routes/receipts"
 import { searchRouter } from "./routes/search"
 import { trustLedgerRouter } from "./routes/trustLedger"
+import { usersRouter } from "./routes/users"
 import { vehiclesRouter } from "./routes/vehicles"
 import { vinDecoderRouter } from "./routes/vinDecoder"
 
@@ -49,6 +51,8 @@ app.use(mailRouter)
 app.use(trustLedgerRouter)
 app.use(searchRouter)
 app.use(vinDecoderRouter)
+app.use(usersRouter)
+app.use(emailTemplatesRouter)
 
 app.get("/health", (req: Request, res: Response) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() })

@@ -27,6 +27,20 @@ async function makeInvoice(
   return res.body
 }
 
+interface LogRow {
+  logNumber: number
+  body: string
+  author: { id: number }
+}
+
+// Accounting writes are auto-logged to the policy. Newest first (logNumber
+// descending), per GET /policy-logs.
+async function policyLogs(policyId: number, cookie: string): Promise<LogRow[]> {
+  const res = await request(app).get(`/policy-logs?policyId=${policyId}`).set("Cookie", cookie)
+  expect(res.status).toBe(200)
+  return res.body
+}
+
 describe("POST /payments (full payment)", () => {
   it("closes the invoice, mints a receipt, and nets the trust account to zero", async () => {
     const { cookie } = await authed("pay-full")
@@ -137,6 +151,97 @@ describe("POST /payments (installments)", () => {
     ledger = await request(app).get(`/trust-ledger?policyId=${policy.id}`).set("Cookie", cookie)
     // 2 payments in + 1 sweep out + 1 fee out.
     expect(ledger.body).toHaveLength(4)
+  })
+})
+
+describe("accounting activity is written to the policy log", () => {
+  it("logs each installment with the balance it left behind", async () => {
+    const { user, cookie } = await authed("pay-log-installment")
+    const policy = await ctx.policy()
+    const invoice = await makeInvoice(cookie, policy.id)
+
+    await request(app)
+      .post("/payments")
+      .set("Cookie", cookie)
+      .send({ invoiceId: invoice.id, method: "check", amount: 150 })
+    await request(app)
+      .post("/payments")
+      .set("Cookie", cookie)
+      .send({ invoiceId: invoice.id, method: "cash", amount: 250 })
+
+    const logs = await policyLogs(policy.id, cookie)
+    // Newest first: closing payment, partial payment, invoice creation.
+    expect(logs.map((l) => l.logNumber)).toEqual([3, 2, 1])
+    expect(logs.every((l) => l.author.id === user.id)).toBe(true)
+    expect(logs[1].body).toBe(
+      `Payment of $150.00 by check on invoice #${invoice.id} — $150.00 applied, $250.00 still due.`
+    )
+    expect(logs[0].body).toBe(
+      `Payment of $250.00 by cash on invoice #${invoice.id} — $250.00 applied, invoice paid in full and closed.`
+    )
+  })
+
+  it("logs the change handed back on an overpayment", async () => {
+    const { cookie } = await authed("pay-log-change")
+    const policy = await ctx.policy()
+    const invoice = await makeInvoice(cookie, policy.id)
+
+    await request(app)
+      .post("/payments")
+      .set("Cookie", cookie)
+      .send({ invoiceId: invoice.id, method: "cash", amount: 500 })
+
+    const logs = await policyLogs(policy.id, cookie)
+    expect(logs[0].body).toBe(
+      `Payment of $500.00 by cash on invoice #${invoice.id} — $400.00 applied, $100.00 change given, invoice paid in full and closed.`
+    )
+  })
+
+  it("logs a void, naming the payment and the reopened balance", async () => {
+    const { cookie } = await authed("pay-log-void")
+    const policy = await ctx.policy()
+    const invoice = await makeInvoice(cookie, policy.id)
+
+    const receipt = await request(app)
+      .post("/payments")
+      .set("Cookie", cookie)
+      .send({ invoiceId: invoice.id, method: "credit_card", amount: 400 })
+    const paymentId = receipt.body.paymentId
+
+    const voided = await request(app)
+      .post(`/payments/${paymentId}/void`)
+      .set("Cookie", cookie)
+      .send({ reason: "card chargeback" })
+    expect(voided.status).toBe(200)
+
+    const logs = await policyLogs(policy.id, cookie)
+    expect(logs.map((l) => l.logNumber)).toEqual([3, 2, 1])
+    expect(logs[0].body).toBe(
+      `Payment #${paymentId} of $400.00 by credit card on invoice #${invoice.id} voided — $400.00 reversed, invoice reopened with $400.00 now due. Reason: card chargeback.`
+    )
+  })
+
+  it("writes no log when a payment is refused", async () => {
+    const { cookie } = await authed("pay-log-refused")
+    const policy = await ctx.policy()
+    const invoice = await makeInvoice(cookie, policy.id)
+
+    await request(app)
+      .post("/payments")
+      .set("Cookie", cookie)
+      .send({ invoiceId: invoice.id, method: "cash", amount: 400 })
+    const before = await policyLogs(policy.id, cookie)
+
+    // The invoice is closed now, so a second payment is refused inside the
+    // transaction - nothing may be logged.
+    const res = await request(app)
+      .post("/payments")
+      .set("Cookie", cookie)
+      .send({ invoiceId: invoice.id, method: "cash", amount: 50 })
+    expect(res.status).toBe(409)
+
+    const after = await policyLogs(policy.id, cookie)
+    expect(after.map((l) => l.logNumber)).toEqual(before.map((l) => l.logNumber))
   })
 })
 

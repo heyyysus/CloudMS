@@ -300,6 +300,15 @@ admins use it to record a running history of calls, changes, and other
 activity on that policy. **Logs are append-only**: there is no PATCH or
 DELETE, only create and list.
 
+Logs come from two places. Most are typed by a staff member through `POST
+/policy-logs` below. The rest are written automatically by accounting actions
+— creating or voiding an invoice, recording or voiding a payment each append
+one (see [Accounting](#accounting)). An auto-written log is an ordinary
+`policy_logs` row in every respect: it shares the policy's `logNumber`
+sequence and is authored by the user who performed the action, so there is no
+`source` flag to filter on. Its body identifies it, e.g. `Invoice #42 created
+— total $400.00 (new business sweep $300.00, new business fee $100.00).`
+
 | Method | Path | Role | Notes |
 |---|---|---|---|
 | GET | `/policy-logs?policyId=` | any | `listPolicyLogsByPolicyId(policyId)`; `policyId` is required; newest first (`logNumber` descending) |
@@ -371,6 +380,13 @@ All accounting records are **immutable** — there is no PATCH or DELETE.
 Corrections are made by **voiding**, which posts reversing trust-ledger entries
 rather than editing or deleting rows. All invoices, payments, and receipts are
 listable with just a `clientId` (or a `policyId`), per requirement.
+
+Every one of those writes also appends a [policy log](#policy-logs) describing
+it — invoice created, invoice voided, payment recorded, payment voided —
+authored by the acting user. The log is written in the same transaction as the
+accounting record, so the two cannot disagree: a request that 4xxs (a payment
+against a closed invoice, a void refused for having active payments) writes no
+log at all.
 
 ### Money format
 

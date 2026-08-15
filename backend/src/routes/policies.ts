@@ -1,8 +1,13 @@
+import { randomUUID } from "node:crypto"
 import { Request, Response, Router } from "express"
 import { requireAuth, requireRole } from "../auth/middleware"
+import { buildPolicyChangeFormPdf, summarizePolicyChanges } from "../policyChangeSummary"
 import {
   createAutoPolicyWithDetails,
+  createPolicyAttachment,
+  createPolicyLog,
   deleteAutoPolicy,
+  getClientWithDetails,
   getPolicyWithDetails,
   listAutoPolicies,
   listAutoPoliciesByClientId,
@@ -10,8 +15,71 @@ import {
   searchPolicies,
   updateAutoPolicyWithDetails,
 } from "../repositories"
+import { putObject } from "../storage/r2"
 import { firstIssue, isPgForeignKeyViolation, isPgUniqueViolation, parseId } from "./helpers"
 import { createPolicyBody, idParam, searchQuery, updatePolicyBody } from "./schemas"
+
+// Best-effort: the policy update has already committed by the time this
+// runs, so nothing in here may throw - every failure (most commonly R2 being
+// unconfigured, but also a bug in this code) is logged and swallowed rather
+// than turning a successful policy update into a failed request.
+async function recordPolicyChangeForm(
+  req: Request,
+  before: NonNullable<Awaited<ReturnType<typeof getPolicyWithDetails>>>,
+  after: NonNullable<Awaited<ReturnType<typeof getPolicyWithDetails>>>,
+  parsedInput: ReturnType<typeof updatePolicyBody.parse>
+): Promise<void> {
+  try {
+    await recordPolicyChangeFormUnsafe(req, before, after, parsedInput)
+  } catch (err) {
+    req.log.error(err, "Failed to record policy change form")
+  }
+}
+
+async function recordPolicyChangeFormUnsafe(
+  req: Request,
+  before: NonNullable<Awaited<ReturnType<typeof getPolicyWithDetails>>>,
+  after: NonNullable<Awaited<ReturnType<typeof getPolicyWithDetails>>>,
+  parsedInput: ReturnType<typeof updatePolicyBody.parse>
+): Promise<void> {
+  const changes = summarizePolicyChanges(before, after, parsedInput)
+  if (changes.length === 0) return
+
+  try {
+    await createPolicyLog({
+      policyId: after.id,
+      authorId: req.user!.id,
+      body: `Policy updated:\n- ${changes.join("\n- ")}`.slice(0, 5000),
+    })
+  } catch (err) {
+    req.log.error(err, "Failed to write policy change log")
+  }
+
+  try {
+    const client = await getClientWithDetails(after.clientId)
+    const clientName = client
+      ? `${client.namedInsured.firstName} ${client.namedInsured.lastName}`
+      : "Unknown client"
+
+    const pdf = await buildPolicyChangeFormPdf(
+      { policy: after, clientName, editedBy: req.user!, editedAt: new Date() },
+      changes
+    )
+    const storageKey = `policy-attachments/${after.id}/${randomUUID()}-policy-change-form.pdf`
+    await putObject(storageKey, pdf, "application/pdf")
+    await createPolicyAttachment({
+      policyId: after.id,
+      fileName: `policy-change-form-${new Date().toISOString().slice(0, 10)}.pdf`,
+      description: "Auto-generated summary of this edit",
+      storageKey,
+      mimeType: "application/pdf",
+      sizeBytes: pdf.length,
+      createdBy: req.user!.id,
+    })
+  } catch (err) {
+    req.log.error(err, "Failed to generate policy change form attachment")
+  }
+}
 
 export const policiesRouter = Router()
 
@@ -97,12 +165,22 @@ policiesRouter.patch("/policies/:id", requireAuth, async (req: Request, res: Res
     return
   }
 
+  const before = await getPolicyWithDetails(id)
+  if (!before) {
+    res.status(404).json({ error: "Policy not found" })
+    return
+  }
+
   try {
     const policy = await updateAutoPolicyWithDetails(id, parsed.data)
     if (!policy) {
       res.status(404).json({ error: "Policy not found" })
       return
     }
+    // Runs (and fully swallows its own errors - see recordPolicyChangeForm)
+    // before responding, so the log/attachment it produces are guaranteed to
+    // be visible to the caller's very next request.
+    await recordPolicyChangeForm(req, before, policy, parsed.data)
     res.json(policy)
   } catch (err) {
     if (!handlePolicyWriteError(err, res)) throw err

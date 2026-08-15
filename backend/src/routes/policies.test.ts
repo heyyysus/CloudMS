@@ -1,10 +1,23 @@
 import request from "supertest"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
+import { R2NotConfiguredError, putObject } from "../storage/r2"
 import { makeSessionCookie, TestContext } from "./testHelpers"
 
+// The policy change form (PATCH /policies/:id's auto-generated log +
+// attachment) uploads its PDF through storage/r2's putObject. Mocked here so
+// tests don't need real R2 credentials; individual tests override this to
+// exercise the "R2 unavailable" path.
+vi.mock("../storage/r2", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../storage/r2")>()
+  return { ...actual, putObject: vi.fn().mockResolvedValue(undefined) }
+})
+
 const ctx = new TestContext()
-afterEach(() => ctx.cleanup())
+afterEach(() => {
+  vi.mocked(putObject).mockReset().mockResolvedValue(undefined)
+  return ctx.cleanup()
+})
 
 describe("GET /policies", () => {
   it("returns 401 without a cookie", async () => {
@@ -268,6 +281,80 @@ describe("PATCH /policies/:id", () => {
       .set("Cookie", cookie)
       .send({ status: "active" })
     expect(res.status).toBe(404)
+  })
+})
+
+describe("PATCH /policies/:id change form", () => {
+  it("logs the change and uploads a PDF attachment when a field actually changes", async () => {
+    const user = await ctx.user("policies-changeform")
+    const cookie = await makeSessionCookie(user.id)
+    const policy = await ctx.policy({ status: "pending" })
+
+    const res = await request(app)
+      .patch(`/policies/${policy.id}`)
+      .set("Cookie", cookie)
+      .send({ status: "active" })
+    expect(res.status).toBe(200)
+
+    const logs = await request(app).get(`/policy-logs?policyId=${policy.id}`).set("Cookie", cookie)
+    expect(logs.body).toHaveLength(1)
+    expect(logs.body[0].body).toContain("Status: pending → active")
+
+    const attachments = await request(app)
+      .get(`/policy-attachments?policyId=${policy.id}`)
+      .set("Cookie", cookie)
+    expect(attachments.body).toHaveLength(1)
+    expect(attachments.body[0].mimeType).toBe("application/pdf")
+    expect(attachments.body[0].fileName).toMatch(/^policy-change-form-/)
+    expect(vi.mocked(putObject)).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`^policy-attachments/${policy.id}/`)),
+      expect.any(Buffer),
+      "application/pdf"
+    )
+  })
+
+  it("writes no log and no attachment when the request changes nothing effective", async () => {
+    const user = await ctx.user("policies-changeform-noop")
+    const cookie = await makeSessionCookie(user.id)
+    const policy = await ctx.policy({ status: "active" })
+
+    const res = await request(app)
+      .patch(`/policies/${policy.id}`)
+      .set("Cookie", cookie)
+      .send({ status: "active" })
+    expect(res.status).toBe(200)
+
+    const logs = await request(app).get(`/policy-logs?policyId=${policy.id}`).set("Cookie", cookie)
+    expect(logs.body).toHaveLength(0)
+
+    const attachments = await request(app)
+      .get(`/policy-attachments?policyId=${policy.id}`)
+      .set("Cookie", cookie)
+    expect(attachments.body).toHaveLength(0)
+    expect(putObject).not.toHaveBeenCalled()
+  })
+
+  it("still logs the change and returns 200 when R2 is unavailable, without creating an attachment", async () => {
+    vi.mocked(putObject).mockRejectedValueOnce(new R2NotConfiguredError("not configured"))
+
+    const user = await ctx.user("policies-changeform-nor2")
+    const cookie = await makeSessionCookie(user.id)
+    const policy = await ctx.policy({ status: "pending" })
+
+    const res = await request(app)
+      .patch(`/policies/${policy.id}`)
+      .set("Cookie", cookie)
+      .send({ status: "active" })
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe("active")
+
+    const logs = await request(app).get(`/policy-logs?policyId=${policy.id}`).set("Cookie", cookie)
+    expect(logs.body).toHaveLength(1)
+
+    const attachments = await request(app)
+      .get(`/policy-attachments?policyId=${policy.id}`)
+      .set("Cookie", cookie)
+    expect(attachments.body).toHaveLength(0)
   })
 })
 

@@ -54,6 +54,11 @@ export function EditPolicyDialog({
           ? { ...old, policies: old.policies.map((p) => (p.id === data.id ? data : p)) }
           : old
       )
+      // The server auto-generates a policy log entry and a change-form
+      // attachment for this edit; refetch both so they show up without a
+      // page reload.
+      queryClient.invalidateQueries({ queryKey: ['policyLogs', policy.id] })
+      queryClient.invalidateQueries({ queryKey: ['policyAttachments', policy.id] })
       setOpen(false)
     },
   })

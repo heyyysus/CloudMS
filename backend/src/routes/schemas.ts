@@ -188,6 +188,13 @@ export const confirmAttachmentBody = z.object({
   description: z.string().trim().max(2000).nullable().optional(),
 })
 
+// Default (omitted) is "inline" - the presigned URL renders in the browser
+// for the preview dialog. "attachment" adds a Content-Disposition header so
+// the same URL forces a save instead.
+export const attachmentLinkQuery = z.object({
+  disposition: z.enum(["inline", "attachment"]).optional(),
+})
+
 export const createCarrierBody = insertCarrierSchema.omit(omitMeta)
 export const updateCarrierBody = createCarrierBody.partial()
 

@@ -24,11 +24,17 @@ export function getPolicyAttachments(
   return request(`/policy-attachments?policyId=${policyId}`, { signal })
 }
 
+export interface GetPolicyAttachmentLinkOptions {
+  disposition?: 'attachment'
+  signal?: AbortSignal
+}
+
 export function getPolicyAttachmentLink(
   id: number,
-  signal?: AbortSignal
+  options?: GetPolicyAttachmentLinkOptions
 ): Promise<{ url: string }> {
-  return request(`/policy-attachments/${id}/link`, { signal })
+  const query = options?.disposition ? `?disposition=${options.disposition}` : ''
+  return request(`/policy-attachments/${id}/link${query}`, { signal: options?.signal })
 }
 
 export interface PresignAttachmentUploadBody {

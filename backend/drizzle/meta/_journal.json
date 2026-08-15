@@ -36,6 +36,20 @@
       "when": 1786693921623,
       "tag": "0004_silky_invaders",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786771827032,
+      "tag": "0005_brief_sharon_carter",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786771835905,
+      "tag": "0006_seed_welcome_template",
+      "breakpoints": true
     }
   ]
 }

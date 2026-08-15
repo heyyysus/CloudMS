@@ -4,6 +4,7 @@ import {
   invoiceItemCategoryEnum,
   invoiceItemTypeEnum,
   paymentMethodEnum,
+  userRoleEnum,
 } from "../db/schema"
 import {
   insertAutoPolicySchema,
@@ -270,4 +271,15 @@ export const sendClientEmailBody = z.object({
   subject: z.string().trim().min(1).max(200),
   body: z.string().trim().min(1).max(20000),
   to: z.array(z.email()).min(1).max(20).optional(),
+})
+
+export const inviteUserBody = z.object({
+  email: z.email().trim().toLowerCase().max(255),
+  name: z.string().trim().min(1).max(150).nullable().optional(),
+  role: z.enum(userRoleEnum.enumValues).default("staff"),
+})
+
+export const updateEmailTemplateBody = z.object({
+  subject: z.string().trim().min(1).max(200),
+  body: z.string().trim().min(1).max(20000),
 })

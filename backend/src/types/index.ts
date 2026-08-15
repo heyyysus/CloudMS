@@ -6,6 +6,9 @@ import type {
   clients,
   driverRatingEnum,
   drivers,
+  emailLog,
+  emailLogStatusEnum,
+  emailTemplates,
   genderEnum,
   invoiceItemCategoryEnum,
   invoiceItems,
@@ -46,6 +49,7 @@ export type InvoiceItemCategory = (typeof invoiceItemCategoryEnum.enumValues)[nu
 export type InvoiceItemType = (typeof invoiceItemTypeEnum.enumValues)[number]
 export type TrustLedgerEntryType = (typeof trustLedgerEntryTypeEnum.enumValues)[number]
 export type TrustLedgerDirection = (typeof trustLedgerDirectionEnum.enumValues)[number]
+export type EmailLogStatus = (typeof emailLogStatusEnum.enumValues)[number]
 
 export type Person = typeof persons.$inferSelect
 export type Driver = typeof drivers.$inferSelect
@@ -64,6 +68,8 @@ export type Receipt = typeof receipts.$inferSelect
 export type TrustLedgerEntry = typeof trustLedger.$inferSelect
 export type User = typeof users.$inferSelect
 export type Session = typeof sessions.$inferSelect
+export type EmailTemplate = typeof emailTemplates.$inferSelect
+export type EmailLogEntry = typeof emailLog.$inferSelect
 
 export type NewPerson = typeof persons.$inferInsert
 export type NewDriver = typeof drivers.$inferInsert
@@ -82,6 +88,8 @@ export type NewReceipt = typeof receipts.$inferInsert
 export type NewTrustLedgerEntry = typeof trustLedger.$inferInsert
 export type NewUser = typeof users.$inferInsert
 export type NewSession = typeof sessions.$inferInsert
+export type NewEmailTemplate = typeof emailTemplates.$inferInsert
+export type NewEmailLogEntry = typeof emailLog.$inferInsert
 
 declare global {
   // Declaration merging into Express's types requires a namespace.

@@ -8,6 +8,7 @@ import {
   clientPhones,
   clients,
   drivers,
+  emailLog,
   persons,
   policyDrivers,
   sessions,
@@ -17,6 +18,9 @@ import {
 
 async function main() {
   await db.delete(sessions)
+  // Not template rows - those are preserved so admin edits to the welcome
+  // template survive a dev reset.
+  await db.delete(emailLog)
   await db.delete(policyDrivers)
   await db.delete(vehicles)
   // autoPolicies cascades away everything scoped to a policy (policyLogs,

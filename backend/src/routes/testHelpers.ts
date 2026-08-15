@@ -4,7 +4,7 @@ import { randomInt } from "crypto"
 import { inArray } from "drizzle-orm"
 import { generateSessionToken, hashToken } from "../auth/tokens"
 import { db } from "../db"
-import { autoPolicies, carriers, clients, persons, users, vehicles } from "../db/schema"
+import { autoPolicies, carriers, clients, emailLog, persons, users, vehicles } from "../db/schema"
 import {
   addDriverToPolicy,
   createAutoPolicy,
@@ -165,7 +165,7 @@ export class TestContext {
   // Registers a row created some other way (e.g. through an API call under
   // test rather than via this context's own builders) so cleanup still
   // removes it.
-  track(kind: "person" | "client" | "carrier" | "policy" | "vehicle", id: number) {
+  track(kind: "person" | "client" | "carrier" | "policy" | "vehicle" | "user", id: number) {
     switch (kind) {
       case "person":
         this.personIds.push(id)
@@ -182,6 +182,9 @@ export class TestContext {
       case "vehicle":
         this.vehicleIds.push(id)
         break
+      case "user":
+        this.userIds.push(id)
+        break
     }
   }
 
@@ -194,6 +197,11 @@ export class TestContext {
     if (this.personIds.length) await db.delete(persons).where(inArray(persons.id, this.personIds))
     if (this.carrierIds.length)
       await db.delete(carriers).where(inArray(carriers.id, this.carrierIds))
-    if (this.userIds.length) await db.delete(users).where(inArray(users.id, this.userIds))
+    if (this.userIds.length) {
+      // email_log.triggered_by has no cascade delete, so any log rows
+      // created by a tracked user must be removed before the user itself.
+      await db.delete(emailLog).where(inArray(emailLog.triggeredBy, this.userIds))
+      await db.delete(users).where(inArray(users.id, this.userIds))
+    }
   }
 }

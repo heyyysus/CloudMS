@@ -70,6 +70,38 @@ export const sessions = pgTable(
   (table) => [index("sessions_user_id_idx").on(table.userId)]
 )
 
+export const emailTemplates = pgTable("email_templates", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 64 }).notNull().unique(),
+  subject: varchar("subject", { length: 200 }).notNull(),
+  body: text("body").notNull(),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+})
+
+export const emailLogStatusEnum = pgEnum("email_log_status", ["sent", "failed"])
+
+export const emailLog = pgTable(
+  "email_log",
+  {
+    id: serial("id").primaryKey(),
+    recipient: varchar("recipient", { length: 255 }).notNull(),
+    // Plain varchar, not an FK to email_templates.key - the log must survive
+    // template renames/deletes.
+    templateKey: varchar("template_key", { length: 64 }).notNull(),
+    // text, not varchar(200): merge-field expansion can push a rendered
+    // subject past the template's own 200-char cap.
+    subject: text("subject").notNull(),
+    resendId: varchar("resend_id", { length: 64 }), // null when the send failed
+    status: emailLogStatusEnum("status").notNull(),
+    error: text("error"), // failure detail, null on success
+    triggeredBy: integer("triggered_by").references(() => users.id, { onDelete: "set null" }),
+    sentAt: timestamp("sent_at").defaultNow().notNull(),
+  },
+  (table) => [index("email_log_recipient_idx").on(table.recipient)]
+)
+
 export const persons = pgTable(
   "persons",
   {

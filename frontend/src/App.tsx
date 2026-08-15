@@ -5,6 +5,7 @@ import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/RequireAuth'
 import { AppLayout } from './components/layout/app-layout'
 import { createQueryClient } from './lib/query-client'
+import Admin from './pages/Admin'
 import ClientDetail from './pages/ClientDetail'
 import Home from './pages/Home'
 import Login from './pages/Login'
@@ -24,6 +25,7 @@ function App() {
               <Route element={<AppLayout />}>
                 <Route path="/home" element={<Home />} />
                 <Route path="/clients/:clientId" element={<ClientDetail />} />
+                <Route path="/admin" element={<Admin />} />
               </Route>
             </Route>
             <Route path="/" element={<Navigate to="/home" replace />} />

@@ -31,6 +31,11 @@ export default defineConfig({
     ],
   },
   server: {
+    // Without an explicit host, Node resolves "localhost" via the OS
+    // resolver and binds only to whichever address comes back first - on
+    // some machines that's the IPv6 loopback, which browsers don't always
+    // fall back from when "localhost" resolves to 127.0.0.1 for them first.
+    host: '127.0.0.1',
     proxy: {
       '/api/v1': {
         target: 'http://localhost:8000',

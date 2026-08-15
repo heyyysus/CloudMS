@@ -139,6 +139,39 @@ describe("summarizePolicyChanges", () => {
     expect(lines).toHaveLength(2)
   })
 
+  it("reports a coverage/deductible change on a vehicle that keeps its VIN", () => {
+    const before = makePolicy({
+      vehicles: [
+        {
+          id: 1,
+          policyId: 1,
+          vin: "SAMEVIN",
+          make: "Honda",
+          model: "Civic",
+          year: 2020,
+          coverageColl: "500",
+        } as PolicyDetail["vehicles"][number],
+      ],
+    })
+    const after = makePolicy({
+      vehicles: [
+        {
+          id: 1,
+          policyId: 1,
+          vin: "SAMEVIN",
+          make: "Honda",
+          model: "Civic",
+          year: 2020,
+          coverageColl: "1,000",
+        } as PolicyDetail["vehicles"][number],
+      ],
+    })
+
+    const input: UpdatePolicyInput = { vehicles: [] }
+    const lines = summarizePolicyChanges(before, after, input)
+    expect(lines).toEqual(["2020 Honda Civic (VIN SAMEVIN) — Collision deductible: 500 → 1,000"])
+  })
+
   it("reports added and removed drivers by person when the drivers key is present", () => {
     const kept = {
       driver: { person: person(1, "Jane", "Kept") },

@@ -38,6 +38,16 @@ function getClient(): { client: S3Client; bucket: string } {
   return { client, bucket }
 }
 
+// Direct server-side upload, as opposed to the presigned-URL flow above
+// (which lets the browser PUT straight to R2). Used for files the server
+// generates itself, e.g. the policy change form.
+export async function putObject(key: string, body: Buffer, contentType: string): Promise<void> {
+  const { client, bucket } = getClient()
+  await client.send(
+    new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType })
+  )
+}
+
 export function getPresignedUploadUrl(key: string, contentType: string): Promise<string> {
   const { client, bucket } = getClient()
   const command = new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType })

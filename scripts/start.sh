@@ -11,9 +11,18 @@ cd "$(dirname "$0")/.." || exit 1
 echo "Pulling latest changes..."
 git pull origin main
 
-# Build and start containers
-echo "Building and starting containers..."
-docker compose up --build -d
+# Building while the other services are running starves the TypeScript build
+# of memory on this host and hangs the deploy, so stop everything first.
+# `down` keeps named volumes: postgres_data survives, and must never be
+# dropped by adding -v here.
+echo "Stopping containers..."
+docker compose down
+
+echo "Building app image..."
+docker compose build app
+
+echo "Starting containers..."
+docker compose up -d
 
 # Remove unused images and containers to free up space
 echo "Cleaning up unused Docker resources..."

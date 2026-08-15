@@ -16,7 +16,12 @@ import {
   R2NotConfiguredError,
 } from "../storage/r2"
 import { firstIssue, parseId } from "./helpers"
-import { confirmAttachmentBody, idParam, presignAttachmentBody } from "./schemas"
+import {
+  attachmentLinkQuery,
+  confirmAttachmentBody,
+  idParam,
+  presignAttachmentBody,
+} from "./schemas"
 
 export const policyAttachmentsRouter = Router()
 
@@ -71,6 +76,12 @@ policyAttachmentsRouter.get(
     const id = parseId(req.params.id, res)
     if (id === undefined) return
 
+    const query = attachmentLinkQuery.safeParse(req.query)
+    if (!query.success) {
+      res.status(400).json({ error: firstIssue(query.error) })
+      return
+    }
+
     const attachment = await findPolicyAttachmentById(id)
     if (!attachment) {
       res.status(404).json({ error: "Attachment not found" })
@@ -78,7 +89,12 @@ policyAttachmentsRouter.get(
     }
 
     try {
-      const url = await getPresignedDownloadUrl(attachment.storageKey)
+      const url = await getPresignedDownloadUrl(
+        attachment.storageKey,
+        query.data.disposition === "attachment"
+          ? { downloadFileName: attachment.fileName }
+          : undefined
+      )
       res.json({ url })
     } catch (err) {
       if (isR2NotConfigured(err, res)) return

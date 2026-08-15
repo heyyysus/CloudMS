@@ -54,9 +54,31 @@ export function getPresignedUploadUrl(key: string, contentType: string): Promise
   return getSignedUrl(client, command, { expiresIn: UPLOAD_URL_EXPIRY_SECONDS })
 }
 
-export function getPresignedDownloadUrl(key: string): Promise<string> {
+// ASCII-only `filename=` for older clients, plus an RFC 5987 `filename*=`
+// (percent-encoded UTF-8) for everything else, so non-ASCII file names still
+// survive; quotes/backslashes are stripped since they'd break the quoted
+// `filename=` value.
+function contentDispositionHeader(fileName: string): string {
+  const asciiFallback = fileName.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_")
+  const encoded = encodeURIComponent(fileName)
+  return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encoded}`
+}
+
+// `downloadFileName` set forces the browser to save rather than render the
+// object - used by the "Download" action in the attachment preview dialog,
+// as opposed to the plain inline URL used to preview it.
+export function getPresignedDownloadUrl(
+  key: string,
+  opts?: { downloadFileName?: string }
+): Promise<string> {
   const { client, bucket } = getClient()
-  const command = new GetObjectCommand({ Bucket: bucket, Key: key })
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    ...(opts?.downloadFileName && {
+      ResponseContentDisposition: contentDispositionHeader(opts.downloadFileName),
+    }),
+  })
   return getSignedUrl(client, command, { expiresIn: DOWNLOAD_URL_EXPIRY_SECONDS })
 }
 

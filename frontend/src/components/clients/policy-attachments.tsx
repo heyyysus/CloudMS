@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AttachmentPreviewDialog } from '@/components/clients/attachment-preview-dialog'
 import { LogAuthorChip } from '@/components/clients/log-author-chip'
 import { formatFileSize } from '@/lib/format-file-size'
 import { formatLogTimestamp } from '@/lib/log-datetime'
@@ -30,23 +31,12 @@ export function PolicyAttachments({
   getPolicyAttachmentsFn = getPolicyAttachments,
   getPolicyAttachmentLinkFn = getPolicyAttachmentLink,
 }: PolicyAttachmentsProps) {
-  const [openingId, setOpeningId] = useState<number | null>(null)
+  const [selected, setSelected] = useState<PolicyAttachment | null>(null)
 
   const { data: attachments, isPending, isError } = useQuery({
     queryKey: ['policyAttachments', policyId],
     queryFn: ({ signal }) => getPolicyAttachmentsFn(policyId, signal),
   })
-
-  async function openAttachment(attachment: PolicyAttachment) {
-    if (openingId !== null) return
-    setOpeningId(attachment.id)
-    try {
-      const { url } = await getPolicyAttachmentLinkFn(attachment.id)
-      window.open(url, '_blank', 'noopener,noreferrer')
-    } finally {
-      setOpeningId(null)
-    }
-  }
 
   return (
     <Card>
@@ -88,19 +78,16 @@ export function PolicyAttachments({
               <button
                 key={attachment.id}
                 type="button"
-                onDoubleClick={() => openAttachment(attachment)}
-                disabled={openingId === attachment.id}
-                aria-label={`Open ${attachment.fileName}`}
-                title="Double-click to open"
+                onClick={() => setSelected(attachment)}
+                aria-label={`Preview ${attachment.fileName}`}
+                title="Preview"
                 className={cn(
                   ATTACHMENT_GRID,
-                  'w-full cursor-default py-1 text-left odd:bg-muted-foreground/15 hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none disabled:opacity-60'
+                  'w-full cursor-pointer py-1 text-left odd:bg-muted-foreground/15 hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none'
                 )}
               >
                 <span className="min-w-0">
-                  <span className="block truncate text-foreground">
-                    {openingId === attachment.id ? 'Opening…' : attachment.fileName}
-                  </span>
+                  <span className="block truncate text-foreground">{attachment.fileName}</span>
                   {attachment.description && (
                     <span className="block truncate text-xs text-muted-foreground">
                       {attachment.description}
@@ -122,6 +109,13 @@ export function PolicyAttachments({
           </div>
         )}
       </CardContent>
+      <AttachmentPreviewDialog
+        attachment={selected}
+        onOpenChange={(open) => {
+          if (!open) setSelected(null)
+        }}
+        getPolicyAttachmentLinkFn={getPolicyAttachmentLinkFn}
+      />
     </Card>
   )
 }

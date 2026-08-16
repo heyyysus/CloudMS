@@ -181,8 +181,10 @@ async function reverseSweepAndFeeEntries(
   }
 }
 
+// receiptId identifies the receipt this void just cancelled, so the caller can
+// hide the receipt's generated PDF.
 export type VoidPaymentResult =
-  { status: "ok" } | { status: "not_found" } | { status: "already_void" }
+  { status: "ok"; receiptId: number | null } | { status: "not_found" } | { status: "already_void" }
 
 // Voids a payment: reverses the money it put into the trust account, voids its
 // receipt, and reopens the invoice if this payment had closed it (reversing
@@ -242,10 +244,11 @@ export async function voidPayment(
         })
         .where(eq(invoices.id, invoice.id))
 
-      await tx
+      const [voidedReceipt] = await tx
         .update(receipts)
         .set({ voidedAt: new Date(), voidedBy, voidReason: reason })
         .where(eq(receipts.paymentId, payment.id))
+        .returning({ id: receipts.id })
 
       await tx
         .update(payments)
@@ -269,7 +272,7 @@ export async function voidPayment(
         }),
       })
 
-      return { status: "ok" }
+      return { status: "ok", receiptId: voidedReceipt?.id ?? null }
     })
   )
 }

@@ -844,6 +844,9 @@ export function InvoicePaymentDialog({
       // whole key rather than plumbing a policyId through - only the mounted
       // query (the selected policy's log) actually refetches.
       queryClient.invalidateQueries({ queryKey: ['policyLogs'] })
+      // The backend also files an invoice/receipt PDF as a policy attachment.
+      // Same whole-key reasoning as policyLogs above.
+      queryClient.invalidateQueries({ queryKey: ['policyAttachments'] })
       toast.success(variables.kind === 'create' ? 'New invoice created' : 'New payment created')
     },
     onError: (error) => toast.error(error.message),

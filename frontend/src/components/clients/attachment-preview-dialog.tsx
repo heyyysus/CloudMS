@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { stripFileExtension } from '@/lib/file-display'
 import { formatFileSize } from '@/lib/format-file-size'
 import { getPolicyAttachmentLink, type PolicyAttachment } from '@/api/policyAttachments'
 
@@ -52,13 +53,17 @@ export function AttachmentPreviewDialog({
     if (linkQuery.data) window.open(linkQuery.data.url, '_blank', 'noopener,noreferrer')
   }
 
+  // The stored fileName keeps its extension so downloads land with one; every
+  // on-screen use shows the bare name.
+  const displayName = attachment ? stripFileExtension(attachment.fileName) : ''
+
   return (
     <Dialog open={attachment !== null} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[90dvh] flex-col sm:max-w-5xl">
         {attachment && (
           <>
             <DialogHeader>
-              <DialogTitle className="truncate">{attachment.fileName}</DialogTitle>
+              <DialogTitle className="truncate">{displayName}</DialogTitle>
               <DialogDescription>
                 {attachment.description ?? formatFileSize(attachment.sizeBytes)}
               </DialogDescription>
@@ -78,7 +83,7 @@ export function AttachmentPreviewDialog({
               {linkQuery.data && attachment.mimeType === 'application/pdf' && (
                 <iframe
                   src={linkQuery.data.url}
-                  title={attachment.fileName}
+                  title={displayName}
                   className="h-full w-full"
                 />
               )}
@@ -86,7 +91,7 @@ export function AttachmentPreviewDialog({
                 <div className="flex h-full items-center justify-center overflow-auto p-4">
                   <img
                     src={linkQuery.data.url}
-                    alt={attachment.fileName}
+                    alt={displayName}
                     className="max-h-full max-w-full object-contain"
                   />
                 </div>

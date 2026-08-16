@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { splitFileName } from '@/lib/file-display'
 import { formatFileSize } from '@/lib/format-file-size'
 import {
   confirmPolicyAttachmentUpload,
@@ -44,15 +45,6 @@ export interface AttachmentSubmitValues {
   file: File
   name: string
   description?: string
-}
-
-// Splits "quote-2026.pdf" into ["quote-2026", ".pdf"] so the naming field can
-// be prefilled with just the base name while the extension is silently
-// re-appended on submit. A file with no extension keeps an empty second part.
-function splitFileName(fileName: string): { base: string; ext: string } {
-  const dot = fileName.lastIndexOf('.')
-  if (dot <= 0) return { base: fileName, ext: '' }
-  return { base: fileName.slice(0, dot), ext: fileName.slice(dot) }
 }
 
 interface AddAttachmentFormProps {

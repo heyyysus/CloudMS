@@ -11,6 +11,9 @@ const pdfAttachment: PolicyAttachment = {
   description: 'Declarations page from carrier',
   mimeType: 'application/pdf',
   sizeBytes: 245_000,
+  isVoided: false,
+  sourceType: 'upload',
+  sourceId: null,
   createdAt: '2026-03-02T14:31:00',
   uploadedBy: { id: 1, name: 'Jane Staff', email: 'jane@example.com' },
 }
@@ -65,8 +68,10 @@ export const Pdf: Story = {
     getPolicyAttachmentLinkFn: fn(async () => ({ url: 'https://example.com/declarations.pdf' })),
   },
   play: async () => {
-    await expect(await screen.findByText('declarations-page.pdf')).toBeInTheDocument()
-    await expect(screen.getByTitle('declarations-page.pdf')).toBeInTheDocument()
+    // The extension is stripped everywhere it's shown; only the download
+    // filename keeps it.
+    await expect(await screen.findByText('declarations-page')).toBeInTheDocument()
+    await expect(screen.getByTitle('declarations-page')).toBeInTheDocument()
     await expect(screen.getByRole('button', { name: /download/i })).toBeInTheDocument()
     await expect(screen.getByRole('button', { name: /open in new tab/i })).toBeInTheDocument()
   },
@@ -78,7 +83,7 @@ export const Image: Story = {
     getPolicyAttachmentLinkFn: fn(async () => ({ url: 'https://example.com/id-card.png' })),
   },
   play: async () => {
-    await expect(await screen.findByAltText('id-card.png')).toBeInTheDocument()
+    await expect(await screen.findByAltText('id-card')).toBeInTheDocument()
   },
 }
 

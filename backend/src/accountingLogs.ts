@@ -4,32 +4,22 @@
 // happened. These are pure string builders - no DB access - so the wording is
 // unit-testable on its own.
 //
-// The line-item and payment-method wording mirrors the labels the UI shows
-// (frontend/src/lib/invoice-options.ts), lowercased because they appear
-// mid-sentence here.
+// The line-item and payment-method wording comes from the shared label maps in
+// invoiceLabels.ts, lowercased because they appear mid-sentence here.
 
+import {
+  formatUsd,
+  INVOICE_ITEM_TYPE_LABEL as ITEM_TYPE_LABEL,
+  PAYMENT_METHOD_LABEL as METHOD_LABEL,
+} from "./invoiceLabels"
 import type { InvoiceItemType, InvoiceStatus, PaymentMethod } from "./types"
 
-const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
-
-function formatUsd(amount: string | number): string {
-  return usd.format(Number(amount))
+function itemTypeLabel(type: InvoiceItemType): string {
+  return ITEM_TYPE_LABEL[type].toLowerCase()
 }
 
-const INVOICE_ITEM_TYPE_LABEL: Record<InvoiceItemType, string> = {
-  new_business_sweep: "new business sweep",
-  new_business_fee: "new business fee",
-  installment_payment_sweep: "installment payment sweep",
-  installment_payment_fee: "installment payment fee",
-  endorsement_sweep: "endorsement sweep",
-  endorsement_fee: "endorsement fee",
-}
-
-const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
-  cash: "cash",
-  check: "check",
-  credit_card: "credit card",
-  debit_card: "debit card",
+function methodLabel(method: PaymentMethod): string {
+  return METHOD_LABEL[method].toLowerCase()
 }
 
 // " Reason: ..." when one was given, nothing when it wasn't. Void reasons are
@@ -47,7 +37,7 @@ export function invoiceCreatedLogBody(input: {
   items: { type: InvoiceItemType; amount: string }[]
 }): string {
   const breakdown = input.items
-    .map((item) => `${INVOICE_ITEM_TYPE_LABEL[item.type]} ${formatUsd(item.amount)}`)
+    .map((item) => `${itemTypeLabel(item.type)} ${formatUsd(item.amount)}`)
     .join(", ")
   return `Invoice #${input.invoiceId} created — total ${formatUsd(input.total)} (${breakdown}).`
 }
@@ -71,7 +61,7 @@ export function paymentRecordedLogBody(input: {
       : `${formatUsd(input.amountDueAfter)} still due`
   )
 
-  const method = PAYMENT_METHOD_LABEL[input.method]
+  const method = methodLabel(input.method)
   return `Payment of ${formatUsd(input.amount)} by ${method} on invoice #${input.invoiceId} — ${parts.join(", ")}.`
 }
 
@@ -103,6 +93,6 @@ export function paymentVoidedLogBody(input: {
         ? `invoice reopened with ${formatUsd(input.amountDueAfter)} now due`
         : `${formatUsd(input.amountDueAfter)} now due`
 
-  const method = PAYMENT_METHOD_LABEL[input.method]
+  const method = methodLabel(input.method)
   return `Payment #${input.paymentId} of ${formatUsd(input.amount)} by ${method} on invoice #${input.invoiceId} voided — ${formatUsd(input.amountApplied)} reversed, ${outcome}.${reasonSuffix(input.reason)}`
 }

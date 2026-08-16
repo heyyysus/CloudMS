@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { createPolicyLog, type PolicyLog } from '@/api/policyLogs'
+import { useToast } from '@/components/ui/toast'
 
 const logFormSchema = z.object({
   body: z.string().trim().min(1, 'Enter a note').max(5000, 'Max 5000 characters'),
@@ -89,6 +90,7 @@ export function AddLogDialog({
   createLogFn = createPolicyLog,
 }: AddLogDialogProps) {
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const mutation = useMutation({
     mutationFn: (body: string) => createLogFn({ policyId, body }),
@@ -98,7 +100,9 @@ export function AddLogDialog({
         ...(old ?? []),
       ])
       onOpenChange(false)
+      toast.success('New log created')
     },
+    onError: (error) => toast.error(error.message),
   })
 
   return (

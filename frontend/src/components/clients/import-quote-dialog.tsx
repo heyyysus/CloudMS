@@ -28,6 +28,7 @@ import { createClient, clientDisplayName, type ClientDetail } from '@/api/client
 import { createPolicy, getCarriers, type CreatePolicyBody } from '@/api/policies'
 import { createPolicyLog } from '@/api/policyLogs'
 import { search as defaultSearch, type SearchClientResult, type SearchFn } from '@/api/search'
+import { useToast } from '@/components/ui/toast'
 import { DEFAULT_BI_LIMIT, DEFAULT_PD_LIMIT } from '@/lib/coverage-options'
 import { formatNameLastFirst } from '@/lib/person-name'
 import { formatPhone } from '@/lib/phone'
@@ -261,6 +262,7 @@ export function ImportQuoteDialog({
   createPolicyLogFn = createPolicyLog,
 }: ImportQuoteDialogProps) {
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const [step, setStep] = useState<'parse' | 'target' | 'policy'>('parse')
   const [parseError, setParseError] = useState<string | null>(null)
@@ -312,7 +314,9 @@ export function ImportQuoteDialog({
       queryClient.setQueryData(['clients', data.id], data)
       setClient(data)
       setStep('policy')
+      toast.success('New client created')
     },
+    onError: (error) => toast.error(error.message),
   })
 
   const importPolicyMutation = useMutation({
@@ -336,7 +340,9 @@ export function ImportQuoteDialog({
       )
       onOpenChange(false)
       onImported(client)
+      toast.success('New policy created')
     },
+    onError: (error) => toast.error(error.message),
   })
 
   function selectClient(next: ClientOption) {

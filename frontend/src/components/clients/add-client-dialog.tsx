@@ -23,7 +23,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { clientDisplayName, createClient, type ClientDetail, type CreateClientBody } from '@/api/clients'
+import { createClient, type ClientDetail, type CreateClientBody } from '@/api/clients'
 import { createPerson, type CreatePersonBody } from '@/api/persons'
 import { AddressFields } from '@/components/clients/address-fields'
 import { useToast } from '@/components/ui/toast'
@@ -413,8 +413,9 @@ export function AddClientDialog({
       queryClient.setQueryData(['clients', data.id], data)
       setOpen(false)
       onCreated?.(data)
-      toast.success(`${clientDisplayName(data)} added`)
+      toast.success('New client created')
     },
+    onError: (error) => toast.error(error.message),
   })
 
   return (

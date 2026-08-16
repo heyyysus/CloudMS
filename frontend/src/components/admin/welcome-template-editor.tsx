@@ -13,6 +13,7 @@ import {
   updateEmailTemplate,
   type EmailTemplateResponse,
 } from '@/api/emailTemplates'
+import { useToast } from '@/components/ui/toast'
 
 const WELCOME_TEMPLATE_KEY = 'welcome'
 
@@ -43,6 +44,7 @@ export function WelcomeTemplateEditor({
   updateEmailTemplateFn = updateEmailTemplate,
 }: WelcomeTemplateEditorProps) {
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const query = useQuery<EmailTemplateResponse>({
     queryKey: ['emailTemplate', WELCOME_TEMPLATE_KEY],
@@ -71,7 +73,9 @@ export function WelcomeTemplateEditor({
       updateEmailTemplateFn(WELCOME_TEMPLATE_KEY, values),
     onSuccess: (data) => {
       queryClient.setQueryData(['emailTemplate', WELCOME_TEMPLATE_KEY], data)
+      toast.success('Email template changes applied')
     },
+    onError: (error) => toast.error(error.message),
   })
 
   return (

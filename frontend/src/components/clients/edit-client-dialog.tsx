@@ -12,6 +12,7 @@ import {
 import { updateClient, type ClientDetail } from '@/api/clients'
 import { updatePerson } from '@/api/persons'
 import { AddClientForm, type ClientFormSubmit } from '@/components/clients/add-client-dialog'
+import { useToast } from '@/components/ui/toast'
 
 interface EditClientDialogProps {
   client: Omit<ClientDetail, 'policies'>
@@ -26,6 +27,7 @@ export function EditClientDialog({
 }: EditClientDialogProps) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const mutation = useMutation({
     mutationFn: async (payload: ClientFormSubmit) => {
@@ -37,7 +39,9 @@ export function EditClientDialog({
     onSuccess: (data) => {
       queryClient.setQueryData(['clients', client.id], data)
       setOpen(false)
+      toast.success('Client changes applied')
     },
+    onError: (error) => toast.error(error.message),
   })
 
   return (

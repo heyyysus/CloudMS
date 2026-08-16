@@ -49,6 +49,7 @@ import {
   type Vehicle,
 } from '@/api/policies'
 import { COVERAGE_LABELS } from '@/components/clients/policy-card'
+import { useToast } from '@/components/ui/toast'
 import { AddressFields } from '@/components/clients/address-fields'
 import { decodeVIN } from '@/api/vinDecoder'
 import { localTodayIsoDate } from '@/lib/policy-status'
@@ -1298,6 +1299,7 @@ export function AddPolicyDialog({
 }: AddPolicyDialogProps) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const carriersQuery = useQuery({
     queryKey: ['carriers'],
@@ -1313,7 +1315,9 @@ export function AddPolicyDialog({
         old ? { ...old, policies: [...old.policies, data] } : old
       )
       setOpen(false)
+      toast.success('New policy created')
     },
+    onError: (error) => toast.error(error.message),
   })
 
   return (

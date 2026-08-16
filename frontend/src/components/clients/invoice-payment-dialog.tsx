@@ -54,6 +54,7 @@ import {
   type PaymentMethod,
 } from '@/api/invoices'
 import { recordPayment, type ReceiptDetail } from '@/api/payments'
+import { useToast } from '@/components/ui/toast'
 
 const INVOICE_ITEM_TYPE_VALUES = [
   'new_business_sweep',
@@ -722,6 +723,7 @@ export function InvoicePaymentDialog({
   getInvoicesFn = getInvoices,
 }: InvoicePaymentDialogProps) {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const [manualStep, setManualStep] = useState<Step | null>(null)
   const [payTargetId, setPayTargetId] = useState<number | null>(null)
 
@@ -783,14 +785,16 @@ export function InvoicePaymentDialog({
         skippedPayments: input.payments.slice(receipts.length),
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['invoices', 'byClient', client.id] })
       // The backend appends a policy log for the invoice and for each payment.
       // This dialog can bill any of the client's policies, so invalidate the
       // whole key rather than plumbing a policyId through - only the mounted
       // query (the selected policy's log) actually refetches.
       queryClient.invalidateQueries({ queryKey: ['policyLogs'] })
+      toast.success(variables.kind === 'create' ? 'New invoice created' : 'New payment created')
     },
+    onError: (error) => toast.error(error.message),
   })
 
   function reset() {

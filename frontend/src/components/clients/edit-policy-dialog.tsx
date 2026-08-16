@@ -19,6 +19,7 @@ import {
   type Vehicle,
 } from '@/api/policies'
 import { AddPolicyForm, type ExistingDriverOption } from '@/components/clients/add-policy-dialog'
+import { useToast } from '@/components/ui/toast'
 
 interface EditPolicyDialogProps {
   client: ClientDetail
@@ -39,6 +40,7 @@ export function EditPolicyDialog({
 }: EditPolicyDialogProps) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const carriersQuery = useQuery({
     queryKey: ['carriers'],
@@ -61,7 +63,9 @@ export function EditPolicyDialog({
       queryClient.invalidateQueries({ queryKey: ['policyLogs', policy.id] })
       queryClient.invalidateQueries({ queryKey: ['policyAttachments', policy.id] })
       setOpen(false)
+      toast.success('Policy changes applied')
     },
+    onError: (error) => toast.error(error.message),
   })
 
   return (

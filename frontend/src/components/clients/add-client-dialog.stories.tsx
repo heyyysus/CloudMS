@@ -4,6 +4,7 @@ import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
 import { AddClientDialog } from './add-client-dialog'
 import { ApiError } from '@/api/client'
 import type { ClientDetail, Person } from '@/api/clients'
+import { ToastProvider } from '@/components/ui/toast'
 
 const personFixture: Person = {
   id: 301,
@@ -51,7 +52,9 @@ const meta = {
   decorators: [
     (Story) => (
       <QueryClientProvider client={createTestQueryClient()}>
-        <Story />
+        <ToastProvider>
+          <Story />
+        </ToastProvider>
       </QueryClientProvider>
     ),
   ],

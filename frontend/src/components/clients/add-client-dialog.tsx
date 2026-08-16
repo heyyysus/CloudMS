@@ -23,9 +23,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { createClient, type ClientDetail, type CreateClientBody } from '@/api/clients'
+import { clientDisplayName, createClient, type ClientDetail, type CreateClientBody } from '@/api/clients'
 import { createPerson, type CreatePersonBody } from '@/api/persons'
 import { AddressFields } from '@/components/clients/address-fields'
+import { useToast } from '@/components/ui/toast'
 import {
   addressFormSchema,
   flattenAddress,
@@ -399,6 +400,7 @@ export function AddClientDialog({
 }: AddClientDialogProps) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const mutation = useMutation({
     mutationFn: async (payload: ClientFormSubmit) => {
@@ -411,6 +413,7 @@ export function AddClientDialog({
       queryClient.setQueryData(['clients', data.id], data)
       setOpen(false)
       onCreated?.(data)
+      toast.success(`${clientDisplayName(data)} added`)
     },
   })
 

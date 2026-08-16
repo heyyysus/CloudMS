@@ -14,7 +14,7 @@ import {
   PAYMENT_METHOD_LABEL,
 } from "./invoiceLabels"
 import { centsToAmount, toCents } from "./money"
-import { formatGeneratedOn, sanitizeForPdf } from "./pdfFormat"
+import { formatGeneratedOn, PDF_FONT, PDF_FONT_BOLD, sanitizeForPdf } from "./pdfFormat"
 import type { getInvoiceWithDetails } from "./repositories"
 
 export type InvoiceDetail = NonNullable<Awaited<ReturnType<typeof getInvoiceWithDetails>>>
@@ -67,13 +67,13 @@ export function buildAccountingDocumentPdf(meta: AccountingDocumentMeta): Promis
     // call would start in the amount column and wrap off the page.
     function renderAmountRow(label: string, amount: string, bold = false): void {
       const y = doc.y
-      doc.font(bold ? "Times-Bold" : "Times-Roman")
+      doc.font(bold ? PDF_FONT_BOLD : PDF_FONT)
       doc.text(sanitizeForPdf(label), left, y, { width: labelWidth })
       const afterLabelY = doc.y
       doc.text(amount, right - amountWidth, y, { width: amountWidth, align: "right" })
       doc.y = Math.max(afterLabelY, doc.y)
       doc.x = left
-      doc.font("Times-Roman")
+      doc.font(PDF_FONT)
     }
 
     // A smaller, indented note under the row just drawn (line-item
@@ -95,10 +95,10 @@ export function buildAccountingDocumentPdf(meta: AccountingDocumentMeta): Promis
         ? `Receipt ${formatDocumentNumber(meta.receipt.id)}`
         : `Invoice ${formatDocumentNumber(invoice.id)}`
 
-    doc.font("Times-Roman")
+    doc.font(PDF_FONT)
 
-    doc.font("Times-Bold").fontSize(18).text(title, { align: "center" })
-    doc.font("Times-Roman")
+    doc.font(PDF_FONT_BOLD).fontSize(18).text(title, { align: "center" })
+    doc.font(PDF_FONT)
     doc.moveDown(0.5)
 
     doc.fontSize(11)
@@ -133,8 +133,8 @@ export function buildAccountingDocumentPdf(meta: AccountingDocumentMeta): Promis
     // amountPaid, so they must not appear on the document either.
     const activePayments = invoice.payments.filter((payment) => payment.voidedAt === null)
     if (activePayments.length > 0) {
-      doc.font("Times-Bold").fontSize(13).text("Payments")
-      doc.font("Times-Roman").fontSize(11)
+      doc.font(PDF_FONT_BOLD).fontSize(13).text("Payments")
+      doc.font(PDF_FONT).fontSize(11)
       doc.moveDown(0.25)
 
       for (const payment of activePayments) {
@@ -160,8 +160,8 @@ export function buildAccountingDocumentPdf(meta: AccountingDocumentMeta): Promis
 
     if (invoice.note) {
       doc.moveDown()
-      doc.font("Times-Bold").text("Notes")
-      doc.font("Times-Roman").text(sanitizeForPdf(invoice.note), { width: right - left })
+      doc.font(PDF_FONT_BOLD).text("Notes")
+      doc.font(PDF_FONT).text(sanitizeForPdf(invoice.note), { width: right - left })
     }
 
     doc.end()

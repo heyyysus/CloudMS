@@ -27,10 +27,11 @@ async function recordPolicyChangeForm(
   req: Request,
   before: NonNullable<Awaited<ReturnType<typeof getPolicyWithDetails>>>,
   after: NonNullable<Awaited<ReturnType<typeof getPolicyWithDetails>>>,
-  parsedInput: ReturnType<typeof updatePolicyBody.parse>
+  parsedInput: ReturnType<typeof updatePolicyBody.parse>,
+  endorsementEffectiveDate: string | undefined
 ): Promise<void> {
   try {
-    await recordPolicyChangeFormUnsafe(req, before, after, parsedInput)
+    await recordPolicyChangeFormUnsafe(req, before, after, parsedInput, endorsementEffectiveDate)
   } catch (err) {
     req.log.error(err, "Failed to record policy change form")
   }
@@ -40,7 +41,8 @@ async function recordPolicyChangeFormUnsafe(
   req: Request,
   before: NonNullable<Awaited<ReturnType<typeof getPolicyWithDetails>>>,
   after: NonNullable<Awaited<ReturnType<typeof getPolicyWithDetails>>>,
-  parsedInput: ReturnType<typeof updatePolicyBody.parse>
+  parsedInput: ReturnType<typeof updatePolicyBody.parse>,
+  endorsementEffectiveDate: string | undefined
 ): Promise<void> {
   const changes = summarizePolicyChanges(before, after, parsedInput)
   if (changes.length === 0) return
@@ -62,7 +64,15 @@ async function recordPolicyChangeFormUnsafe(
       : "Unknown client"
 
     const pdf = await buildPolicyChangeFormPdf(
-      { policy: after, clientName, editedBy: req.user!, editedAt: new Date() },
+      {
+        policy: after,
+        clientName,
+        editedBy: req.user!,
+        editedAt: new Date(),
+        // Falls back to today when the caller didn't send one, so the PDF
+        // always has a value even if this route is ever hit without it.
+        endorsementEffectiveDate: endorsementEffectiveDate ?? new Date().toISOString().slice(0, 10),
+      },
       changes
     )
     const storageKey = `policy-attachments/${after.id}/${randomUUID()}-policy-change-form.pdf`
@@ -171,8 +181,12 @@ policiesRouter.patch("/policies/:id", requireAuth, async (req: Request, res: Res
     return
   }
 
+  // Not a real policy column - it only feeds the generated change form/log
+  // below, so it's kept out of the DB update.
+  const { endorsementEffectiveDate, ...policyInput } = parsed.data
+
   try {
-    const policy = await updateAutoPolicyWithDetails(id, parsed.data)
+    const policy = await updateAutoPolicyWithDetails(id, policyInput)
     if (!policy) {
       res.status(404).json({ error: "Policy not found" })
       return
@@ -180,7 +194,7 @@ policiesRouter.patch("/policies/:id", requireAuth, async (req: Request, res: Res
     // Runs (and fully swallows its own errors - see recordPolicyChangeForm)
     // before responding, so the log/attachment it produces are guaranteed to
     // be visible to the caller's very next request.
-    await recordPolicyChangeForm(req, before, policy, parsed.data)
+    await recordPolicyChangeForm(req, before, policy, parsed.data, endorsementEffectiveDate)
     res.json(policy)
   } catch (err) {
     if (!handlePolicyWriteError(err, res)) throw err

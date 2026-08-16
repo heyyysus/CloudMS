@@ -153,9 +153,12 @@ export const createPolicyBody = policyCoreBody
 
 // Partial like other update bodies, but vehicles/drivers are replace-all: key
 // absent leaves that collection untouched, [] clears it, [...] replaces it.
+// endorsementEffectiveDate isn't a policy column - it's the date this
+// specific edit takes effect, used only on the generated change form/log
+// (see recordPolicyChangeForm in routes/policies.ts), so it's edit-only.
 export const updatePolicyBody = policyCoreBody
   .partial()
-  .extend(policyChildren)
+  .extend({ ...policyChildren, endorsementEffectiveDate: z.iso.date().optional() })
   .superRefine(checkPolicyChildren)
 
 export const createVehicleBody = insertVehicleSchema.omit(omitMeta)

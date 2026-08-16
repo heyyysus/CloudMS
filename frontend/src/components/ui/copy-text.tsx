@@ -54,7 +54,7 @@ export function CopyText({ value, copyValue, label, className }: CopyTextProps) 
       aria-label={label ? `Copy ${label}` : `Copy ${text}`}
       title="Click to copy"
       className={cn(
-        'cursor-grab rounded-sm text-left underline decoration-muted-foreground/50 decoration-dotted underline-offset-2 transition-colors duration-150 hover:bg-primary/10 hover:decoration-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        'cursor-grab rounded-sm text-left underline decoration-muted-foreground/50 decoration-dotted underline-offset-2 transition-colors duration-150 hover:bg-primary/10 hover:decoration-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:decoration-white/50',
         copied && 'bg-primary/20',
         className
       )}

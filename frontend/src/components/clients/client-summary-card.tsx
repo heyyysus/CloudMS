@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { CopyText, useCopyToClipboard } from '@/components/ui/copy-text'
 import { clientDisplayName, formatClientId, type ClientDetail } from '@/api/clients'
-import { formatAddress, formatAddressLines, pickAddress } from '@/lib/address'
+import { formatAddressLines, pickAddress } from '@/lib/address'
 import { formatNameLastFirst } from '@/lib/person-name'
 import { formatPhone } from '@/lib/phone'
 
@@ -81,16 +81,9 @@ export function ClientSummaryCard({ client, action }: ClientSummaryCardProps) {
           <div>
             <p className="text-xs font-medium text-muted-foreground">Mailing Address</p>
             {mailingLines.length > 0 ? (
-              <CopyText
-                className="text-sm"
-                value={mailingLines.map((line) => (
-                  <span key={line} className="block">
-                    {line}
-                  </span>
-                ))}
-                copyValue={formatAddress(mailingAddress) ?? undefined}
-                label="mailing address"
-              />
+              mailingLines.map((line) => (
+                <CopyText key={line} className="block text-sm" value={line} label="mailing address" />
+              ))
             ) : (
               <p className="text-sm text-muted-foreground">—</p>
             )}
@@ -98,16 +91,9 @@ export function ClientSummaryCard({ client, action }: ClientSummaryCardProps) {
           <div>
             <p className="text-xs font-medium text-muted-foreground">Physical Address</p>
             {physicalLines.length > 0 ? (
-              <CopyText
-                className="text-sm"
-                value={physicalLines.map((line) => (
-                  <span key={line} className="block">
-                    {line}
-                  </span>
-                ))}
-                copyValue={formatAddress(physicalAddress) ?? undefined}
-                label="physical address"
-              />
+              physicalLines.map((line) => (
+                <CopyText key={line} className="block text-sm" value={line} label="physical address" />
+              ))
             ) : (
               <p className="text-sm text-muted-foreground">—</p>
             )}

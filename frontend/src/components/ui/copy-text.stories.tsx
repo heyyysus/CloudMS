@@ -34,8 +34,12 @@ export const CopiesOnClick: Story = {
     const originalWriteText = navigator.clipboard.writeText
     navigator.clipboard.writeText = async () => {}
     try {
+      // The value text must never change - only a background flash signals
+      // the copy, so readability is unaffected.
+      await expect(button).toHaveTextContent('(555) 123-4567')
       await userEvent.click(button)
-      await expect(button).toHaveTextContent('Copied')
+      await expect(button).toHaveClass('bg-primary/20')
+      await expect(button).toHaveTextContent('(555) 123-4567')
     } finally {
       navigator.clipboard.writeText = originalWriteText
     }

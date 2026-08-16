@@ -1,5 +1,15 @@
 // Formatting shared by every server-generated PDF (policy change forms and
-// accounting documents). Pure string helpers - no PDFKit, no DB.
+// accounting documents). Pure strings and font names - no PDFKit, no DB.
+
+// The app's printable invoice/receipt summaries render in the UI's sans stack
+// (`system-ui, 'Segoe UI', Roboto, sans-serif` - see frontend/src/index.css),
+// so the generated PDFs use a sans face too: a receipt printed from the
+// browser and the same receipt downloaded from the policy's attachments
+// should not look like two different documents. Helvetica is one of PDF's
+// standard 14 fonts, so it needs no embedded font file and keeps the WinAnsi
+// encoding sanitizeForPdf below assumes.
+export const PDF_FONT = "Helvetica"
+export const PDF_FONT_BOLD = "Helvetica-Bold"
 
 // PDFKit's standard fonts only support WinAnsi encoding, which doesn't
 // include the unicode arrow used in "from → to" lines - it renders as

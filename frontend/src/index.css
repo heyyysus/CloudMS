@@ -118,9 +118,9 @@
     --warning: oklch(0.828 0.189 84.429);
     --surface-solid: oklch(1 0 0);
     --surface-solid-foreground: oklch(0.145 0 0);
-    /* White, not muted-foreground/50 - the muted gray reads as too faint
-       (near-black) against the dark background. */
-    --copy-underline: color-mix(in oklch, white 50%, transparent);
+    /* Full-opacity white, not a dimmed mix - at 50% the underline still read
+       as faint/gray against the dark background. */
+    --copy-underline: white;
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: #c084fc;

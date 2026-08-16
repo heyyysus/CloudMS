@@ -229,7 +229,7 @@ export const ParsesAndPrefills: Story = {
 
     // JOHN (the just-created insured) is auto-checked as an existing
     // driver; MARY (unmatched) landed as a new driver row.
-    await expect(screen.getByRole('checkbox', { name: /john van der berg/i })).toBeChecked()
+    await expect(screen.getByRole('checkbox', { name: /van der berg, john/i })).toBeChecked()
     await expect(screen.getByLabelText(/^first name$/i)).toHaveValue('MARY')
     await expect(screen.getByLabelText(/^last name$/i)).toHaveValue('VAN DER BERG')
   },
@@ -249,11 +249,11 @@ export const ExistingClientPath: Story = {
       'aria-selected',
       'true'
     )
-    await expect(screen.getByText('JOHN VAN DER BERG')).toBeInTheDocument()
+    await expect(screen.getByText('VAN DER BERG, JOHN')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /^continue$/i }))
 
     await screen.findByLabelText(/policy number/i)
-    await expect(screen.getByRole('checkbox', { name: /john van der berg/i })).toBeChecked()
+    await expect(screen.getByRole('checkbox', { name: /van der berg, john/i })).toBeChecked()
     await expect(screen.getByLabelText(/^first name$/i)).toHaveValue('MARY')
 
     await fillPolicyRequiredFields()
@@ -283,12 +283,12 @@ export const SearchDifferentClientPath: Story = {
     searchFn: fn(async (): Promise<SearchResponse> => ({ clients: [otherClient], policies: [] })),
   },
   play: async ({ args }) => {
-    await screen.findByText('JOHN VAN DER BERG')
+    await screen.findByText('VAN DER BERG, JOHN')
     await userEvent.click(screen.getByRole('button', { name: /search a different client/i }))
 
     const input = await screen.findByPlaceholderText(/search clients/i)
     await userEvent.type(input, 'Rivera')
-    await userEvent.click(await screen.findByText('Alex Rivera'))
+    await userEvent.click(await screen.findByText('Rivera, Alex'))
 
     await screen.findByLabelText(/policy number/i)
     await fillPolicyRequiredFields()
@@ -312,7 +312,7 @@ export const TogglesToNewClient: Story = {
     createClientFn: fn(async () => createdClient),
   },
   play: async () => {
-    await screen.findByText('JOHN VAN DER BERG')
+    await screen.findByText('VAN DER BERG, JOHN')
     await userEvent.click(screen.getByRole('tab', { name: /new client/i }))
     await expect(await screen.findByLabelText(/first name/i)).toHaveValue('JOHN')
   },
@@ -341,7 +341,7 @@ export const LogFailureStillSucceeds: Story = {
     }),
   },
   play: async ({ args }) => {
-    await screen.findByText('JOHN VAN DER BERG')
+    await screen.findByText('VAN DER BERG, JOHN')
     await userEvent.click(screen.getByRole('button', { name: /^continue$/i }))
     await screen.findByLabelText(/policy number/i)
 

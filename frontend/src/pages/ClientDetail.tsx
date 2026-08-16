@@ -240,7 +240,7 @@ function ClientDetail() {
         action={
           <div className="flex gap-2">
             {selectedPolicy && (
-              <Button size="sm" variant="outline" onClick={() => openInvoiceDialog()}>
+              <Button size="sm" variant="white" onClick={() => openInvoiceDialog()}>
                 <ReceiptIcon /> New invoice
               </Button>
             )}

@@ -105,13 +105,19 @@ export function isEmptyAddress(a: Address): boolean {
   )
 }
 
-// Joins the parts of an address for read-only display, skipping empty ones.
-// Returns null when every part is empty so callers can render a '—' fallback.
-export function formatAddress(a: Address): string | null {
+// Splits an address into display lines — street on one line, "City, ST ZIP"
+// on the next — skipping empty parts. Returns [] when every part is empty.
+export function formatAddressLines(a: Address): string[] {
   const street = [a.address1, a.address2].filter((s) => !!s && s.trim() !== '').join(', ')
   const stateZip = [a.state, a.zip].filter((s) => !!s && s.trim() !== '').join(' ')
   const cityLine = [a.city, stateZip].filter((s) => !!s && s.trim() !== '').join(', ')
-  const parts = [street, cityLine].filter((s) => s !== '')
+  return [street, cityLine].filter((s) => s !== '')
+}
+
+// Joins the parts of an address for read-only display, skipping empty ones.
+// Returns null when every part is empty so callers can render a '—' fallback.
+export function formatAddress(a: Address): string | null {
+  const parts = formatAddressLines(a)
   return parts.length > 0 ? parts.join(', ') : null
 }
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { PencilIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -72,15 +73,15 @@ export function EditPolicyDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          Edit
+        <Button variant="white" size="sm">
+          <PencilIcon /> Endorse
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Edit policy</DialogTitle>
+          <DialogTitle>Endorse policy</DialogTitle>
           <DialogDescription>
-            Update the policy, its vehicles, and its drivers.
+            Endorse the policy, its vehicles, and its drivers.
           </DialogDescription>
         </DialogHeader>
         <AddPolicyForm

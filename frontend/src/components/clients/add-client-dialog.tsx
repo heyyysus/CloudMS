@@ -34,6 +34,7 @@ import {
   toNullableAddress,
   type Address,
 } from '@/lib/address'
+import { formatPhoneInput, normalizePhone } from '@/lib/phone'
 
 const MARITAL_OPTIONS = ['single', 'married', 'divorced', 'widowed', 'separated'] as const
 
@@ -100,7 +101,14 @@ function toSubmit(
     client: {
       ...flattenAddress('mailing', toNullableAddress(values.mailing)),
       ...flattenAddress('physical', toNullableAddress(values.physical)),
-      phones: values.phones.map((phone) => phone.value.trim()),
+      // Stored as bare digits so every future render can format consistently
+      // via formatPhone; values that don't reduce to 10 digits (an ext., a
+      // non-US number) are kept as typed.
+      phones: values.phones.map((phone) => {
+        const trimmed = phone.value.trim()
+        const digits = normalizePhone(trimmed)
+        return digits.length === 10 ? digits : trimmed
+      }),
       emails: values.emails.map((email) => email.value.trim()),
     },
   }
@@ -278,9 +286,19 @@ export function AddClientForm({
             {phoneFields.fields.map((field, index) => (
               <Field key={field.id} orientation="horizontal">
                 <div className="flex-1">
-                  <Input
-                    aria-label={`Phone ${index + 1}`}
-                    {...register(`phones.${index}.value`)}
+                  <Controller
+                    control={control}
+                    name={`phones.${index}.value`}
+                    render={({ field: phoneField }) => (
+                      <Input
+                        aria-label={`Phone ${index + 1}`}
+                        name={phoneField.name}
+                        ref={phoneField.ref}
+                        value={phoneField.value}
+                        onChange={(e) => phoneField.onChange(formatPhoneInput(e.target.value))}
+                        onBlur={phoneField.onBlur}
+                      />
+                    )}
                   />
                   <FieldError
                     errors={

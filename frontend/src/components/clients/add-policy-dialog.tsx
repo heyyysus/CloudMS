@@ -52,6 +52,7 @@ import { COVERAGE_LABELS } from '@/components/clients/policy-card'
 import { AddressFields } from '@/components/clients/address-fields'
 import { decodeVIN } from '@/api/vinDecoder'
 import { localTodayIsoDate } from '@/lib/policy-status'
+import { formatNameLastFirst } from '@/lib/person-name'
 import {
   addressFormSchema,
   flattenAddress,
@@ -81,7 +82,7 @@ export interface ExistingDriverOption {
   driver?: { dlNumber: string | null; rating: string; sr22: boolean }
 }
 
-const RELATION_OPTIONS: { value: Person['relationToInsured']; label: string }[] = [
+export const RELATION_OPTIONS: { value: Person['relationToInsured']; label: string }[] = [
   { value: 'self', label: 'Self' },
   { value: 'spouse', label: 'Spouse' },
   { value: 'child', label: 'Child' },
@@ -91,7 +92,7 @@ const RELATION_OPTIONS: { value: Person['relationToInsured']; label: string }[] 
   { value: 'other', label: 'Other' },
 ]
 
-const MARITAL_OPTIONS = ['single', 'married', 'divorced', 'widowed', 'separated'] as const
+export const MARITAL_OPTIONS = ['single', 'married', 'divorced', 'widowed', 'separated'] as const
 
 // Radix Select doesn't allow an empty-string item value, so the "None"
 // option is represented by this sentinel and translated back to '' here.
@@ -156,7 +157,9 @@ const addPolicySchema = z
     }),
     vehicles: z.array(
       z.object({
-        vin: z.string().trim().min(17, 'VIN is required').max(17, 'Max 17 characters'),
+        // Empty or partial VINs are allowed - not every vehicle is fully
+        // identified at entry time.
+        vin: z.string().trim().max(17, 'Max 17 characters'),
         make: z.string().trim().min(1, 'Make is required').max(100, 'Max 100 characters'),
         model: z.string().trim().min(1, 'Model is required').max(100, 'Max 100 characters'),
         year: z.string().trim().regex(/^\d{4}$/, 'Enter a 4-digit year'),
@@ -199,7 +202,8 @@ const addPolicySchema = z
           'other',
         ]),
         maritalStatus: z.enum(['none', ...MARITAL_OPTIONS]),
-        dlNumber: z.string().trim().min(1, 'DL number is required').max(50, 'Max 50 characters'),
+        // An agency may not have a driver's DL number yet - not required.
+        dlNumber: z.string().trim().max(50, 'Max 50 characters'),
         rating: z.enum(['rated', 'excluded']),
         sr22: z.boolean(),
       })
@@ -209,6 +213,9 @@ const addPolicySchema = z
     const vins = new Set<string>()
     values.vehicles.forEach((vehicle, index) => {
       const vin = vehicle.vin.trim().toUpperCase()
+      // An empty (or shared partial) VIN isn't flagged as a duplicate - only
+      // a fully-entered VIN can meaningfully collide with another.
+      if (!vin) return
       if (vins.has(vin)) {
         ctx.addIssue({
           code: 'custom',
@@ -218,7 +225,6 @@ const addPolicySchema = z
       }
       vins.add(vin)
     })
-    
   })
 
 export type AddPolicyFormValues = z.infer<typeof addPolicySchema>
@@ -321,7 +327,7 @@ function toFormValues({ client, existingDrivers, initial }: ToFormValuesArgs): A
     existingDrivers: existingDrivers.map((option) => ({
       checked: initialDriverPersonIds.has(option.personId),
       personId: option.personId,
-      label: `${option.person.firstName} ${option.person.lastName}`,
+      label: formatNameLastFirst(option.person),
       hasDriverRow: !!option.driver,
       dlNumber: option.driver?.dlNumber ?? '',
       rating: option.driver?.rating === 'excluded' ? 'excluded' : 'rated',

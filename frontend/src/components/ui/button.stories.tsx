@@ -22,6 +22,9 @@ export const Variants: Story = {
       <Button {...args} variant="outline">
         Outline
       </Button>
+      <Button {...args} variant="white">
+        White
+      </Button>
       <Button {...args} variant="secondary">
         Secondary
       </Button>

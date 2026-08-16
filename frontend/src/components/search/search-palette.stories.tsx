@@ -90,7 +90,7 @@ export const WithResults: Story = {
   play: async () => {
     const input = screen.getByPlaceholderText(/search clients or policies/i)
     await userEvent.type(input, 'Doe')
-    await expect(await screen.findByText('Jane Doe')).toBeInTheDocument()
+    await expect(await screen.findByText('Doe, Jane')).toBeInTheDocument()
     await expect(await screen.findByText('SMOKE-POL-001')).toBeInTheDocument()
   },
 }

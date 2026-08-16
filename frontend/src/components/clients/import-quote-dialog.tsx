@@ -29,6 +29,8 @@ import { createPolicy, getCarriers, type CreatePolicyBody } from '@/api/policies
 import { createPolicyLog } from '@/api/policyLogs'
 import { search as defaultSearch, type SearchClientResult, type SearchFn } from '@/api/search'
 import { DEFAULT_BI_LIMIT, DEFAULT_PD_LIMIT } from '@/lib/coverage-options'
+import { formatNameLastFirst } from '@/lib/person-name'
+import { formatPhone } from '@/lib/phone'
 import {
   parseIntegrationFile,
   IntegrationFileParseError,
@@ -102,7 +104,7 @@ function buildExistingDriverRows(
   return options.map((option) => ({
     checked: matchedPersonIds.has(option.personId),
     personId: option.personId,
-    label: `${option.person.firstName} ${option.person.lastName}`,
+    label: formatNameLastFirst(option.person),
     hasDriverRow: !!option.driver,
     dlNumber: option.driver?.dlNumber ?? '',
     rating: option.driver?.rating === 'excluded' ? 'excluded' : 'rated',
@@ -222,9 +224,9 @@ function ExistingClientSearch({
             {clients.map((client) => (
               <CommandItem key={client.id} value={String(client.id)} onSelect={() => onSelect(client)}>
                 <div className="flex flex-col">
-                  <span>{clientDisplayName(client)}</span>
+                  <span>{formatNameLastFirst(client.namedInsured)}</span>
                   <span className="text-xs text-muted-foreground">
-                    {client.emails[0]?.email ?? client.phones[0]?.phoneNumber ?? ''}
+                    {client.emails[0]?.email ?? formatPhone(client.phones[0]?.phoneNumber) ?? ''}
                   </span>
                 </div>
               </CommandItem>
@@ -394,7 +396,7 @@ export function ImportQuoteDialog({
             ) : defaultClient && !searchingDifferent ? (
               <div className="flex flex-col gap-3 rounded-lg border p-4">
                 <div>
-                  <p className="font-medium">{clientDisplayName(defaultClient)}</p>
+                  <p className="font-medium">{formatNameLastFirst(defaultClient.namedInsured)}</p>
                   <p className="text-sm text-muted-foreground">Import this policy onto this client.</p>
                 </div>
                 <div className="flex gap-2">

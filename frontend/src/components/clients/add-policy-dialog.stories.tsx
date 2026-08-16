@@ -126,7 +126,7 @@ export const OpensAndPrefills: Story = {
     await expect(policyAddressGroup.getByLabelText(/address line 1/i)).toHaveValue(
       client.physicalAddress1
     )
-    await expect(screen.getByRole('checkbox', { name: /jane doe/i })).toBeInTheDocument()
+    await expect(screen.getByRole('checkbox', { name: /doe, jane/i })).toBeInTheDocument()
   },
 }
 

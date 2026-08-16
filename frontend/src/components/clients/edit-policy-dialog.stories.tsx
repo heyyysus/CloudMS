@@ -158,8 +158,8 @@ export const OpensAndPrefills: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await userEvent.click(canvas.getByRole('button', { name: /^edit$/i }))
-    await expect(await screen.findByRole('heading', { name: /edit policy/i })).toBeInTheDocument()
+    await userEvent.click(canvas.getByRole('button', { name: /^endorse$/i }))
+    await expect(await screen.findByRole('heading', { name: /endorse policy/i })).toBeInTheDocument()
 
     await expect(screen.getByLabelText(/policy number/i)).toHaveValue('POL-123')
     await waitFor(() =>
@@ -168,7 +168,7 @@ export const OpensAndPrefills: Story = {
       )
     )
     await expect(screen.getByLabelText(/^vin$/i)).toHaveValue(policy.vehicles[0].vin)
-    await expect(screen.getByRole('checkbox', { name: /jane doe/i })).toBeChecked()
+    await expect(screen.getByRole('checkbox', { name: /doe, jane/i })).toBeChecked()
 
     const termTrigger = screen.getByRole('combobox', { name: /term/i })
     await expect(termTrigger).toHaveTextContent(/6 months/i)
@@ -187,7 +187,7 @@ export const KeepsMissingCoveragesEmpty: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await userEvent.click(canvas.getByRole('button', { name: /^edit$/i }))
+    await userEvent.click(canvas.getByRole('button', { name: /^endorse$/i }))
     await screen.findByLabelText(/policy number/i)
 
     await expect(screen.getByRole('combobox', { name: /^bi$/i })).toHaveTextContent(/none/i)
@@ -201,7 +201,7 @@ export const SubmitSavesAndCloses: Story = {
   },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement)
-    await userEvent.click(canvas.getByRole('button', { name: /^edit$/i }))
+    await userEvent.click(canvas.getByRole('button', { name: /^endorse$/i }))
     await screen.findByLabelText(/policy number/i)
 
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
@@ -219,7 +219,7 @@ export const SubmitSavesAndCloses: Story = {
       })
     )
     await waitFor(() =>
-      expect(screen.queryByRole('heading', { name: /edit policy/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: /endorse policy/i })).not.toBeInTheDocument()
     )
   },
 }
@@ -232,12 +232,12 @@ export const ServerError: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await userEvent.click(canvas.getByRole('button', { name: /^edit$/i }))
+    await userEvent.click(canvas.getByRole('button', { name: /^endorse$/i }))
     await screen.findByLabelText(/policy number/i)
 
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
     await expect(await screen.findByText('Policy number already exists')).toBeInTheDocument()
-    await expect(screen.getByRole('heading', { name: /edit policy/i })).toBeInTheDocument()
+    await expect(screen.getByRole('heading', { name: /endorse policy/i })).toBeInTheDocument()
   },
 }

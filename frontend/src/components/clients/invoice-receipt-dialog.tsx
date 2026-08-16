@@ -19,7 +19,9 @@ import {
   PAYMENT_METHOD_LABEL,
 } from '@/lib/invoice-options'
 import { amountDueCents, getInvoice } from '@/api/invoices'
-import { clientDisplayName, type AutoPolicy, type ClientDetail } from '@/api/clients'
+import type { AutoPolicy, ClientDetail } from '@/api/clients'
+import { formatDate } from '@/lib/date-display'
+import { formatNameLastFirst } from '@/lib/person-name'
 
 interface InvoiceReceiptDialogProps {
   invoiceId: number | undefined
@@ -87,12 +89,12 @@ export function InvoiceReceiptDialog({
             <div className="flex flex-col gap-1 border-b pb-3">
               <h2 className="font-heading text-lg font-semibold">Receipt / Invoice Summary</h2>
               <p className="text-xs text-muted-foreground">
-                Printed {new Date().toLocaleDateString()}
+                Printed {formatDate(new Date().toISOString().slice(0, 10))}
               </p>
             </div>
 
             <div className="flex flex-col gap-0.5">
-              <p className="font-medium">{clientDisplayName(client)}</p>
+              <p className="font-medium">{formatNameLastFirst(client.namedInsured)}</p>
               <p className="text-muted-foreground">Client #{client.id}</p>
               {policyNumber && <p className="text-muted-foreground">Policy #{policyNumber}</p>}
             </div>

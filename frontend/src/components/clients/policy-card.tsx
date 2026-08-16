@@ -40,8 +40,10 @@ export const COVERAGE_LABELS: Record<
   coverageTowing: 'Towing',
 }
 
+// Plain-text rows (no border/padding/background) that open a detail dialog
+// on click - distinct from CopyText, which copies rather than navigates.
 const ROW_CLASS =
-  'w-full cursor-pointer rounded-md border px-2 py-1.5 text-left text-sm odd:bg-muted-foreground/10 hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none'
+  'w-full cursor-pointer text-left hover:text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none rounded-sm'
 
 interface PolicyCardProps {
   policy: AutoPolicy
@@ -77,11 +79,19 @@ export function PolicyCard({
         <div className="grid gap-4 sm:grid-cols-3 text-sm">
           <div>
             <p className="text-xs font-medium text-muted-foreground">Effective</p>
-            <p>{formatDate(policy.effectiveDate) ?? '—'}</p>
+            {formatDate(policy.effectiveDate) ? (
+              <CopyText value={formatDate(policy.effectiveDate)!} label="effective date" />
+            ) : (
+              <p>—</p>
+            )}
           </div>
           <div>
             <p className="text-xs font-medium text-muted-foreground">Expiration</p>
-            <p>{formatDate(policy.expirationDate) ?? '—'}</p>
+            {formatDate(policy.expirationDate) ? (
+              <CopyText value={formatDate(policy.expirationDate)!} label="expiration date" />
+            ) : (
+              <p>—</p>
+            )}
           </div>
           <div>
             <p className="text-xs font-medium text-muted-foreground">Carrier</p>

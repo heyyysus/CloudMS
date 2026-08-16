@@ -37,10 +37,16 @@ export function VehicleDetailDialog({ vehicle, onOpenChange }: VehicleDetailDial
           <>
             <DialogHeader>
               <DialogTitle>
-                {vehicle.year} {vehicle.make} {vehicle.model}
+                <CopyText
+                  value={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                  label="vehicle"
+                />
               </DialogTitle>
             </DialogHeader>
             <div className="grid gap-3 sm:grid-cols-2">
+              <Row label="Year" value={String(vehicle.year)} />
+              <Row label="Make" value={vehicle.make} />
+              <Row label="Model" value={vehicle.model} />
               <Row label="VIN" value={vehicle.vin} />
               <Row label="Garaging Zip" value={vehicle.garagingZip} />
             </div>

@@ -111,8 +111,9 @@
     --destructive: oklch(0.704 0.191 22.216);
     --success: oklch(0.723 0.219 149.579);
     --warning: oklch(0.828 0.189 84.429);
-    --surface-solid: oklch(0.269 0 0);
-    --surface-solid-foreground: oklch(0.985 0 0);
+    /* surface-solid intentionally NOT overridden here: it's a literal
+       white-bg/black-text button treatment (Endorse, New invoice) that stays
+       white/black in both themes rather than inverting like other tokens. */
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: #c084fc;

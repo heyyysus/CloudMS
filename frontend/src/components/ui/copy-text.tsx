@@ -37,8 +37,10 @@ interface CopyTextProps {
   className?: string
 }
 
-// The entire value is the click target - clicking anywhere on it copies and
-// shows a brief "Copied" state in place of the value.
+// The entire value is the click target - clicking anywhere on it copies.
+// The value text itself never changes (a "Copied" swap would hurt
+// readability); feedback is a brief background highlight that fades back
+// out, driven by the same `copied` flag used for the flash below.
 export function CopyText({ value, copyValue, label, className }: CopyTextProps) {
   const { copied, copy } = useCopyToClipboard()
   const text = copyValue ?? (typeof value === 'string' ? value : undefined)
@@ -52,11 +54,12 @@ export function CopyText({ value, copyValue, label, className }: CopyTextProps) 
       aria-label={label ? `Copy ${label}` : `Copy ${text}`}
       title="Click to copy"
       className={cn(
-        'cursor-pointer rounded-sm text-left hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        'cursor-grab rounded-sm text-left underline decoration-muted-foreground/50 decoration-dotted underline-offset-2 transition-colors duration-150 hover:bg-primary/10 hover:decoration-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        copied && 'bg-primary/20',
         className
       )}
     >
-      {copied ? 'Copied' : value}
+      {value}
     </button>
   )
 }

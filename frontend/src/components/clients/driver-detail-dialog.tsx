@@ -43,9 +43,13 @@ export function DriverDetailDialog({ driver, onOpenChange }: DriverDetailDialogP
         {driver && (
           <>
             <DialogHeader>
-              <DialogTitle>{formatNameLastFirst(driver.driver.person)}</DialogTitle>
+              <DialogTitle>
+                <CopyText value={formatNameLastFirst(driver.driver.person)} label="driver name" />
+              </DialogTitle>
             </DialogHeader>
             <div className="grid gap-3 sm:grid-cols-2">
+              <Row label="First Name" value={driver.driver.person.firstName} />
+              <Row label="Last Name" value={driver.driver.person.lastName} />
               <Row label="Date of Birth" value={formatDate(driver.driver.person.dateOfBirth) ?? '—'} />
               <Row label="DL Number" value={driver.driver.dlNumber ?? '—'} />
               <Row label="Relation to Insured" value={relationLabel(driver.driver.person.relationToInsured)} />

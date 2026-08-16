@@ -1,6 +1,10 @@
 import { Request, Response, Router } from "express"
 import { requireAuth, requireRole } from "../auth/middleware"
-import { buildPolicyChangeFormPdf, summarizePolicyChanges } from "../policyChangeSummary"
+import {
+  buildPolicyChangeFormPdf,
+  formatChangeSummaryText,
+  summarizePolicyChanges,
+} from "../policyChangeSummary"
 import {
   createAutoPolicyWithDetails,
   createPolicyLog,
@@ -49,7 +53,7 @@ async function recordPolicyChangeFormUnsafe(
     await createPolicyLog({
       policyId: after.id,
       authorId: req.user!.id,
-      body: `Policy updated:\n- ${changes.join("\n- ")}`.slice(0, 5000),
+      body: `Policy updated:\n${formatChangeSummaryText(changes)}`.slice(0, 5000),
     })
   } catch (err) {
     req.log.error(err, "Failed to write policy change log")

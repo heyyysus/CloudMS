@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/RequireAuth'
 import { AppLayout } from './components/layout/app-layout'
+import { ToastProvider } from './components/ui/toast'
 import { createQueryClient } from './lib/query-client'
 import Admin from './pages/Admin'
 import ClientDetail from './pages/ClientDetail'
@@ -16,23 +17,25 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/logout" element={<Logout />} />
-            <Route element={<RequireAuth />}>
-              <Route element={<AppLayout />}>
-                <Route path="/home" element={<Home />} />
-                <Route path="/clients/:clientId" element={<ClientDetail />} />
-                <Route path="/admin" element={<Admin />} />
+      <ToastProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/logout" element={<Logout />} />
+              <Route element={<RequireAuth />}>
+                <Route element={<AppLayout />}>
+                  <Route path="/home" element={<Home />} />
+                  <Route path="/clients/:clientId" element={<ClientDetail />} />
+                  <Route path="/admin" element={<Admin />} />
+                </Route>
               </Route>
-            </Route>
-            <Route path="/" element={<Navigate to="/home" replace />} />
-            <Route path="*" element={<Navigate to="/home" replace />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
+              <Route path="/" element={<Navigate to="/home" replace />} />
+              <Route path="*" element={<Navigate to="/home" replace />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </ToastProvider>
     </QueryClientProvider>
   )
 }

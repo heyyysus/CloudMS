@@ -151,15 +151,56 @@
     }
 }
 
+/* Toast auto-dismiss countdown. The bar's own animation drives the visible
+   countdown; --toast-duration is set per-toast as an inline style (see
+   toast.tsx) so one keyframe works for every duration and type. */
+@keyframes toast-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+[data-slot="toast-countdown"] {
+  transform-origin: left;
+  animation: toast-countdown var(--toast-duration, 4000ms) linear forwards;
+}
+
+/* Radix pauses each toast's own dismiss timer on hover, focus-within and
+   window blur; these selectors keep the visible bar in step with it so it
+   can't run out while the toast is still being read. Window blur has no CSS
+   equivalent, so ToastProvider (toast.tsx) toggles data-paused on the
+   viewport from the window's blur/focus events. */
+[data-slot="toast-viewport"]:hover [data-slot="toast-countdown"],
+[data-slot="toast-viewport"]:focus-within [data-slot="toast-countdown"],
+[data-slot="toast-viewport"][data-paused] [data-slot="toast-countdown"] {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Hold the bar at full width rather than animating it - it stays a
+     meaningful "this will dismiss soon" affordance without relying on
+     motion to convey it. */
+  [data-slot="toast-countdown"] {
+    animation: none;
+    transform: scaleX(1);
+  }
+}
+
 /* Printing an invoice receipt. The receipt lives in a Radix dialog that is
    portaled onto <body> as a sibling of the app root (#root), so hiding #root
    drops the whole app while the dialog survives. The dialog's fixed centering
    and chrome (overlay, header, footer, close button) are then neutralised so
-   the receipt flows from the top of page 1 and paginates normally. */
+   the receipt flows from the top of page 1 and paginates normally. The toast
+   viewport is portaled the same way, so it needs the same treatment or a
+   toast on screen at print time would appear on the printed receipt. */
 @media print {
   #root,
   [data-slot="dialog-overlay"],
-  [data-slot="dialog-close"] {
+  [data-slot="dialog-close"],
+  [data-slot="toast-viewport"] {
     display: none !important;
   }
   [data-slot="dialog-content"] {

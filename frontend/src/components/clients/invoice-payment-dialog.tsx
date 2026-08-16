@@ -237,6 +237,12 @@ function NewInvoiceForm({
     (sum, item) => sum + (Number(item.amount) > 0 ? toCents(item.amount) : 0),
     0
   )
+  const watchedPayments = watch('payments')
+  const enteredPaymentsCents = watchedPayments.reduce(
+    (sum, row) => sum + (Number(row.amount) > 0 ? toCents(row.amount) : 0),
+    0
+  )
+  const remainingCents = totalCents - enteredPaymentsCents
 
   return (
     <form
@@ -405,7 +411,11 @@ function NewInvoiceForm({
               variant="outline"
               size="sm"
               className="self-start"
-              onClick={() => paymentFields.append(emptyPaymentRow())}
+              onClick={() =>
+                paymentFields.append(
+                  emptyPaymentRow(centsToDecimalString(Math.max(remainingCents, 0)))
+                )
+              }
             >
               <PlusIcon /> Add payment
             </Button>
@@ -473,6 +483,7 @@ function PayInvoiceForm({
     control,
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<PayFormValues>({
     resolver: zodResolver(payFormSchema),
@@ -480,6 +491,12 @@ function PayInvoiceForm({
   })
 
   const paymentFields = useFieldArray({ control, name: 'payments' })
+  const watchedPayments = watch('payments')
+  const enteredPaymentsCents = watchedPayments.reduce(
+    (sum, row) => sum + (Number(row.amount) > 0 ? toCents(row.amount) : 0),
+    0
+  )
+  const remainingCents = dueCents - enteredPaymentsCents
 
   return (
     <form onSubmit={handleSubmit((values) => onSubmit(toPaymentInputs(values.payments)))} noValidate>
@@ -573,7 +590,11 @@ function PayInvoiceForm({
               variant="outline"
               size="sm"
               className="self-start"
-              onClick={() => paymentFields.append(emptyPaymentRow())}
+              onClick={() =>
+                paymentFields.append(
+                  emptyPaymentRow(centsToDecimalString(Math.max(remainingCents, 0)))
+                )
+              }
             >
               <PlusIcon /> Add payment
             </Button>

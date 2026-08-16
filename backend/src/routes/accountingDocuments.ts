@@ -47,7 +47,14 @@ async function documentHeader(
   }
 }
 
-export async function recordInvoiceDocument(req: Request, invoice: InvoiceDetail): Promise<void> {
+// `logId` is the policy log the accounting write appended; passing it through
+// files the PDF under that log so staff see the document from the log as well
+// as from the attachments list.
+export async function recordInvoiceDocument(
+  req: Request,
+  invoice: InvoiceDetail,
+  logId?: number
+): Promise<void> {
   await bestEffort(req, "record the invoice document", async () => {
     const header = await documentHeader(invoice)
     const pdf = await buildAccountingDocumentPdf({
@@ -65,11 +72,16 @@ export async function recordInvoiceDocument(req: Request, invoice: InvoiceDetail
       sourceType: "invoice",
       sourceId: invoice.id,
       createdBy: req.user!.id,
+      linkToLogId: logId,
     })
   })
 }
 
-export async function recordReceiptDocument(req: Request, receiptId: number): Promise<void> {
+export async function recordReceiptDocument(
+  req: Request,
+  receiptId: number,
+  logId?: number
+): Promise<void> {
   await bestEffort(req, "record the receipt document", async () => {
     const receipt = await getReceiptWithDetails(receiptId)
     if (!receipt) return
@@ -95,6 +107,7 @@ export async function recordReceiptDocument(req: Request, receiptId: number): Pr
       sourceType: "receipt",
       sourceId: receipt.id,
       createdBy: req.user!.id,
+      linkToLogId: logId,
     })
   })
 }

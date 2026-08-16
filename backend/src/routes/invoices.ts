@@ -58,20 +58,21 @@ invoicesRouter.post("/invoices", requireAuth, async (req: Request, res: Response
   }
 
   try {
-    const invoice = await createInvoiceWithDetails({
+    const created = await createInvoiceWithDetails({
       policyId: parsed.data.policyId,
       note: parsed.data.note ?? null,
       items: parsed.data.items,
       createdBy: req.user!.id,
     })
-    if (!invoice) {
+    if (!created) {
       res.status(404).json({ error: "Policy not found" })
       return
     }
     // Awaited before responding so the attachment is already there on the
-    // caller's next read of the policy's attachments.
-    await recordInvoiceDocument(req, invoice)
-    res.status(201).json(invoice)
+    // caller's next read of the policy's attachments. logId ties the PDF to
+    // the "Invoice #N created" log the same write appended.
+    await recordInvoiceDocument(req, created.invoice, created.logId)
+    res.status(201).json(created.invoice)
   } catch (err) {
     if (err instanceof InvoiceWriteError) {
       res.status(400).json({ error: err.message })

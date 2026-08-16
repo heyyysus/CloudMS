@@ -49,12 +49,17 @@ async function recordPolicyChangeFormUnsafe(
   const changes = summarizePolicyChanges(before, after, parsedInput)
   if (changes.length === 0) return
 
+  // Held across both try blocks so the change form filed below can attach
+  // itself to the log describing the same edit. Stays undefined if the log
+  // write failed, in which case the attachment is simply filed unlinked.
+  let changeLogId: number | undefined
   try {
-    await createPolicyLog({
+    const log = await createPolicyLog({
       policyId: after.id,
       authorId: req.user!.id,
       body: `Policy updated:\n${formatChangeSummaryText(changes)}`.slice(0, 5000),
     })
+    changeLogId = log?.id
   } catch (err) {
     req.log.error(err, "Failed to write policy change log")
   }
@@ -86,6 +91,7 @@ async function recordPolicyChangeFormUnsafe(
       sourceType: "policy_change",
       sourceId: after.id,
       createdBy: req.user!.id,
+      linkToLogId: changeLogId,
     })
   } catch (err) {
     req.log.error(err, "Failed to generate policy change form attachment")

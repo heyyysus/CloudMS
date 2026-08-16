@@ -362,6 +362,39 @@ export const policyAttachments = pgTable(
   ]
 )
 
+// Ties an attachment to a log, so opening a log shows the documents that
+// belong to it. Both sides are append-only but the link itself is not - it is
+// an editorial association, and staff can undo one from the log's dialog.
+// Links never cross policies; the route checks both ends resolve to the same
+// one. Server-generated documents link themselves to the log the same action
+// wrote, so a change form or receipt arrives already attached.
+export const policyLogAttachments = pgTable(
+  "policy_log_attachments",
+  {
+    id: serial("id").primaryKey(),
+    logId: integer("log_id")
+      .notNull()
+      .references(() => policyLogs.id, { onDelete: "cascade" }),
+    attachmentId: integer("attachment_id")
+      .notNull()
+      .references(() => policyAttachments.id, { onDelete: "cascade" }),
+    // Who made the association, which the log's dialog credits. Not the same
+    // as the attachment's own uploader.
+    linkedBy: integer("linked_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("policy_log_attachments_log_id_idx").on(table.logId),
+    index("policy_log_attachments_attachment_id_idx").on(table.attachmentId),
+    unique("policy_log_attachments_log_id_attachment_id_unique").on(
+      table.logId,
+      table.attachmentId
+    ),
+  ]
+)
+
 // ---------------------------------------------------------------------------
 // Accounting
 //

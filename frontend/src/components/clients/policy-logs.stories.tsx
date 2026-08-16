@@ -2,8 +2,11 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { expect, fn, screen, userEvent, within } from 'storybook/test'
 import { PolicyLogs } from './policy-logs'
+import { ToastProvider } from '@/components/ui/toast'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ApiError } from '@/api/client'
+import type { PolicyAttachment } from '@/api/policyAttachments'
+import type { PolicyLogAttachment } from '@/api/policyLogAttachments'
 import type { PolicyLog } from '@/api/policyLogs'
 
 const logs: PolicyLog[] = [
@@ -25,6 +28,31 @@ const logs: PolicyLog[] = [
   },
 ]
 
+const changeForm: PolicyAttachment = {
+  id: 11,
+  policyId: 900,
+  fileName: 'Policy Change Form.pdf',
+  description: 'Auto-generated summary of this edit',
+  mimeType: 'application/pdf',
+  sizeBytes: 42_000,
+  isVoided: false,
+  sourceType: 'policy_change',
+  sourceId: 900,
+  createdAt: '2026-03-02T14:31:00',
+  uploadedBy: { id: 2, name: 'Tom Reyes', email: 'tom@example.com' },
+}
+
+// Linked to log 2 only, so the paperclip appears on one row and not the other.
+const links: PolicyLogAttachment[] = [
+  {
+    id: 501,
+    logId: 2,
+    createdAt: '2026-03-02T14:32:00',
+    linkedBy: { id: 2, name: 'Tom Reyes', email: 'tom@example.com' },
+    attachment: changeForm,
+  },
+]
+
 function createTestQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
@@ -37,13 +65,18 @@ const meta = {
     policyId: 900,
     onAddLog: fn(),
     currentUserId: 1,
+    // Most stories are about the log list itself, so links default to empty
+    // and the ones that care override it.
+    getPolicyLogAttachmentsFn: fn(async () => []),
   },
   decorators: [
     (Story) => (
       <QueryClientProvider client={createTestQueryClient()}>
-        <TooltipProvider>
-          <Story />
-        </TooltipProvider>
+        <ToastProvider>
+          <TooltipProvider>
+            <Story />
+          </TooltipProvider>
+        </ToastProvider>
       </QueryClientProvider>
     ),
   ],
@@ -148,5 +181,55 @@ export const OpensDetailDialog: Story = {
     await expect(dialog.getByText(/insured called in to inquire/i)).toBeInTheDocument()
     await expect(dialog.getByText('Jane Staff')).toBeInTheDocument()
     await expect(dialog.getByRole('button', { name: /copy log body/i })).toBeInTheDocument()
+  },
+}
+
+export const BadgesLogsWithAttachments: Story = {
+  args: {
+    getPolicyLogsFn: fn(async () => logs),
+    getPolicyLogAttachmentsFn: fn(async () => links),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await canvas.findByText('Log #')
+    const clips = await canvas.findAllByLabelText('Has attachments')
+    await expect(clips).toHaveLength(1)
+    // The clip sits on log 2, the only one with a link.
+    await expect(canvas.getByRole('button', { name: 'Open log 2' })).toContainElement(clips[0])
+  },
+}
+
+export const ShowsLinkedAttachmentsInDialog: Story = {
+  args: {
+    getPolicyLogsFn: fn(async () => logs),
+    getPolicyLogAttachmentsFn: fn(async () => links),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(await canvas.findByRole('button', { name: 'Open log 2' }))
+
+    const dialog = within(await screen.findByRole('dialog'))
+    await expect(dialog.getByText('Attachments')).toBeInTheDocument()
+    await expect(dialog.getByText('Policy Change Form')).toBeInTheDocument()
+    await expect(dialog.getByText('Linked by Tom Reyes')).toBeInTheDocument()
+    await expect(
+      dialog.getByRole('button', { name: 'Unlink Policy Change Form' })
+    ).toBeInTheDocument()
+  },
+}
+
+export const UnlinksAnAttachment: Story = {
+  args: {
+    getPolicyLogsFn: fn(async () => logs),
+    getPolicyLogAttachmentsFn: fn(async () => links),
+    unlinkPolicyLogAttachmentFn: fn(async () => undefined),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(await canvas.findByRole('button', { name: 'Open log 2' }))
+
+    const dialog = within(await screen.findByRole('dialog'))
+    await userEvent.click(dialog.getByRole('button', { name: 'Unlink Policy Change Form' }))
+    await expect(args.unlinkPolicyLogAttachmentFn).toHaveBeenCalledWith(501)
   },
 }

@@ -73,7 +73,7 @@ export function ToastItem({ type, message, duration, onDismiss }: ToastItemProps
       {/* Full-height accent strip - the primary type signal, deliberately
           left unbroken by the countdown bar below (which starts to its
           right, inside the content column). */}
-      <span aria-hidden className="w-1 shrink-0 bg-(--toast-accent)" />
+      <span aria-hidden className="w-4 shrink-0 bg-(--toast-accent)" />
       <div className="relative flex flex-1 items-start gap-2 py-3 pr-2 pl-3">
         <Icon aria-hidden className="mt-0.5 size-4 shrink-0 text-(--toast-accent)" />
         <ToastPrimitive.Title className="line-clamp-2 flex-1 text-sm">

@@ -1,4 +1,5 @@
 import type { Preview } from '@storybook/react-vite'
+import { ToastProvider } from '../src/components/ui/toast'
 import '../src/index.css'
 
 const preview: Preview = {
@@ -38,9 +39,11 @@ const preview: Preview = {
     (Story, { globals }) => {
       document.documentElement.classList.toggle('dark', globals.theme === 'dark')
       return (
-        <div className="bg-background text-foreground p-4">
-          <Story />
-        </div>
+        <ToastProvider>
+          <div className="bg-background text-foreground p-4">
+            <Story />
+          </div>
+        </ToastProvider>
       )
     },
   ],

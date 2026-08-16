@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, userEvent, within } from 'storybook/test'
+import { expect, userEvent, waitFor, within } from 'storybook/test'
 import { CopyText } from './copy-text'
 
 const meta = {
@@ -30,15 +30,17 @@ export const CopiesOnClick: Story = {
     const button = canvas.getByRole('button')
     // The headless test browser has no clipboard permission granted, so
     // navigator.clipboard.writeText rejects; stub it to exercise the
-    // component's "copied" state without depending on that permission.
+    // component's copy flow without depending on that permission.
     const originalWriteText = navigator.clipboard.writeText
     navigator.clipboard.writeText = async () => {}
     try {
-      // The value text must never change - only a background flash signals
-      // the copy, so readability is unaffected.
+      // The value text must never change - a toast signals the copy, so
+      // readability is unaffected.
       await expect(button).toHaveTextContent('(555) 123-4567')
       await userEvent.click(button)
-      await expect(button).toHaveClass('bg-primary/20')
+      await waitFor(() =>
+        expect(within(document.body).getByText('Copied to Clipboard')).toBeInTheDocument()
+      )
       await expect(button).toHaveTextContent('(555) 123-4567')
     } finally {
       navigator.clipboard.writeText = originalWriteText

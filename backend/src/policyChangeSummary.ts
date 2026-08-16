@@ -254,10 +254,7 @@ export function buildPolicyChangeFormPdf(
 
     doc.font("Times-Roman")
 
-    doc
-      .font("Times-Bold")
-      .fontSize(18)
-      .text("Policy Change Request", { align: "center" })
+    doc.font("Times-Bold").fontSize(18).text("Policy Change Request", { align: "center" })
     doc.font("Times-Roman")
     doc.moveDown()
 

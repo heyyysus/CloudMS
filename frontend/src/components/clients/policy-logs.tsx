@@ -1,12 +1,20 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { PaperclipIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AttachmentPreviewDialog } from '@/components/clients/attachment-preview-dialog'
 import { LogAuthorChip } from '@/components/clients/log-author-chip'
 import { LogDetailDialog } from '@/components/clients/log-detail-dialog'
+import { useToast } from '@/components/ui/toast'
 import { formatLogTimestamp } from '@/lib/log-datetime'
 import { cn } from '@/lib/utils'
+import { getPolicyAttachmentLink, type PolicyAttachment } from '@/api/policyAttachments'
+import {
+  getPolicyLogAttachments,
+  unlinkPolicyLogAttachment,
+} from '@/api/policyLogAttachments'
 import { getPolicyLogs, type PolicyLog } from '@/api/policyLogs'
 
 interface PolicyLogsProps {
@@ -14,6 +22,9 @@ interface PolicyLogsProps {
   onAddLog: () => void
   currentUserId?: number
   getPolicyLogsFn?: typeof getPolicyLogs
+  getPolicyLogAttachmentsFn?: typeof getPolicyLogAttachments
+  unlinkPolicyLogAttachmentFn?: typeof unlinkPolicyLogAttachment
+  getPolicyAttachmentLinkFn?: typeof getPolicyAttachmentLink
 }
 
 // Shared by the header and every row so the columns can never drift: Log #
@@ -26,13 +37,35 @@ export function PolicyLogs({
   onAddLog,
   currentUserId,
   getPolicyLogsFn = getPolicyLogs,
+  getPolicyLogAttachmentsFn = getPolicyLogAttachments,
+  unlinkPolicyLogAttachmentFn = unlinkPolicyLogAttachment,
+  getPolicyAttachmentLinkFn = getPolicyAttachmentLink,
 }: PolicyLogsProps) {
+  const queryClient = useQueryClient()
+  const toast = useToast()
   const [selectedLog, setSelectedLog] = useState<PolicyLog | null>(null)
+  const [previewAttachment, setPreviewAttachment] = useState<PolicyAttachment | null>(null)
 
   const { data: logs, isPending, isError } = useQuery({
     queryKey: ['policyLogs', policyId],
     queryFn: ({ signal }) => getPolicyLogsFn(policyId, signal),
   })
+
+  // One call for the whole policy: it badges every row here and fills the
+  // detail dialog, so opening a log costs no extra request.
+  const { data: links } = useQuery({
+    queryKey: ['policyLogAttachments', policyId],
+    queryFn: ({ signal }) => getPolicyLogAttachmentsFn(policyId, signal),
+  })
+
+  const unlink = useMutation({
+    mutationFn: (linkId: number) => unlinkPolicyLogAttachmentFn(linkId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['policyLogAttachments', policyId] }),
+    onError: (error) => toast.error(error.message),
+  })
+
+  const linkedLogIds = new Set(links?.map((link) => link.logId))
 
   return (
     <Card>
@@ -87,6 +120,14 @@ export function PolicyLogs({
                 </span>
                 <LogAuthorChip author={log.author} isCurrentUser={log.author.id === currentUserId} />
                 <span className="min-w-0 truncate text-foreground">
+                  {/* Without this, linked documents are invisible until you
+                      happen to open the log they sit under. */}
+                  {linkedLogIds.has(log.id) && (
+                    <PaperclipIcon
+                      aria-label="Has attachments"
+                      className="mr-1 inline size-3 align-[-0.1em] text-muted-foreground"
+                    />
+                  )}
                   <span className="text-muted-foreground">-- </span>
                   {log.body}
                 </span>
@@ -101,6 +142,20 @@ export function PolicyLogs({
         onOpenChange={(open) => {
           if (!open) setSelectedLog(null)
         }}
+        links={links?.filter((link) => link.logId === selectedLog?.id) ?? []}
+        onPreviewAttachment={setPreviewAttachment}
+        onUnlink={(linkId) => unlink.mutate(linkId)}
+        unlinkingId={unlink.isPending ? unlink.variables : undefined}
+      />
+      {/* A sibling, not nested inside the log dialog: two stacked Radix modals
+          each keep their own focus trap, so closing the preview drops the user
+          back on the log they opened it from. */}
+      <AttachmentPreviewDialog
+        attachment={previewAttachment}
+        onOpenChange={(open) => {
+          if (!open) setPreviewAttachment(null)
+        }}
+        getPolicyAttachmentLinkFn={getPolicyAttachmentLinkFn}
       />
     </Card>
   )

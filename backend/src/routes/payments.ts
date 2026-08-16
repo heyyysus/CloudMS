@@ -74,8 +74,9 @@ paymentsRouter.post("/payments", requireAuth, async (req: Request, res: Response
       return
     case "ok":
       // Awaited before responding so the receipt PDF is already filed on the
-      // caller's next read of the policy's attachments.
-      await recordReceiptDocument(req, result.receiptId)
+      // caller's next read of the policy's attachments. logId ties it to the
+      // "Payment of $X ..." log this write appended.
+      await recordReceiptDocument(req, result.receiptId, result.logId)
       res.status(201).json(await getReceiptWithDetails(result.receiptId))
       return
   }

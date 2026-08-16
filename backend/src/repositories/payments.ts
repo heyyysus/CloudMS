@@ -17,8 +17,10 @@ export interface RecordPaymentInput {
   createdBy: number
 }
 
+// logId is the policy log this payment appended, carried out so the route can
+// attach the receipt PDF - generated after this commits - to that same log.
 export type RecordPaymentResult =
-  | { status: "ok"; receiptId: number }
+  | { status: "ok"; receiptId: number; logId: number }
   | { status: "invoice_not_found" }
   | { status: "invoice_not_open" }
 
@@ -126,7 +128,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
         await postSweepAndFeeEntries(tx, invoice.id)
       }
 
-      await insertPolicyLogInTx(tx, {
+      const logId = await insertPolicyLogInTx(tx, {
         policyId: invoice.policyId,
         authorId: input.createdBy,
         body: paymentRecordedLogBody({
@@ -140,7 +142,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
         }),
       })
 
-      return { status: "ok", receiptId: receipt.id }
+      return { status: "ok", receiptId: receipt.id, logId }
     })
   )
 }

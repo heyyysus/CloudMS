@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { CheckIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AttachmentPreviewDialog } from '@/components/clients/attachment-preview-dialog'
+import { LinkAttachmentsToLogDialog } from '@/components/clients/link-attachments-to-log-dialog'
 import { LogAuthorChip } from '@/components/clients/log-author-chip'
 import { attachmentIcon, stripFileExtension } from '@/lib/file-display'
 import { formatFileSize } from '@/lib/format-file-size'
@@ -14,6 +16,8 @@ import {
   getPolicyAttachments,
   type PolicyAttachment,
 } from '@/api/policyAttachments'
+import { linkAttachmentsToLog } from '@/api/policyLogAttachments'
+import { getPolicyLogs } from '@/api/policyLogs'
 
 interface PolicyAttachmentsProps {
   policyId: number
@@ -21,6 +25,10 @@ interface PolicyAttachmentsProps {
   currentUserId?: number
   getPolicyAttachmentsFn?: typeof getPolicyAttachments
   getPolicyAttachmentLinkFn?: typeof getPolicyAttachmentLink
+  getPolicyLogsFn?: typeof getPolicyLogs
+  linkAttachmentsToLogFn?: typeof linkAttachmentsToLog
+  // Opens the card already in selection mode; only used by stories.
+  initialSelecting?: boolean
 }
 
 // Leading fixed column holds the file-type icon; the extension is stripped
@@ -28,28 +36,108 @@ interface PolicyAttachmentsProps {
 const ATTACHMENT_GRID =
   'grid grid-cols-[1.25rem_minmax(0,1fr)_6rem_11rem_2.75rem] items-center gap-x-3 px-2'
 
+// Same columns with a checkbox prepended, so switching modes shifts the rows
+// and the header together rather than letting them drift apart.
+const ATTACHMENT_GRID_SELECTING =
+  'grid grid-cols-[1rem_1.25rem_minmax(0,1fr)_6rem_11rem_2.75rem] items-center gap-x-3 px-2'
+
+// Presentational, not a Radix Checkbox: the row itself is the button, and
+// nesting a second interactive element inside it would be invalid. The row
+// carries aria-pressed, so this only has to look like a checkbox.
+function SelectionBox({ checked }: { checked: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'flex size-4 items-center justify-center rounded-sm border',
+        checked ? 'border-primary bg-primary text-primary-foreground' : 'border-input'
+      )}
+    >
+      {checked && <CheckIcon className="size-3" strokeWidth={3} />}
+    </span>
+  )
+}
+
 export function PolicyAttachments({
   policyId,
   onAddAttachment,
   currentUserId,
   getPolicyAttachmentsFn = getPolicyAttachments,
   getPolicyAttachmentLinkFn = getPolicyAttachmentLink,
+  getPolicyLogsFn = getPolicyLogs,
+  linkAttachmentsToLogFn = linkAttachmentsToLog,
+  initialSelecting = false,
 }: PolicyAttachmentsProps) {
   const [selected, setSelected] = useState<PolicyAttachment | null>(null)
+  // null means "not selecting" - distinct from an empty set, which is
+  // selection mode with nothing picked yet.
+  const [selectedIds, setSelectedIds] = useState<Set<number> | null>(
+    initialSelecting ? new Set() : null
+  )
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false)
 
   const { data: attachments, isPending, isError } = useQuery({
     queryKey: ['policyAttachments', policyId],
     queryFn: ({ signal }) => getPolicyAttachmentsFn(policyId, signal),
   })
 
+  const selecting = selectedIds !== null
+  const selectedAttachments = attachments?.filter((a) => selectedIds?.has(a.id)) ?? []
+
+  function toggle(id: number) {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Attachments</CardTitle>
-        <CardAction>
-          <Button type="button" variant="outline" size="sm" onClick={onAddAttachment}>
-            Add attachment
-          </Button>
+        <CardAction className="flex items-center gap-2">
+          {selecting ? (
+            <>
+              <span className="text-sm text-muted-foreground">
+                {selectedIds.size} selected
+              </span>
+              {/* Link is the first bulk action; further ones slot in here. */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={selectedIds.size === 0}
+                onClick={() => setLinkDialogOpen(true)}
+              >
+                Link to log
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedIds(null)}
+              >
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={!attachments || attachments.length === 0}
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Select
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={onAddAttachment}>
+                Add attachment
+              </Button>
+            </>
+          )}
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
@@ -69,10 +157,11 @@ export function PolicyAttachments({
           <div className="max-h-96 overflow-y-auto rounded-md border bg-background text-sm">
             <div
               className={cn(
-                ATTACHMENT_GRID,
+                selecting ? ATTACHMENT_GRID_SELECTING : ATTACHMENT_GRID,
                 'sticky top-0 z-10 border-b bg-background py-1.5 text-xs font-semibold text-muted-foreground'
               )}
             >
+              {selecting && <span aria-hidden="true" />}
               <span aria-hidden="true" />
               <span>File</span>
               <span>Size</span>
@@ -82,20 +171,28 @@ export function PolicyAttachments({
             {attachments.map((attachment) => {
               const Icon = attachmentIcon(attachment.mimeType)
               const displayName = stripFileExtension(attachment.fileName)
+              const isSelected = selectedIds?.has(attachment.id) ?? false
               return (
                 <button
                   key={attachment.id}
                   type="button"
-                  onClick={() => setSelected(attachment)}
-                  aria-label={`Preview ${displayName}`}
-                  title="Preview"
+                  onClick={() =>
+                    selecting ? toggle(attachment.id) : setSelected(attachment)
+                  }
+                  aria-pressed={selecting ? isSelected : undefined}
+                  aria-label={
+                    selecting ? `Select ${displayName}` : `Preview ${displayName}`
+                  }
+                  title={selecting ? 'Select' : 'Preview'}
                   className={cn(
-                    ATTACHMENT_GRID,
+                    selecting ? ATTACHMENT_GRID_SELECTING : ATTACHMENT_GRID,
                     'w-full cursor-pointer py-1 text-left odd:bg-muted-foreground/15 hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none',
+                    isSelected && 'bg-primary/10',
                     // Only admins ever receive voided rows.
                     attachment.isVoided && 'opacity-60'
                   )}
                 >
+                  {selecting && <SelectionBox checked={isSelected} />}
                   <Icon aria-hidden="true" className="size-4 text-muted-foreground" />
                   <span className="min-w-0">
                     <span className="block truncate text-foreground">
@@ -132,6 +229,18 @@ export function PolicyAttachments({
           if (!open) setSelected(null)
         }}
         getPolicyAttachmentLinkFn={getPolicyAttachmentLinkFn}
+      />
+      <LinkAttachmentsToLogDialog
+        policyId={policyId}
+        attachments={selectedAttachments}
+        currentUserId={currentUserId}
+        open={linkDialogOpen}
+        onOpenChange={setLinkDialogOpen}
+        // Selection has served its purpose once the link lands, so the card
+        // drops back to its normal state rather than leaving rows ticked.
+        onLinked={() => setSelectedIds(null)}
+        getPolicyLogsFn={getPolicyLogsFn}
+        linkAttachmentsToLogFn={linkAttachmentsToLogFn}
       />
     </Card>
   )

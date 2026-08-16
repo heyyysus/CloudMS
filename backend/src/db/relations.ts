@@ -12,6 +12,7 @@ import {
   persons,
   policyAttachments,
   policyDrivers,
+  policyLogAttachments,
   policyLogs,
   receipts,
   sessions,
@@ -119,23 +120,35 @@ export const policyDriversRelations = relations(policyDrivers, ({ one }) => ({
   driver: one(drivers, { fields: [policyDrivers.driverId], references: [drivers.id] }),
 }))
 
-export const policyLogsRelations = relations(policyLogs, ({ one }) => ({
+export const policyLogsRelations = relations(policyLogs, ({ one, many }) => ({
   policy: one(autoPolicies, { fields: [policyLogs.policyId], references: [autoPolicies.id] }),
   author: one(users, { fields: [policyLogs.authorId], references: [users.id] }),
+  linkedAttachments: many(policyLogAttachments),
 }))
 
-export const policyAttachmentsRelations = relations(policyAttachments, ({ one }) => ({
+export const policyAttachmentsRelations = relations(policyAttachments, ({ one, many }) => ({
   policy: one(autoPolicies, {
     fields: [policyAttachments.policyId],
     references: [autoPolicies.id],
   }),
   createdByUser: one(users, { fields: [policyAttachments.createdBy], references: [users.id] }),
+  logLinks: many(policyLogAttachments),
+}))
+
+export const policyLogAttachmentsRelations = relations(policyLogAttachments, ({ one }) => ({
+  log: one(policyLogs, { fields: [policyLogAttachments.logId], references: [policyLogs.id] }),
+  attachment: one(policyAttachments, {
+    fields: [policyLogAttachments.attachmentId],
+    references: [policyAttachments.id],
+  }),
+  linkedByUser: one(users, { fields: [policyLogAttachments.linkedBy], references: [users.id] }),
 }))
 
 export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   policyLogs: many(policyLogs),
   policyAttachments: many(policyAttachments),
+  policyLogAttachments: many(policyLogAttachments),
 }))
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({

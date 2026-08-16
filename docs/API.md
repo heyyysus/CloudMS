@@ -354,6 +354,72 @@ Note the `author` field is a small joined object (`id`, `name`, `email`),
 not just an `authorId`, and there is no `updatedAt` — logs are immutable
 once created, so there is nothing to have been updated.
 
+## Policy Log Attachments
+
+A `policy_log_attachments` row files one policy attachment under one policy
+log, so opening a log shows the documents that belong to it. Staff create
+these from the Attachments subtab — select one or more files, then pick a
+single log — and the server creates them too: the change form, invoice, and
+receipt PDFs it generates are linked to the log the same action appended.
+
+Unlike logs and attachments, **links are not append-only**. An association is
+an editorial judgement, so any authenticated user may remove any link,
+including one somebody else made. Removing a link never touches the log or
+the attachment.
+
+Both ends must belong to the same policy. Voided documents follow the same
+visibility rule as `GET /policy-attachments`: a link whose attachment is
+voided is withheld from staff and returned to admins.
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| GET | `/policy-log-attachments?policyId=` | any | every link on the policy, newest first; `policyId` is required. One call serves every log — filter client-side by `logId` |
+| POST | `/policy-log-attachments` | any | body validated against `linkPolicyLogAttachmentsBody`; returns 201 with the created links |
+| DELETE | `/policy-log-attachments/:id` | any | `:id` is the **link's** id, not the attachment's; 204, or 404 if unknown |
+
+POST body: `logId` (required), `attachmentIds` (required, 1-50 positive
+integers). Many attachments to one log — the shape of the selection UI.
+Re-linking a pair that is already linked is a no-op rather than a conflict,
+so a double submit is safe. Returns 404 for an unknown `logId` or
+`attachmentId`, and 400 when an attachment belongs to a different policy than
+the log.
+
+`linkedBy` is **never accepted from the client** — it is always the session
+user, and it credits whoever made the link, which is not necessarily the
+attachment's uploader.
+
+Example response (`GET /policy-log-attachments?policyId=104`):
+
+```json
+[
+  {
+    "id": 12,
+    "logId": 9,
+    "createdAt": "2026-07-15T14:05:00.000Z",
+    "linkedBy": { "id": 3, "name": "Jane Staff", "email": "jane@example.com" },
+    "attachment": {
+      "id": 41,
+      "policyId": 104,
+      "fileName": "Policy Change Form.pdf",
+      "description": "Auto-generated summary of this edit",
+      "mimeType": "application/pdf",
+      "sizeBytes": 41230,
+      "isVoided": false,
+      "sourceType": "policy_change",
+      "sourceId": 104,
+      "createdAt": "2026-07-15T14:05:00.000Z",
+      "uploadedBy": { "id": 3, "name": "Jane Staff", "email": "jane@example.com" }
+    }
+  }
+]
+```
+
+The attachment is embedded rather than referenced so a client can render a
+log's documents without also holding the attachments list — and so an admin
+still sees a voided document here after it has dropped out of that list. As
+everywhere else, `storageKey` is never included; download URLs come from
+`GET /policy-attachments/:id/link`.
+
 ## Carriers
 
 Included because policies require a `carrierId` — without a carriers

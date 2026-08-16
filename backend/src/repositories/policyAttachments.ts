@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { and, desc, eq, gte, sql } from "drizzle-orm"
 import { db } from "../db"
-import { policyAttachments } from "../db/schema"
+import { policyAttachments, policyLogAttachments } from "../db/schema"
 import { putObject } from "../storage/r2"
 import type { AttachmentSourceType } from "../types"
 
@@ -20,7 +20,9 @@ export interface PolicyAttachmentWithUploader {
 }
 
 // storageKey is deliberately absent - see listPolicyAttachmentsByPolicyId.
-const publicColumns = {
+// Exported so policyLogAttachments.ts selects the same safe column set when it
+// embeds an attachment in a link row.
+export const attachmentPublicColumns = {
   id: true,
   policyId: true,
   fileName: true,
@@ -56,7 +58,7 @@ export async function listPolicyAttachmentsByPolicyId(
       ? eq(policyAttachments.policyId, policyId)
       : and(eq(policyAttachments.policyId, policyId), eq(policyAttachments.isVoided, false)),
     orderBy: desc(policyAttachments.createdAt),
-    columns: publicColumns,
+    columns: attachmentPublicColumns,
     with: { createdByUser: { columns: { id: true, name: true, email: true } } },
   })
   return rows.map(({ createdByUser, ...rest }) => ({ ...rest, uploadedBy: createdByUser }))
@@ -100,7 +102,7 @@ export async function createPolicyAttachment(input: {
     .returning({ id: policyAttachments.id })
   const created = await db.query.policyAttachments.findFirst({
     where: eq(policyAttachments.id, row.id),
-    columns: publicColumns,
+    columns: attachmentPublicColumns,
     with: { createdByUser: { columns: { id: true, name: true, email: true } } },
   })
   if (!created) throw new Error(`Failed to reload policy attachment ${row.id} after insert`)
@@ -124,10 +126,13 @@ export async function storeGeneratedPolicyAttachment(input: {
   sourceType: AttachmentSourceType
   sourceId: number
   createdBy: number
+  // The log this document belongs to, when the same action wrote one, so the
+  // document shows up under that log without anyone linking it by hand.
+  linkToLogId?: number
 }): Promise<PolicyAttachmentWithUploader> {
   const storageKey = `${attachmentKeyPrefix(input.policyId)}${randomUUID()}-${input.keySlug}.pdf`
   await putObject(storageKey, input.pdf, "application/pdf")
-  return createPolicyAttachment({
+  const attachment = await createPolicyAttachment({
     policyId: input.policyId,
     fileName: input.fileName,
     description: input.description,
@@ -138,6 +143,29 @@ export async function storeGeneratedPolicyAttachment(input: {
     sourceId: input.sourceId,
     createdBy: input.createdBy,
   })
+
+  // Deliberately last and deliberately swallowed: the document itself is the
+  // record that matters, and an unlinked one can still be linked by hand.
+  if (input.linkToLogId !== undefined) {
+    try {
+      // Inserted directly rather than through policyLogAttachments.ts, which
+      // imports this module for its column set - going the other way too would
+      // make the pair circular for one three-line insert.
+      await db
+        .insert(policyLogAttachments)
+        .values({
+          logId: input.linkToLogId,
+          attachmentId: attachment.id,
+          linkedBy: input.createdBy,
+        })
+        .onConflictDoNothing()
+    } catch {
+      // Callers here have already committed; see the header of
+      // routes/accountingDocuments.ts.
+    }
+  }
+
+  return attachment
 }
 
 // Flips the generated document(s) for a voided invoice or receipt. The R2

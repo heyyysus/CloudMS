@@ -67,12 +67,15 @@ export async function listInvoicesByClientId(clientId: number) {
 // carrier when none is given; agency-fee items never carry a carrier. Returns
 // undefined when the policy doesn't exist. The invoice opens with amountPaid 0
 // and status "open".
+//
+// `logId` comes back alongside the invoice so the route can attach the invoice
+// PDF - generated after this commits - to the very log written here.
 export async function createInvoiceWithDetails(input: CreateInvoiceInput) {
   if (input.items.length === 0) {
     throw new InvoiceWriteError("An invoice needs at least one item")
   }
 
-  const id = await withLogNumberRetry(async () =>
+  const created = await withLogNumberRetry(async () =>
     db.transaction(async (tx) => {
       const [policy] = await tx
         .select({
@@ -125,18 +128,19 @@ export async function createInvoiceWithDetails(input: CreateInvoiceInput) {
         .insert(invoiceItems)
         .values(resolvedItems.map((item) => ({ ...item, invoiceId: invoice.id })))
 
-      await insertPolicyLogInTx(tx, {
+      const logId = await insertPolicyLogInTx(tx, {
         policyId: input.policyId,
         authorId: input.createdBy,
         body: invoiceCreatedLogBody({ invoiceId: invoice.id, total, items: resolvedItems }),
       })
 
-      return invoice.id
+      return { invoiceId: invoice.id, logId }
     })
   )
 
-  if (id === undefined) return undefined
-  return getInvoiceWithDetails(id)
+  if (created === undefined) return undefined
+  const invoice = await getInvoiceWithDetails(created.invoiceId)
+  return invoice && { invoice, logId: created.logId }
 }
 
 export type VoidInvoiceResult =

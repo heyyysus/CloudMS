@@ -12,6 +12,7 @@ import { paymentsRouter } from "./routes/payments"
 import { personsRouter } from "./routes/persons"
 import { policiesRouter } from "./routes/policies"
 import { policyAttachmentsRouter } from "./routes/policyAttachments"
+import { policyLogAttachmentsRouter } from "./routes/policyLogAttachments"
 import { policyLogsRouter } from "./routes/policyLogs"
 import { receiptsRouter } from "./routes/receipts"
 import { searchRouter } from "./routes/search"
@@ -42,6 +43,7 @@ app.use(clientsRouter)
 app.use(policiesRouter)
 app.use(policyLogsRouter)
 app.use(policyAttachmentsRouter)
+app.use(policyLogAttachmentsRouter)
 app.use(vehiclesRouter)
 app.use(carriersRouter)
 app.use(invoicesRouter)

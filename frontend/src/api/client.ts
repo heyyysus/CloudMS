@@ -25,5 +25,9 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(res.status, body?.error ?? res.statusText)
   }
 
+  // DELETE endpoints answer 204 with no body, which res.json() would choke on.
+  // Callers of those declare Promise<void>, so undefined is the right value.
+  if (res.status === 204) return undefined as T
+
   return res.json()
 }

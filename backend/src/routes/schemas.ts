@@ -198,6 +198,14 @@ export const attachmentLinkQuery = z.object({
   disposition: z.enum(["inline", "attachment"]).optional(),
 })
 
+// One log, many attachments: the UI picks files in the attachments list and
+// then chooses a single log for all of them. The cap is a sanity bound on a
+// batch a human assembled by clicking, not a product limit.
+export const linkPolicyLogAttachmentsBody = z.object({
+  logId: z.number().int().positive(),
+  attachmentIds: z.array(z.number().int().positive()).min(1).max(50),
+})
+
 export const createCarrierBody = insertCarrierSchema.omit(omitMeta)
 export const updateCarrierBody = createCarrierBody.partial()
 

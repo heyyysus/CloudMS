@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   buildPolicyChangeFormPdf,
+  formatChangeSummaryText,
   summarizePolicyChanges,
   type PolicyDetail,
 } from "./policyChangeSummary"
@@ -44,7 +45,17 @@ function person(id: number, firstName: string, lastName: string) {
     firstName,
     lastName,
     dateOfBirth: "1990-01-01",
+    maritalStatus: "single",
+    relationToInsured: "other",
   } as PolicyDetail["policyDrivers"][number]["driver"]["person"]
+}
+
+// A policyDrivers row wrapping `person`, with the driver-level fields the
+// summary reports. Overrides cover the nullable ones.
+function policyDriver(p: ReturnType<typeof person>, driverOverrides: Record<string, unknown> = {}) {
+  return {
+    driver: { person: p, dlNumber: null, rating: "rated", sr22: false, ...driverOverrides },
+  } as PolicyDetail["policyDrivers"][number]
 }
 
 describe("summarizePolicyChanges", () => {
@@ -138,9 +149,43 @@ describe("summarizePolicyChanges", () => {
 
     const input: UpdatePolicyInput = { vehicles: [] }
     const lines = summarizePolicyChanges(before, after, input)
+    // Neither of these fixtures carries coverage, so the added vehicle falls
+    // back to a bare label line - see the next test for the usual case.
     expect(lines).toContain("Vehicle added: 2022 Toyota Camry (VIN NEWVIN)")
     expect(lines).toContain("Vehicle removed: 2018 Ford Focus (VIN OLDVIN)")
     expect(lines).toHaveLength(2)
+  })
+
+  it("lists every coverage carried by an added vehicle, skipping the blank ones", () => {
+    const added = {
+      id: 3,
+      policyId: 1,
+      vin: "NEWVIN",
+      make: "Toyota",
+      model: "Camry",
+      year: 2022,
+      garagingZip: "90210",
+      coverageBi: "100/300",
+      coveragePd: "50,000",
+      coverageUmbi: null,
+      coverageUmpd: "",
+      coverageCdw: "   ",
+      coverageColl: "500",
+      coverageComp: "250",
+    } as PolicyDetail["vehicles"][number]
+
+    const lines = summarizePolicyChanges(makePolicy(), makePolicy({ vehicles: [added] }), {
+      vehicles: [],
+    })
+    // Ordered by VEHICLE_FIELD_LABELS; null, empty and whitespace-only
+    // coverages are left off entirely.
+    expect(lines).toEqual([
+      "Vehicle added: 2022 Toyota Camry (VIN NEWVIN) — Garaging ZIP: 90210",
+      "Vehicle added: 2022 Toyota Camry (VIN NEWVIN) — Bodily injury coverage: 100/300",
+      "Vehicle added: 2022 Toyota Camry (VIN NEWVIN) — Property damage coverage: 50,000",
+      "Vehicle added: 2022 Toyota Camry (VIN NEWVIN) — Collision deductible: 500",
+      "Vehicle added: 2022 Toyota Camry (VIN NEWVIN) — Comprehensive deductible: 250",
+    ])
   })
 
   it("reports a coverage/deductible change on a vehicle that keeps its VIN", () => {
@@ -177,24 +222,83 @@ describe("summarizePolicyChanges", () => {
   })
 
   it("reports added and removed drivers by person when the drivers key is present", () => {
-    const kept = {
-      driver: { person: person(1, "Jane", "Kept") },
-    } as PolicyDetail["policyDrivers"][number]
-    const removed = {
-      driver: { person: person(2, "John", "Removed") },
-    } as PolicyDetail["policyDrivers"][number]
-    const added = {
-      driver: { person: person(3, "Alex", "Added") },
-    } as PolicyDetail["policyDrivers"][number]
+    const kept = policyDriver(person(1, "Jane", "Kept"))
+    const removed = policyDriver(person(2, "John", "Removed"))
+    const added = policyDriver(person(3, "Alex", "Added"))
 
     const before = makePolicy({ policyDrivers: [kept, removed] })
     const after = makePolicy({ policyDrivers: [kept, added] })
 
     const input: UpdatePolicyInput = { drivers: [] }
     const lines = summarizePolicyChanges(before, after, input)
-    expect(lines).toContain("Driver added: Alex Added")
+    // A removal stays a single line; an addition expands into its details.
     expect(lines).toContain("Driver removed: John Removed")
-    expect(lines).toHaveLength(2)
+    expect(lines.filter((line) => line.startsWith("Driver added: Alex Added — "))).not.toHaveLength(
+      0
+    )
+    expect(lines).not.toContain("Driver added: Alex Added")
+  })
+
+  it("lists every detail of an added driver", () => {
+    const added = policyDriver(
+      {
+        ...person(3, "Alex", "Added"),
+        dateOfBirth: "1991-05-12",
+        maritalStatus: "married",
+        relationToInsured: "significant-other",
+      } as PolicyDetail["policyDrivers"][number]["driver"]["person"],
+      { dlNumber: "D1234567", rating: "excluded", sr22: true }
+    )
+
+    const lines = summarizePolicyChanges(makePolicy(), makePolicy({ policyDrivers: [added] }), {
+      drivers: [],
+    })
+    expect(lines).toEqual([
+      "Driver added: Alex Added — Date of birth: 05/12/1991",
+      "Driver added: Alex Added — Relation to insured: Significant other",
+      "Driver added: Alex Added — Marital status: Married",
+      "Driver added: Alex Added — DL number: D1234567",
+      "Driver added: Alex Added — Rating: Excluded",
+      "Driver added: Alex Added — SR-22: Yes",
+    ])
+  })
+
+  it("omits an added driver's marital status and DL number when they are unset", () => {
+    const added = policyDriver(
+      {
+        ...person(3, "Alex", "Added"),
+        maritalStatus: null,
+      } as PolicyDetail["policyDrivers"][number]["driver"]["person"],
+      { dlNumber: null }
+    )
+
+    const lines = summarizePolicyChanges(makePolicy(), makePolicy({ policyDrivers: [added] }), {
+      drivers: [],
+    })
+    expect(lines).toEqual([
+      "Driver added: Alex Added — Date of birth: 01/01/1990",
+      "Driver added: Alex Added — Relation to insured: Other",
+      "Driver added: Alex Added — Rating: Rated",
+      "Driver added: Alex Added — SR-22: No",
+    ])
+  })
+})
+
+describe("formatChangeSummaryText", () => {
+  it("nests a multi-detail group under its label", () => {
+    const text = formatChangeSummaryText([
+      "Status: pending → active",
+      "Vehicle added: 2022 Toyota Camry (VIN NEWVIN) — Garaging ZIP: 90210",
+      "Vehicle added: 2022 Toyota Camry (VIN NEWVIN) — Bodily injury coverage: 100/300",
+    ])
+    expect(text).toBe(
+      [
+        "- Status: pending → active",
+        "- Vehicle added: 2022 Toyota Camry (VIN NEWVIN)",
+        "  - Garaging ZIP: 90210",
+        "  - Bodily injury coverage: 100/300",
+      ].join("\n")
+    )
   })
 })
 
@@ -205,6 +309,10 @@ describe("buildPolicyChangeFormPdf", () => {
       "Status: pending → active",
       "2020 Honda Civic (VIN SAMEVIN) — Collision deductible: 500 → 1,000",
       "2020 Honda Civic (VIN SAMEVIN) — Comprehensive deductible: 250 → 500",
+      "Vehicle added: 2022 Toyota Camry (VIN NEWVIN) — Garaging ZIP: 90210",
+      "Vehicle added: 2022 Toyota Camry (VIN NEWVIN) — Bodily injury coverage: 100/300",
+      "Driver added: Alex Added — Date of birth: 05/12/1991",
+      "Driver added: Alex Added — Relation to insured: Spouse",
     ]
 
     const pdf = await buildPolicyChangeFormPdf(

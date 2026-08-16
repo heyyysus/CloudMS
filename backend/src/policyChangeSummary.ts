@@ -3,7 +3,13 @@
 // into PATCH /policies/:id (routes/policies.ts), which logs the summary as a
 // policy log and uploads the PDF as a policy attachment.
 import PDFDocument from "pdfkit"
-import { formatGeneratedOn, formatMmDdYyyy, sanitizeForPdf } from "./pdfFormat"
+import {
+  formatGeneratedOn,
+  formatMmDdYyyy,
+  PDF_FONT,
+  PDF_FONT_BOLD,
+  sanitizeForPdf,
+} from "./pdfFormat"
 import type { getPolicyWithDetails } from "./repositories"
 import type { UpdatePolicyInput } from "./repositories/autoPolicies"
 
@@ -61,6 +67,62 @@ const VEHICLE_FIELDS = Object.keys(VEHICLE_FIELD_LABELS) as Array<
   keyof PolicyDetail["vehicles"][number]
 >
 
+// The subset listed under a newly added vehicle: everything except the three
+// fields vehicleLabel() already prints.
+const VEHICLE_DETAIL_FIELDS = VEHICLE_FIELDS.filter(
+  (field) => field !== "make" && field !== "model" && field !== "year"
+)
+
+// Coverage columns are nullable free text, and the edit form can submit an
+// empty string, so both count as "not carried" and are left off the form.
+function hasValue(value: unknown): boolean {
+  return value !== null && value !== undefined && String(value).trim() !== ""
+}
+
+type DriverRow = PolicyDetail["policyDrivers"][number]["driver"]
+type PersonRow = DriverRow["person"]
+
+const MARITAL_STATUS_LABELS: Record<NonNullable<PersonRow["maritalStatus"]>, string> = {
+  single: "Single",
+  married: "Married",
+  divorced: "Divorced",
+  widowed: "Widowed",
+  separated: "Separated",
+}
+
+const RELATION_LABELS: Record<PersonRow["relationToInsured"], string> = {
+  self: "Self",
+  spouse: "Spouse",
+  child: "Child",
+  sibling: "Sibling",
+  "significant-other": "Significant other",
+  "other-related": "Other related",
+  other: "Other",
+}
+
+const DRIVER_RATING_LABELS: Record<DriverRow["rating"], string> = {
+  rated: "Rated",
+  excluded: "Excluded",
+}
+
+// The details listed under a newly added driver, in a fixed order. Nullable
+// fields are omitted when empty, matching how a new vehicle's unpurchased
+// coverages are left off.
+function driverDetailLines(policyDriver: PolicyDetail["policyDrivers"][number]): string[] {
+  const { person, dlNumber, rating, sr22 } = policyDriver.driver
+  const lines = [
+    `Date of birth: ${formatMmDdYyyy(person.dateOfBirth)}`,
+    `Relation to insured: ${RELATION_LABELS[person.relationToInsured]}`,
+  ]
+  if (person.maritalStatus) {
+    lines.push(`Marital status: ${MARITAL_STATUS_LABELS[person.maritalStatus]}`)
+  }
+  if (hasValue(dlNumber)) lines.push(`DL number: ${dlNumber}`)
+  lines.push(`Rating: ${DRIVER_RATING_LABELS[rating]}`)
+  lines.push(`SR-22: ${sr22 ? "Yes" : "No"}`)
+  return lines
+}
+
 // Compares `before` and `after` policy details, but only for the fields the
 // caller actually sent (`input`) - untouched fields never produce a line,
 // even if the two detail objects differ for unrelated reasons (they never
@@ -92,7 +154,20 @@ export function summarizePolicyChanges(
     for (const vehicle of after.vehicles) {
       const prior = beforeByVin.get(vehicle.vin)
       if (!prior) {
-        lines.push(`Vehicle added: ${vehicleLabel(vehicle)}`)
+        // An added vehicle always lists the coverage it's carrying, not just
+        // its name - the signed form is the record of what was bound. Only
+        // the "label — detail" lines are pushed (never a bare label line as
+        // well), so groupChangeLines nests them under a single bullet.
+        const details = VEHICLE_DETAIL_FIELDS.filter((field) => hasValue(vehicle[field]))
+        if (details.length === 0) {
+          lines.push(`Vehicle added: ${vehicleLabel(vehicle)}`)
+          continue
+        }
+        for (const field of details) {
+          lines.push(
+            `Vehicle added: ${vehicleLabel(vehicle)} — ${VEHICLE_FIELD_LABELS[field]}: ${vehicle[field]}`
+          )
+        }
         continue
       }
       for (const field of VEHICLE_FIELDS) {
@@ -113,8 +188,17 @@ export function summarizePolicyChanges(
     const beforeByPerson = new Map(before.policyDrivers.map((d) => [d.driver.person.id, d]))
     const afterByPerson = new Map(after.policyDrivers.map((d) => [d.driver.person.id, d]))
     for (const driver of after.policyDrivers) {
-      if (!beforeByPerson.has(driver.driver.person.id))
+      if (beforeByPerson.has(driver.driver.person.id)) continue
+      // Same shape as an added vehicle: the driver's identifying details are
+      // nested under one bullet.
+      const details = driverDetailLines(driver)
+      if (details.length === 0) {
         lines.push(`Driver added: ${driverName(driver)}`)
+        continue
+      }
+      for (const detail of details) {
+        lines.push(`Driver added: ${driverName(driver)} — ${detail}`)
+      }
     }
     for (const driver of before.policyDrivers) {
       if (!afterByPerson.has(driver.driver.person.id))
@@ -165,6 +249,23 @@ function groupChangeLines(changes: string[]): ChangeGroup[] {
   return groups
 }
 
+// The plain-text rendering of the same grouping the PDF uses, for the policy
+// log body. Nesting matters there beyond readability: an added vehicle or
+// driver repeats its label on every line, which would otherwise eat into the
+// log's 5000-character cap (see routes/policies.ts).
+export function formatChangeSummaryText(changes: string[]): string {
+  const out: string[] = []
+  for (const group of groupChangeLines(changes)) {
+    if (group.label === null) {
+      out.push(`- ${group.lines[0]}`)
+      continue
+    }
+    out.push(`- ${group.label}`)
+    for (const rest of group.lines) out.push(`  - ${rest}`)
+  }
+  return out.join("\n")
+}
+
 // Renders a single-page PDF summarizing the changes. Collects the PDFKit
 // output stream into a Buffer rather than writing to disk, since the caller
 // uploads it straight to R2.
@@ -213,10 +314,10 @@ export function buildPolicyChangeFormPdf(
       doc.y = y + lineHeight + 2 + doc.currentLineHeight()
     }
 
-    doc.font("Times-Roman")
+    doc.font(PDF_FONT)
 
-    doc.font("Times-Bold").fontSize(18).text("Policy Change Request", { align: "center" })
-    doc.font("Times-Roman")
+    doc.font(PDF_FONT_BOLD).fontSize(18).text("Policy Change Request", { align: "center" })
+    doc.font(PDF_FONT)
     doc.moveDown()
 
     doc.fontSize(11)

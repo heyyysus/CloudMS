@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { summarizePolicyChanges, type PolicyDetail } from "./policyChangeSummary"
+import {
+  buildPolicyChangeFormPdf,
+  summarizePolicyChanges,
+  type PolicyDetail,
+} from "./policyChangeSummary"
 import type { UpdatePolicyInput } from "./repositories/autoPolicies"
 
 // Minimal fixture matching getPolicyWithDetails' shape. Fields irrelevant to
@@ -191,5 +195,30 @@ describe("summarizePolicyChanges", () => {
     expect(lines).toContain("Driver added: Alex Added")
     expect(lines).toContain("Driver removed: John Removed")
     expect(lines).toHaveLength(2)
+  })
+})
+
+describe("buildPolicyChangeFormPdf", () => {
+  it("renders a valid, non-empty PDF for a mix of scalar and multi-field vehicle changes", async () => {
+    const policy = makePolicy()
+    const changes = [
+      "Status: pending → active",
+      "2020 Honda Civic (VIN SAMEVIN) — Collision deductible: 500 → 1,000",
+      "2020 Honda Civic (VIN SAMEVIN) — Comprehensive deductible: 250 → 500",
+    ]
+
+    const pdf = await buildPolicyChangeFormPdf(
+      {
+        policy,
+        clientName: "Jane Doe",
+        editedBy: { name: "Agent Smith", email: "agent@example.com" },
+        editedAt: new Date("2026-01-01T00:00:00.000Z"),
+        endorsementEffectiveDate: "2026-01-15",
+      },
+      changes
+    )
+
+    expect(pdf.length).toBeGreaterThan(0)
+    expect(pdf.subarray(0, 5).toString("ascii")).toBe("%PDF-")
   })
 })

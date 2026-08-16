@@ -145,6 +145,9 @@ const addPolicySchema = z
       .max(50, 'Max 50 characters'),
     status: z.enum(['pending', 'active', 'cancelled', 'expired']),
     policyAddress: addressFormSchema,
+    // Only shown/required in the edit ("Endorse policy") dialog; the create
+    // form defaults it but never renders it.
+    endorsementEffectiveDate: z.iso.date('Enter a valid date'),
     effectiveDate: z.iso.date('Enter a valid date'),
     // '' = the policy's dates don't span a standard term (edit mode only)
     term: z.enum(['1', '6', '12']).or(z.literal('')),
@@ -300,6 +303,9 @@ function toFormValues({ client, existingDrivers, initial }: ToFormValuesArgs): A
     policyNumber: initial?.policyNumber ?? '',
     status: initial?.status ?? 'pending',
     policyAddress: toAddressFormValues(defaultPolicyAddress(client, initial)),
+    // Always today, regardless of `initial` - this is when *this* edit takes
+    // effect, not the policy's original effective date.
+    endorsementEffectiveDate: localTodayIsoDate(),
     effectiveDate,
     term: initial ? deriveTerm(effectiveDate, initial.expirationDate) : DEFAULT_TERM,
     expirationDate: initial?.expirationDate ?? addMonths(effectiveDate, Number(DEFAULT_TERM)),
@@ -380,6 +386,7 @@ function toBody(values: AddPolicyFormValues, clientId: number): CreatePolicyBody
     carrierId: Number(values.carrierId),
     policyNumber: values.policyNumber.trim(),
     ...flattenAddress('policy', toNullableAddress(values.policyAddress)),
+    endorsementEffectiveDate: values.endorsementEffectiveDate,
     effectiveDate: values.effectiveDate,
     expirationDate: values.expirationDate,
     status: values.status,
@@ -571,6 +578,23 @@ export function AddPolicyForm({
             <FieldError errors={errors.policyNumber ? [errors.policyNumber] : undefined} />
           </Field>
         </div>
+
+        {initial && (
+          <Field data-invalid={!!errors.endorsementEffectiveDate}>
+            <FieldLabel htmlFor="add-policy-endorsement-effective">Effective Date</FieldLabel>
+            <Input
+              id="add-policy-endorsement-effective"
+              type="date"
+              {...register('endorsementEffectiveDate')}
+            />
+            <FieldDescription>When this change takes effect.</FieldDescription>
+            <FieldError
+              errors={
+                errors.endorsementEffectiveDate ? [errors.endorsementEffectiveDate] : undefined
+              }
+            />
+          </Field>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field data-invalid={!!errors.effectiveDate}>

@@ -129,6 +129,79 @@ export interface PolicyChangeFormMeta {
   clientName: string
   editedBy: { name: string | null; email: string }
   editedAt: Date
+  // The date this endorsement takes effect - distinct from the policy's own
+  // effectiveDate/expirationDate, and not persisted (see routes/policies.ts).
+  endorsementEffectiveDate: string
+}
+
+// PDFKit's standard fonts only support WinAnsi encoding, which doesn't
+// include the unicode arrow used in "from → to" lines - it renders as
+// garbage glyphs. Swap in an ASCII arrow for the PDF only; the plain-text
+// policy log keeps the real character.
+function sanitizeForPdf(text: string): string {
+  return text.replace(/→/g, "->")
+}
+
+// Reformats a stored 'YYYY-MM-DD' date as 'MM/DD/YYYY'. Splits the string
+// rather than using `new Date(...)`, which parses as UTC midnight and can
+// shift a day in western timezones.
+function formatMmDdYyyy(iso: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
+  if (!match) return iso
+  const [, year, month, day] = match
+  return `${month}/${day}/${year}`
+}
+
+// The server runs in UTC (no TZ set), so formatting with the ambient/local
+// timezone - as the frontend does correctly in the browser for the policy
+// log's timestamp - would print the wrong wall-clock time here. There's no
+// browser to inherit a timezone from during server-side PDF generation, so
+// the agency's timezone is named explicitly instead.
+const GENERATED_ON_TIME_ZONE = "America/Los_Angeles"
+
+function formatGeneratedOn(date: Date): string {
+  const datePart = date.toLocaleDateString("en-US", {
+    timeZone: GENERATED_ON_TIME_ZONE,
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  })
+  const timePart = date.toLocaleTimeString("en-US", {
+    timeZone: GENERATED_ON_TIME_ZONE,
+    hour: "numeric",
+    minute: "2-digit",
+  })
+  return `${datePart} ${timePart}`
+}
+
+// Groups the flat change lines by vehicle so a vehicle with several changed
+// fields shows its label once, with each change nested underneath, instead
+// of repeating the full vehicle label on every line. Per-vehicle field-change
+// lines are the only ones shaped "label — rest" (see the " — " join above),
+// and are pushed contiguously per vehicle, so a simple linear scan groups
+// them correctly.
+interface ChangeGroup {
+  label: string | null
+  lines: string[]
+}
+
+function groupChangeLines(changes: string[]): ChangeGroup[] {
+  const groups: ChangeGroup[] = []
+  for (const line of changes) {
+    const match = line.match(/^(.+?) — (.+)$/)
+    if (match) {
+      const [, label, rest] = match
+      const last = groups[groups.length - 1]
+      if (last?.label === label) {
+        last.lines.push(rest)
+      } else {
+        groups.push({ label, lines: [rest] })
+      }
+    } else {
+      groups.push({ label: null, lines: [line] })
+    }
+  }
+  return groups
 }
 
 // Renders a single-page PDF summarizing the changes. Collects the PDFKit
@@ -145,23 +218,79 @@ export function buildPolicyChangeFormPdf(
     doc.on("end", () => resolve(Buffer.concat(chunks)))
     doc.on("error", reject)
 
-    doc.fontSize(18).text("Policy Change Form", { align: "center" })
+    const left = doc.page.margins.left
+    const right = doc.page.width - doc.page.margins.right
+
+    // Draws "Label: ____ Date: ____" on one line, with the signer's printed
+    // name beneath the signature blank. Defined here (rather than as a
+    // module-level function taking `doc` as a parameter) so it can close
+    // over `doc` without needing PDFKit's document type name.
+    function renderSignatureField(label: string, name: string): void {
+      const dateLabel = "Date:"
+      const dateBlankWidth = 100
+      const gap = 20
+
+      doc.fontSize(11)
+      const sigLabelWidth = doc.widthOfString(`${label} `)
+      const dateLabelWidth = doc.widthOfString(`${dateLabel} `)
+      const dateBlankLeft = right - dateBlankWidth
+      const dateLabelX = dateBlankLeft - dateLabelWidth - gap
+      const sigBlankLeft = left + sigLabelWidth
+      const sigBlankRight = dateLabelX - gap
+
+      const y = doc.y
+      const lineHeight = doc.currentLineHeight()
+      const lineY = y + lineHeight - 2
+
+      doc.text(label, left, y)
+      doc.text(dateLabel, dateLabelX, y)
+      doc.moveTo(sigBlankLeft, lineY).lineTo(sigBlankRight, lineY).stroke()
+      doc.moveTo(dateBlankLeft, lineY).lineTo(right, lineY).stroke()
+
+      doc.fontSize(9).text(name, left, y + lineHeight + 2)
+      doc.fontSize(11)
+      doc.y = y + lineHeight + 2 + doc.currentLineHeight()
+    }
+
+    doc.font("Times-Roman")
+
+    doc
+      .font("Times-Bold")
+      .fontSize(18)
+      .text("Policy Change Request", { align: "center" })
+    doc.font("Times-Roman")
     doc.moveDown()
 
     doc.fontSize(11)
     doc.text(`Policy number: ${meta.policy.policyNumber}`)
+    doc.text(`Effective Date: ${formatMmDdYyyy(meta.endorsementEffectiveDate)}`)
     doc.text(`Client: ${meta.clientName}`)
+    doc.text(`Agent: ${meta.editedBy.name ?? meta.editedBy.email}`)
     doc.text(`Carrier: ${meta.policy.carrier.name}`)
-    doc.text(`Edited by: ${meta.editedBy.name ?? meta.editedBy.email}`)
-    doc.text(`Edited at: ${meta.editedAt.toISOString()}`)
+    doc.text(`Generated on: ${formatGeneratedOn(meta.editedAt)}`)
     doc.moveDown()
 
-    doc.fontSize(13).text("Changes")
+    doc.moveTo(left, doc.y).lineTo(right, doc.y).stroke()
+    doc.moveDown(0.5)
+
+    doc.fontSize(13).text("Summary of Changes:")
     doc.moveDown(0.5)
     doc.fontSize(11)
-    for (const line of changes) {
-      doc.text(`• ${line}`)
+    for (const group of groupChangeLines(changes)) {
+      if (group.label === null) {
+        doc.text(`• ${sanitizeForPdf(group.lines[0])}`)
+        continue
+      }
+      doc.text(`• ${sanitizeForPdf(group.label)}`)
+      for (const rest of group.lines) {
+        doc.text(`- ${sanitizeForPdf(rest)}`, { indent: 20 })
+      }
     }
+    doc.moveDown(3)
+
+    renderSignatureField("Insured Signature:", meta.clientName)
+    doc.moveDown()
+    renderSignatureField("Agent Signature:", meta.editedBy.name ?? meta.editedBy.email)
 
     doc.end()
   })

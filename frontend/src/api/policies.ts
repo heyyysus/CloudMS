@@ -133,6 +133,9 @@ export interface CreatePolicyBody {
   status: AutoPolicy['status']
   vehicles?: CreatePolicyVehicleBody[]
   drivers?: CreatePolicyDriverBody[]
+  // Meaningful only on updates (the date this endorsement takes effect, for
+  // the generated change form) - ignored by the create endpoint.
+  endorsementEffectiveDate?: string
 }
 
 export function createPolicy(body: CreatePolicyBody): Promise<PolicyDetail> {

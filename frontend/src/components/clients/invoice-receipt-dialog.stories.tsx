@@ -146,6 +146,30 @@ const closedInvoice: InvoiceDetail = {
   createdByUser: { id: 1, name: 'Jane Staff', email: 'jane@example.com' },
 }
 
+const closedInvoiceWithChange: InvoiceDetail = {
+  ...closedInvoice,
+  id: 43,
+  payments: [
+    {
+      ...closedInvoice.payments[0],
+      id: 6,
+      invoiceId: 43,
+      amount: '650.00',
+      amountApplied: '600.00',
+      changeGiven: '50.00',
+    },
+  ],
+  receipts: [
+    {
+      ...closedInvoice.receipts[0],
+      id: 89,
+      paymentId: 6,
+      invoiceId: 43,
+      changeGiven: '50.00',
+    },
+  ],
+}
+
 const openInvoice: InvoiceDetail = {
   ...closedInvoice,
   id: 42,
@@ -212,6 +236,8 @@ export const ClosedInvoiceReceipt: Story = {
     await expect(screen.getByText('Payments')).toBeInTheDocument()
     await expect(screen.getByText(/Credit card/)).toBeInTheDocument()
     await expect(screen.getByText(/Receipt #88/)).toBeInTheDocument()
+    // No change was given on this payment.
+    await expect(screen.queryByText(/change given/i)).not.toBeInTheDocument()
 
     await expect(screen.getByText('Amount due')).toBeInTheDocument()
     await expect(screen.getByText('$0.00')).toBeInTheDocument()
@@ -221,6 +247,17 @@ export const ClosedInvoiceReceipt: Story = {
 
     await userEvent.click(screen.getByRole('button', { name: /print/i }))
     await expect(args.printFn).toHaveBeenCalled()
+  },
+}
+
+export const ClosedInvoiceReceiptWithChange: Story = {
+  args: {
+    invoiceId: 43,
+    getInvoiceFn: fn(async () => closedInvoiceWithChange),
+  },
+  play: async () => {
+    await expect(await screen.findByText('Invoice #43')).toBeInTheDocument()
+    await expect(screen.getByText(/change given: \$50\.00/i)).toBeInTheDocument()
   },
 }
 

@@ -96,6 +96,35 @@ function toPaymentInputs(rows: PaymentRowFormValues[]): PaymentRowInput[] {
   }))
 }
 
+// Live preview of what's still owed or what change is owed back, shown while
+// the user edits payment amounts (not just after submit). The backend applies
+// each payment row against the current due balance in sequence, capped at
+// zero, so the total applied across rows always equals
+// min(sum(entered), initialDue) regardless of row order — meaning this
+// aggregate remainingCents always matches what the backend will actually do.
+function dueOrChangeSummary(remainingCents: number) {
+  if (remainingCents > 0) {
+    return { text: `Amount due: ${formatMoney(remainingCents / 100)}`, tone: 'due' as const }
+  }
+  if (remainingCents < 0) {
+    return { text: `Change due: ${formatMoney(-remainingCents / 100)}`, tone: 'change' as const }
+  }
+  return { text: 'Paid in full', tone: 'settled' as const }
+}
+
+function DueOrChangeBanner({ remainingCents }: { remainingCents: number }) {
+  const { text, tone } = dueOrChangeSummary(remainingCents)
+  return (
+    <div
+      className={cn(
+        'rounded-lg border p-2 text-center text-sm font-medium',
+        tone === 'change' ? 'border-warning bg-warning/10 text-warning' : 'text-muted-foreground'
+      )}
+    >
+      {text}
+    </div>
+  )
+}
 
 // --- Step 1: choose between paying an open invoice or creating a new one. --
 
@@ -420,6 +449,7 @@ function NewInvoiceForm({
               <PlusIcon /> Add payment
             </Button>
           </FieldGroup>
+          {paymentFields.fields.length > 0 && <DueOrChangeBanner remainingCents={remainingCents} />}
         </FieldSet>
 
         <div className="flex justify-end">
@@ -608,6 +638,7 @@ function PayInvoiceForm({
                   : undefined
             }
           />
+          <DueOrChangeBanner remainingCents={remainingCents} />
         </FieldSet>
 
         {errorMessage && (

@@ -227,6 +227,17 @@ export const NoOpenInvoicesBuildsNewInvoice: Story = {
     // userEvent.type (see TermUpdatesExpiration in add-policy-form.stories.tsx).
     fireEvent.change(screen.getByLabelText('Line 1 amount'), { target: { value: '150' } })
 
+    // No payment rows yet: no due/change banner should be showing.
+    await expect(screen.queryByText(/amount due:|change due:|paid in full/i)).not.toBeInTheDocument()
+
+    // findByRole (not getByRole): the Select's modal-close cleanup (aria-hidden
+    // on the rest of the tree) can still be settling here.
+    await userEvent.click(await screen.findByRole('button', { name: /add payment/i }))
+    fireEvent.change(screen.getByLabelText('Payment 1 amount'), { target: { value: '50' } })
+    await expect(await screen.findByText(/amount due: \$100\.00/i)).toBeInTheDocument()
+    // Remove the payment row again - this story only exercises invoice creation.
+    await userEvent.click(screen.getByRole('button', { name: /remove payment 1/i }))
+
     // findByRole (not getByRole): the Select's modal-close cleanup (aria-hidden
     // on the rest of the tree) can still be settling here.
     await userEvent.click(await screen.findByRole('button', { name: /create invoice/i }))
@@ -266,6 +277,8 @@ export const OpenInvoiceChooseThenPay: Story = {
     // Server-defaulted carrier still shows in the read-only summary.
     await expect(screen.getByText(/acme insurance/i)).toBeInTheDocument()
     await expect(screen.getByLabelText('Payment 1 amount')).toHaveValue('60.00')
+    // The prefilled amount exactly covers the balance due.
+    await expect(screen.getByText(/paid in full/i)).toBeInTheDocument()
 
     await userEvent.type(screen.getByLabelText('Payment 1 note'), 'Paid at front desk')
     await userEvent.click(screen.getByRole('button', { name: /record payment/i }))
@@ -299,6 +312,9 @@ export const PreTargetedInvoiceSkipsChoiceAndShowsChange: Story = {
     const amountInput = screen.getByLabelText('Payment 1 amount')
     await userEvent.clear(amountInput)
     await userEvent.type(amountInput, '100')
+    // Shown live, before the payment is even submitted.
+    await expect(await screen.findByText(/change due: \$40\.00/i)).toBeInTheDocument()
+
     await userEvent.click(screen.getByRole('button', { name: /record payment/i }))
 
     await expect(await screen.findByText(/change given: \$40\.00/i)).toBeInTheDocument()

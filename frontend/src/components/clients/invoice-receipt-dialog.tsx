@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
-import { formatMoney } from '@/lib/money'
+import { formatMoney, toCents } from '@/lib/money'
 import {
   INVOICE_ITEM_TYPE_LABEL,
   INVOICE_STATUS_LABEL,
@@ -137,6 +137,11 @@ export function InvoiceReceiptDialog({
                         {receipt ? ` — Receipt #${receipt.id}` : ''}
                         {payment.note && (
                           <span className="block text-xs text-muted-foreground">{payment.note}</span>
+                        )}
+                        {toCents(payment.changeGiven) > 0 && (
+                          <span className="block text-xs text-warning">
+                            Change given: {formatMoney(payment.changeGiven)}
+                          </span>
                         )}
                       </span>
                       <span className="tabular-nums">{formatMoney(payment.amountApplied)}</span>

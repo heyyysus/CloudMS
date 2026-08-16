@@ -15,6 +15,7 @@ import {
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { inviteUser, type InviteUserBody, type InviteUserResult } from '@/api/users'
+import { useToast } from '@/components/ui/toast'
 
 const inviteFormSchema = z.object({
   email: z.email('Enter a valid email address').max(255, 'Max 255 characters'),
@@ -122,8 +123,11 @@ interface InviteUserCardProps {
 }
 
 export function InviteUserCard({ inviteUserFn = inviteUser }: InviteUserCardProps) {
+  const toast = useToast()
   const mutation = useMutation<InviteUserResult, Error, InviteUserBody>({
     mutationFn: inviteUserFn,
+    onSuccess: () => toast.success('New user created'),
+    onError: (error) => toast.error(error.message),
   })
 
   return (

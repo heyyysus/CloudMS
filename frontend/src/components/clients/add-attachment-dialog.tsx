@@ -21,6 +21,7 @@ import {
   presignPolicyAttachmentUpload,
   type PolicyAttachment,
 } from '@/api/policyAttachments'
+import { useToast } from '@/components/ui/toast'
 
 // Mirrors the server defaults (POLICY_ATTACHMENT_MAX_SIZE_MB /
 // ATTACHMENT_MIME_TYPES) for immediate feedback - the server is the source
@@ -175,6 +176,7 @@ export function AddAttachmentDialog({
   confirmFn = confirmPolicyAttachmentUpload,
 }: AddAttachmentDialogProps) {
   const queryClient = useQueryClient()
+  const toast = useToast()
 
   const mutation = useMutation({
     mutationFn: async ({ file, name, description }: AttachmentSubmitValues) => {
@@ -213,7 +215,9 @@ export function AddAttachmentDialog({
         ...(old ?? []),
       ])
       onOpenChange(false)
+      toast.success('New attachment uploaded')
     },
+    onError: (error) => toast.error(error.message),
   })
 
   return (

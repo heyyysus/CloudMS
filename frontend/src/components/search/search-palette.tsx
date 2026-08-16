@@ -12,9 +12,10 @@ import {
   CommandSeparator,
 } from '@/components/ui/command'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
-import { clientDisplayName } from '@/api/clients'
 import { search as defaultSearch, type SearchClientResult, type SearchPolicyResult } from '@/api/search'
 import type { SearchFn } from '@/api/search'
+import { formatNameLastFirst } from '@/lib/person-name'
+import { formatPhone } from '@/lib/phone'
 
 interface SearchPaletteProps {
   open: boolean
@@ -98,9 +99,9 @@ export function SearchPalette({
                 >
                   <User />
                   <div className="flex flex-col">
-                    <span>{clientDisplayName(client)}</span>
+                    <span>{formatNameLastFirst(client.namedInsured)}</span>
                     <span className="text-xs text-muted-foreground">
-                      {client.emails[0]?.email ?? client.phones[0]?.phoneNumber ?? ''}
+                      {client.emails[0]?.email ?? formatPhone(client.phones[0]?.phoneNumber) ?? ''}
                     </span>
                   </div>
                 </CommandItem>

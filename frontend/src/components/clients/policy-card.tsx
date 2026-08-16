@@ -1,10 +1,15 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { CopyText } from '@/components/ui/copy-text'
+import { DriverDetailDialog } from '@/components/clients/driver-detail-dialog'
+import { VehicleDetailDialog } from '@/components/clients/vehicle-detail-dialog'
 import { cn } from '@/lib/utils'
+import { formatDate } from '@/lib/date-display'
+import { formatNameLastFirst } from '@/lib/person-name'
 import type { AutoPolicy } from '@/api/clients'
-import type { PolicyDetail, Vehicle } from '@/api/policies'
+import type { PolicyDetail, PolicyDriver, Vehicle } from '@/api/policies'
 import { displayStatus, STATUS_TEXT_CLASS } from '@/lib/policy-status'
 
 export const COVERAGE_LABELS: Record<
@@ -35,6 +40,9 @@ export const COVERAGE_LABELS: Record<
   coverageTowing: 'Towing',
 }
 
+const ROW_CLASS =
+  'w-full cursor-pointer rounded-md border px-2 py-1.5 text-left text-sm odd:bg-muted-foreground/10 hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none'
+
 interface PolicyCardProps {
   policy: AutoPolicy
   detail?: PolicyDetail
@@ -51,12 +59,14 @@ export function PolicyCard({
   action,
 }: PolicyCardProps) {
   const status = displayStatus(policy)
+  const [selectedDriver, setSelectedDriver] = useState<PolicyDriver | null>(null)
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex flex-col text-base">
-          <span>{policy.policyNumber}</span>
+          <CopyText value={policy.policyNumber} label="policy number" />
           <span className={cn('text-xs font-normal capitalize', STATUS_TEXT_CLASS[status])}>
             {status}
           </span>
@@ -67,11 +77,11 @@ export function PolicyCard({
         <div className="grid gap-4 sm:grid-cols-3 text-sm">
           <div>
             <p className="text-xs font-medium text-muted-foreground">Effective</p>
-            <p>{policy.effectiveDate}</p>
+            <p>{formatDate(policy.effectiveDate) ?? '—'}</p>
           </div>
           <div>
             <p className="text-xs font-medium text-muted-foreground">Expiration</p>
-            <p>{policy.expirationDate}</p>
+            <p>{formatDate(policy.expirationDate) ?? '—'}</p>
           </div>
           <div>
             <p className="text-xs font-medium text-muted-foreground">Carrier</p>
@@ -82,46 +92,78 @@ export function PolicyCard({
         <Separator />
 
         <div>
+          <p className="mb-2 text-xs font-medium text-muted-foreground">Drivers</p>
+          {isError && <p className="text-sm text-destructive">Failed to load drivers.</p>}
+          {isLoading && (
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-7 w-full" />
+              <Skeleton className="h-7 w-full" />
+            </div>
+          )}
+          {!isLoading && !isError && detail && detail.policyDrivers.length === 0 && (
+            <p className="text-sm text-muted-foreground">No drivers.</p>
+          )}
+          {!isLoading && !isError && detail && detail.policyDrivers.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {detail.policyDrivers.map((policyDriver) => (
+                <button
+                  key={policyDriver.id}
+                  type="button"
+                  onClick={() => setSelectedDriver(policyDriver)}
+                  aria-label={`View ${formatNameLastFirst(policyDriver.driver.person)}`}
+                  className={ROW_CLASS}
+                >
+                  {formatNameLastFirst(policyDriver.driver.person)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <Separator />
+
+        <div>
           <p className="mb-2 text-xs font-medium text-muted-foreground">Vehicles</p>
           {isError && <p className="text-sm text-destructive">Failed to load vehicles.</p>}
           {isLoading && (
             <div className="flex flex-col gap-2">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-7 w-full" />
+              <Skeleton className="h-7 w-full" />
             </div>
           )}
           {!isLoading && !isError && detail && detail.vehicles.length === 0 && (
             <p className="text-sm text-muted-foreground">No vehicles.</p>
           )}
-          {!isLoading &&
-            !isError &&
-            detail &&
-            detail.vehicles.map((vehicle) => {
-              const coverages = (
-                Object.entries(COVERAGE_LABELS) as [keyof typeof COVERAGE_LABELS, string][]
-              )
-                .map(([key, label]) => {
-                  const value = vehicle[key]
-                  return value ? `${label} ${value}` : null
-                })
-                .filter(Boolean)
-
-              return (
-                <div key={vehicle.id} className="mb-2 rounded-md border p-2 text-sm last:mb-0">
-                  <p>
-                    {vehicle.year} {vehicle.make} {vehicle.model}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    VIN {vehicle.vin} · Garaging Zip {vehicle.garagingZip}
-                  </p>
-                  {coverages.length > 0 && (
-                    <p className="mt-1 text-xs text-muted-foreground">{coverages.join(' · ')}</p>
-                  )}
-                </div>
-              )
-            })}
+          {!isLoading && !isError && detail && detail.vehicles.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {detail.vehicles.map((vehicle) => (
+                <button
+                  key={vehicle.id}
+                  type="button"
+                  onClick={() => setSelectedVehicle(vehicle)}
+                  aria-label={`View ${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                  className={ROW_CLASS}
+                >
+                  {vehicle.year} {vehicle.make} {vehicle.model}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </CardContent>
+
+      <DriverDetailDialog
+        driver={selectedDriver}
+        onOpenChange={(open) => {
+          if (!open) setSelectedDriver(null)
+        }}
+      />
+      <VehicleDetailDialog
+        vehicle={selectedVehicle}
+        onOpenChange={(open) => {
+          if (!open) setSelectedVehicle(null)
+        }}
+      />
     </Card>
   )
 }

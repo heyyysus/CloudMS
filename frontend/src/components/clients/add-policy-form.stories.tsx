@@ -114,8 +114,8 @@ export const Default: Story = {
       client.physicalAddress1
     )
     await expect(canvas.getByRole('combobox', { name: /term/i })).toHaveTextContent(/6 months/i)
-    await expect(canvas.getByRole('checkbox', { name: /jane doe/i })).not.toBeChecked()
-    await expect(canvas.getByRole('checkbox', { name: /john doe/i })).not.toBeChecked()
+    await expect(canvas.getByRole('checkbox', { name: /doe, jane/i })).not.toBeChecked()
+    await expect(canvas.getByRole('checkbox', { name: /doe, john/i })).not.toBeChecked()
   },
 }
 
@@ -173,12 +173,13 @@ export const DefaultCoverages: Story = {
 export const ValidationErrors: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement)
-    // Checking a person without a drivers row requires a DL number.
-    await userEvent.click(canvas.getByRole('checkbox', { name: /jane doe/i }))
+    // Checking a person without a drivers row no longer requires a DL number
+    // - an agency may not have it on file yet.
+    await userEvent.click(canvas.getByRole('checkbox', { name: /doe, jane/i }))
     await userEvent.click(canvas.getByRole('button', { name: /create policy/i }))
     await expect(await canvas.findByText(/carrier is required/i)).toBeInTheDocument()
     await expect(await canvas.findByText(/policy number is required/i)).toBeInTheDocument()
-    await expect(await canvas.findByText(/dl number is required/i)).toBeInTheDocument()
+    await expect(canvas.queryByText(/dl number is required/i)).not.toBeInTheDocument()
     await expect(args.onSubmit).not.toHaveBeenCalled()
   },
 }
@@ -196,10 +197,10 @@ export const SubmitFansOutCoverages: Story = {
     await userEvent.click(await canvas.findByRole('button', { name: /2018 honda accord/i }))
 
     // Existing person without a drivers row: DL fields appear when checked.
-    await userEvent.click(canvas.getByRole('checkbox', { name: /jane doe/i }))
+    await userEvent.click(canvas.getByRole('checkbox', { name: /doe, jane/i }))
     await userEvent.type(await canvas.findByLabelText(/dl number/i), 'D999')
     // Existing person with a drivers row: no extra fields needed.
-    await userEvent.click(canvas.getByRole('checkbox', { name: /john doe/i }))
+    await userEvent.click(canvas.getByRole('checkbox', { name: /doe, john/i }))
 
     await userEvent.click(canvas.getByRole('button', { name: /create policy/i }))
 

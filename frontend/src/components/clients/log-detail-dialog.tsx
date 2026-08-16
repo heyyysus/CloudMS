@@ -1,19 +1,13 @@
-import { useEffect, useState } from 'react'
 import { CheckIcon, CopyIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { LogAuthorChip } from '@/components/clients/log-author-chip'
+import { useCopyToClipboard } from '@/components/ui/copy-text'
 import { formatLogTimestamp } from '@/lib/log-datetime'
 import type { PolicyLog } from '@/api/policyLogs'
 
 function CopyLogBodyButton({ body }: { body: string }) {
-  const [copied, setCopied] = useState(false)
-
-  useEffect(() => {
-    if (!copied) return
-    const timeout = setTimeout(() => setCopied(false), 1500)
-    return () => clearTimeout(timeout)
-  }, [copied])
+  const { copied, copy } = useCopyToClipboard()
 
   return (
     <Button
@@ -22,10 +16,7 @@ function CopyLogBodyButton({ body }: { body: string }) {
       size="sm"
       className="gap-1.5"
       aria-label="Copy log body"
-      onClick={() => {
-        navigator.clipboard.writeText(body)
-        setCopied(true)
-      }}
+      onClick={() => copy(body)}
     >
       {copied ? <CheckIcon /> : <CopyIcon />}
       {copied ? 'Copied!' : 'Copy'}

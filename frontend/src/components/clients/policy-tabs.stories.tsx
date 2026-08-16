@@ -105,8 +105,10 @@ export const DefaultSelectsNewest: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     const tabs = canvas.getAllByRole('tab')
-    await expect(tabs.map((tab) => tab.textContent)).toEqual(['AUTOP-1', 'AUTOP-2', 'AUTOP-3'])
-    await expect(tabs[2]).toHaveAttribute('aria-selected', 'true')
+    // Newest → oldest, left to right, but the number stays tied to age rank
+    // (AUTOP-1 is always the oldest policy).
+    await expect(tabs.map((tab) => tab.textContent)).toEqual(['AUTOP-3', 'AUTOP-2', 'AUTOP-1'])
+    await expect(tabs[0]).toHaveAttribute('aria-selected', 'true')
     await expect(canvas.getByText('POL-NEWEST')).toBeInTheDocument()
   },
 }
@@ -134,7 +136,10 @@ export const DerivedExpired: Story = {
     // The card shows the derived status despite the stored 'active'.
     await expect(canvas.getByText('expired')).toBeInTheDocument()
     // The tab's status dot is gray (muted) for the derived-expired policy.
-    const expiredTab = canvas.getByRole('tab', { name: /AUTOP-4/ })
+    // It's the newest policy (created last), so it's now the leftmost tab
+    // even though its number (AUTOP-4) still reflects it being 4th by age.
+    const expiredTab = canvas.getAllByRole('tab')[0]
+    await expect(expiredTab).toHaveTextContent('AUTOP-4')
     await expect(expiredTab.querySelector('[aria-hidden]')).toHaveClass('bg-muted-foreground')
   },
 }

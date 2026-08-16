@@ -4,7 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { Field, FieldError } from '@/components/ui/field'
+import { Field, FieldError, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
@@ -32,6 +33,7 @@ const attachmentFormSchema = z.object({
     .instanceof(File, { message: 'Choose a file' })
     .refine((file) => ALLOWED_TYPES.includes(file.type), 'Only PDF, PNG, or JPEG files are allowed')
     .refine((file) => file.size <= MAX_SIZE_BYTES, 'File exceeds the 10MB limit'),
+  name: z.string().trim().min(1, 'Enter a file name').max(200, 'Max 200 characters'),
   description: z.string().trim().max(2000, 'Max 2000 characters').optional(),
 })
 
@@ -39,7 +41,17 @@ type AttachmentFormValues = z.infer<typeof attachmentFormSchema>
 
 export interface AttachmentSubmitValues {
   file: File
+  name: string
   description?: string
+}
+
+// Splits "quote-2026.pdf" into ["quote-2026", ".pdf"] so the naming field can
+// be prefilled with just the base name while the extension is silently
+// re-appended on submit. A file with no extension keeps an empty second part.
+function splitFileName(fileName: string): { base: string; ext: string } {
+  const dot = fileName.lastIndexOf('.')
+  if (dot <= 0) return { base: fileName, ext: '' }
+  return { base: fileName.slice(0, dot), ext: fileName.slice(dot) }
 }
 
 interface AddAttachmentFormProps {
@@ -66,7 +78,11 @@ export function AddAttachmentForm({
     formState: { errors },
   } = useForm<AttachmentFormValues>({
     resolver: zodResolver(attachmentFormSchema),
-    defaultValues: { file: initialFile, description: '' },
+    defaultValues: {
+      file: initialFile,
+      name: initialFile ? splitFileName(initialFile.name).base : '',
+      description: '',
+    },
   })
 
   const submit = handleSubmit((values) => onSubmit(values))
@@ -84,7 +100,13 @@ export function AddAttachmentForm({
           aria-label="Attachment file"
           onChange={(e) => {
             const selected = e.target.files?.[0]
-            if (selected) setValue('file', selected, { shouldValidate: true, shouldDirty: true })
+            if (selected) {
+              setValue('file', selected, { shouldValidate: true, shouldDirty: true })
+              setValue('name', splitFileName(selected.name).base, {
+                shouldValidate: true,
+                shouldDirty: true,
+              })
+            }
           }}
         />
         <div className="flex items-center gap-2">
@@ -96,6 +118,12 @@ export function AddAttachmentForm({
           </span>
         </div>
         <FieldError errors={errors.file ? [errors.file] : undefined} />
+      </Field>
+
+      <Field data-invalid={!!errors.name} className="mt-4">
+        <FieldLabel htmlFor="attachment-form-name">Name</FieldLabel>
+        <Input id="attachment-form-name" {...register('name')} />
+        <FieldError errors={errors.name ? [errors.name] : undefined} />
       </Field>
 
       <Field data-invalid={!!errors.description} className="mt-4">
@@ -149,10 +177,14 @@ export function AddAttachmentDialog({
   const queryClient = useQueryClient()
 
   const mutation = useMutation({
-    mutationFn: async ({ file, description }: AttachmentSubmitValues) => {
+    mutationFn: async ({ file, name, description }: AttachmentSubmitValues) => {
+      // The user edits only the base name; the original extension is
+      // re-appended so the stored file name still reflects the real type.
+      const fileName = `${name.trim()}${splitFileName(file.name).ext}`
+
       const { uploadUrl, storageKey } = await presignFn({
         policyId,
-        fileName: file.name,
+        fileName,
         contentType: file.type,
         sizeBytes: file.size,
       })
@@ -171,7 +203,7 @@ export function AddAttachmentDialog({
       return confirmFn({
         policyId,
         storageKey,
-        fileName: file.name,
+        fileName,
         description: description || null,
       })
     },

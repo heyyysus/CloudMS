@@ -96,7 +96,9 @@ export const SubmitSavesAndCloses: Story = {
     )
     await expect(args.updateClientFn).toHaveBeenCalledWith(
       155,
-      expect.objectContaining({ phones: ['555-867-5309'], emails: ['jane@example.com'] })
+      // Phones are normalized to bare digits on submit so every render can
+      // format them consistently via formatPhone.
+      expect.objectContaining({ phones: ['5558675309'], emails: ['jane@example.com'] })
     )
     await waitFor(() => expect(screen.queryByText(/edit client/i)).not.toBeInTheDocument())
   },

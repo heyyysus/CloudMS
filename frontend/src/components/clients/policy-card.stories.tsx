@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, within } from 'storybook/test'
+import { expect, screen, userEvent, within } from 'storybook/test'
 import { PolicyCard } from './policy-card'
 import type { AutoPolicy } from '@/api/clients'
 import type { PolicyDetail } from '@/api/policies'
@@ -72,7 +72,32 @@ const detail: PolicyDetail = {
       updatedAt: '2026-07-14T17:48:07.653Z',
     },
   ],
-  policyDrivers: [],
+  policyDrivers: [
+    {
+      id: 60,
+      policyId: 104,
+      driverId: 61,
+      createdAt: '2026-07-14T17:48:07.653Z',
+      driver: {
+        id: 61,
+        personId: 229,
+        dlNumber: 'D1234567',
+        rating: 'rated',
+        sr22: false,
+        person: {
+          id: 229,
+          firstName: 'Jane',
+          lastName: 'Doe',
+          dateOfBirth: '1987-07-22',
+          maritalStatus: 'married',
+          gender: 'f',
+          relationToInsured: 'self',
+          createdAt: '2026-07-14T17:48:07.653Z',
+          updatedAt: '2026-07-14T17:48:07.653Z',
+        },
+      },
+    },
+  ],
 }
 
 const meta = {
@@ -90,6 +115,32 @@ type Story = StoryObj<typeof meta>
 export const Loaded: Story = {
   args: {
     detail,
+  },
+}
+
+export const ClickDriverOpensDialog: Story = {
+  args: {
+    detail,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByRole('button', { name: /view doe, jane/i }))
+    // The dialog renders through a portal, outside canvasElement.
+    await expect(await screen.findByRole('heading', { name: /doe, jane/i })).toBeInTheDocument()
+    await expect(screen.getByText('D1234567')).toBeInTheDocument()
+  },
+}
+
+export const ClickVehicleOpensDialog: Story = {
+  args: {
+    detail,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByRole('button', { name: /view 2020 honda accord/i }))
+    // The dialog renders through a portal, outside canvasElement.
+    await expect(await screen.findByRole('heading', { name: /2020 honda accord/i })).toBeInTheDocument()
+    await expect(screen.getByText(detail.vehicles[0].vin)).toBeInTheDocument()
   },
 }
 

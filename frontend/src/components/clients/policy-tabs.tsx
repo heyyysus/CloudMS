@@ -18,7 +18,14 @@ interface PolicyTabsProps {
 }
 
 export function PolicyTabs({ policies, selectedId, onSelect, action, children }: PolicyTabsProps) {
-  const sorted = sortPoliciesByCreatedAt(policies)
+  // Numbered oldest → newest (AUTOP-1 is always the oldest), but displayed
+  // newest → oldest, left to right, so the label a policy gets never changes
+  // as later policies are added even though its tab position does.
+  const ranked = sortPoliciesByCreatedAt(policies).map((policy, index) => ({
+    policy,
+    number: index + 1,
+  }))
+  const displayed = [...ranked].reverse()
 
   return (
     <Tabs
@@ -28,7 +35,7 @@ export function PolicyTabs({ policies, selectedId, onSelect, action, children }:
     >
       <div className="flex items-end justify-between gap-2 border-b">
         <TabsList className="-mb-px h-auto justify-start gap-1 overflow-x-auto overflow-y-hidden rounded-none bg-transparent p-0">
-          {sorted.map((policy, index) => {
+          {displayed.map(({ policy, number }) => {
             const status = displayStatus(policy)
             return (
               <TabsTrigger
@@ -41,14 +48,14 @@ export function PolicyTabs({ policies, selectedId, onSelect, action, children }:
                 )}
               >
                 <span aria-hidden className={cn('size-2 rounded-full', STATUS_DOT_CLASS[status])} />
-                {POLICY_TAB_PREFIX}-{index + 1}
+                {POLICY_TAB_PREFIX}-{number}
               </TabsTrigger>
             )
           })}
         </TabsList>
         {action && <div className="pb-1.5">{action}</div>}
       </div>
-      {sorted.map((policy) => (
+      {displayed.map(({ policy }) => (
         <TabsContent key={policy.id} value={String(policy.id)}>
           {children(policy)}
         </TabsContent>

@@ -198,7 +198,7 @@ export const ClosedInvoiceReceipt: Story = {
   },
   play: async ({ args }) => {
     // Radix portals dialog content onto document.body, so query via screen.
-    await expect(await screen.findByText('John Doe')).toBeInTheDocument()
+    await expect(await screen.findByText('Doe, John')).toBeInTheDocument()
     await expect(screen.getByText('Client #223')).toBeInTheDocument()
     await expect(screen.getByText('Policy #2052')).toBeInTheDocument()
     await expect(screen.getByText('Invoice #41')).toBeInTheDocument()

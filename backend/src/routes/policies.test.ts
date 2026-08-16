@@ -305,7 +305,9 @@ describe("PATCH /policies/:id change form", () => {
       .set("Cookie", cookie)
     expect(attachments.body).toHaveLength(1)
     expect(attachments.body[0].mimeType).toBe("application/pdf")
-    expect(attachments.body[0].fileName).toMatch(/^policy-change-form-/)
+    expect(attachments.body[0].fileName).toBe("Policy Change Form.pdf")
+    expect(attachments.body[0].sourceType).toBe("policy_change")
+    expect(attachments.body[0].sourceId).toBe(policy.id)
     expect(vi.mocked(putObject)).toHaveBeenCalledWith(
       expect.stringMatching(new RegExp(`^policy-attachments/${policy.id}/`)),
       expect.any(Buffer),

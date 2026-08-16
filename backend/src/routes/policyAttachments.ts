@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import { Request, Response, Router } from "express"
 import { requireAuth } from "../auth/middleware"
 import {
+  attachmentKeyPrefix,
   countAttachmentsCreatedTodayByUser,
   createPolicyAttachment,
   findAutoPolicyById,
@@ -65,7 +66,12 @@ policyAttachmentsRouter.get(
       res.status(400).json({ error: "Invalid policyId" })
       return
     }
-    res.json(await listPolicyAttachmentsByPolicyId(policyId.data))
+    // Documents for voided invoices/payments are admin-only.
+    res.json(
+      await listPolicyAttachmentsByPolicyId(policyId.data, {
+        includeVoided: req.user!.role === "admin",
+      })
+    )
   }
 )
 
@@ -83,7 +89,9 @@ policyAttachmentsRouter.get(
     }
 
     const attachment = await findPolicyAttachmentById(id)
-    if (!attachment) {
+    // A voided document is invisible to staff in the list, so it has to 404
+    // here too - otherwise the object is still reachable by guessing an id.
+    if (!attachment || (attachment.isVoided && req.user!.role !== "admin")) {
       res.status(404).json({ error: "Attachment not found" })
       return
     }
@@ -130,7 +138,7 @@ policyAttachmentsRouter.post(
       return
     }
 
-    const storageKey = `policy-attachments/${parsed.data.policyId}/${randomUUID()}-${sanitizeFileName(parsed.data.fileName)}`
+    const storageKey = `${attachmentKeyPrefix(parsed.data.policyId)}${randomUUID()}-${sanitizeFileName(parsed.data.fileName)}`
     try {
       const uploadUrl = await getPresignedUploadUrl(storageKey, parsed.data.contentType)
       res.json({ uploadUrl, storageKey })
@@ -160,7 +168,7 @@ policyAttachmentsRouter.post(
     // storageKey is server-generated at presign time and always prefixed with
     // the policyId, so cross-checking it here rejects a confirm call for an
     // object that was presigned for a different policy.
-    if (!parsed.data.storageKey.startsWith(`policy-attachments/${parsed.data.policyId}/`)) {
+    if (!parsed.data.storageKey.startsWith(attachmentKeyPrefix(parsed.data.policyId))) {
       res.status(400).json({ error: "storageKey does not match policyId" })
       return
     }

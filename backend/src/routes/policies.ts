@@ -1,10 +1,8 @@
-import { randomUUID } from "node:crypto"
 import { Request, Response, Router } from "express"
 import { requireAuth, requireRole } from "../auth/middleware"
 import { buildPolicyChangeFormPdf, summarizePolicyChanges } from "../policyChangeSummary"
 import {
   createAutoPolicyWithDetails,
-  createPolicyAttachment,
   createPolicyLog,
   deleteAutoPolicy,
   getClientWithDetails,
@@ -13,9 +11,9 @@ import {
   listAutoPoliciesByClientId,
   PolicyWriteError,
   searchPolicies,
+  storeGeneratedPolicyAttachment,
   updateAutoPolicyWithDetails,
 } from "../repositories"
-import { putObject } from "../storage/r2"
 import { firstIssue, isPgForeignKeyViolation, isPgUniqueViolation, parseId } from "./helpers"
 import { createPolicyBody, idParam, searchQuery, updatePolicyBody } from "./schemas"
 
@@ -75,15 +73,14 @@ async function recordPolicyChangeFormUnsafe(
       },
       changes
     )
-    const storageKey = `policy-attachments/${after.id}/${randomUUID()}-policy-change-form.pdf`
-    await putObject(storageKey, pdf, "application/pdf")
-    await createPolicyAttachment({
+    await storeGeneratedPolicyAttachment({
       policyId: after.id,
-      fileName: `policy-change-form-${new Date().toISOString().slice(0, 10)}.pdf`,
+      pdf,
+      fileName: "Policy Change Form.pdf",
+      keySlug: "policy-change-form",
       description: "Auto-generated summary of this edit",
-      storageKey,
-      mimeType: "application/pdf",
-      sizeBytes: pdf.length,
+      sourceType: "policy_change",
+      sourceId: after.id,
       createdBy: req.user!.id,
     })
   } catch (err) {

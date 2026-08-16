@@ -8,6 +8,7 @@ import {
   recordPayment,
   voidPayment,
 } from "../repositories"
+import { recordReceiptDocument, voidAccountingDocument } from "./accountingDocuments"
 import { firstIssue, parseId } from "./helpers"
 import { idParam, recordPaymentBody, voidBody } from "./schemas"
 
@@ -72,6 +73,9 @@ paymentsRouter.post("/payments", requireAuth, async (req: Request, res: Response
       res.status(409).json({ error: "Invoice is not open for payment" })
       return
     case "ok":
+      // Awaited before responding so the receipt PDF is already filed on the
+      // caller's next read of the policy's attachments.
+      await recordReceiptDocument(req, result.receiptId)
       res.status(201).json(await getReceiptWithDetails(result.receiptId))
       return
   }
@@ -98,6 +102,9 @@ paymentsRouter.post("/payments/:id/void", requireAuth, async (req: Request, res:
       res.status(409).json({ error: "Payment is already void" })
       return
     case "ok":
+      if (result.receiptId !== null) {
+        await voidAccountingDocument(req, "receipt", result.receiptId)
+      }
       res.json(await getPaymentWithDetails(id))
       return
   }

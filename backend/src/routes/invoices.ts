@@ -8,6 +8,7 @@ import {
   listInvoicesByPolicyId,
   voidInvoice,
 } from "../repositories"
+import { recordInvoiceDocument, voidAccountingDocument } from "./accountingDocuments"
 import { firstIssue, parseId } from "./helpers"
 import { createInvoiceBody, idParam, voidBody } from "./schemas"
 
@@ -67,6 +68,9 @@ invoicesRouter.post("/invoices", requireAuth, async (req: Request, res: Response
       res.status(404).json({ error: "Policy not found" })
       return
     }
+    // Awaited before responding so the attachment is already there on the
+    // caller's next read of the policy's attachments.
+    await recordInvoiceDocument(req, invoice)
     res.status(201).json(invoice)
   } catch (err) {
     if (err instanceof InvoiceWriteError) {
@@ -101,6 +105,9 @@ invoicesRouter.post("/invoices/:id/void", requireAuth, async (req: Request, res:
       res.status(409).json({ error: "Void the invoice's payments before voiding the invoice" })
       return
     case "ok":
+      // Voiding requires no active payments, so any receipt documents on this
+      // invoice were already hidden when their payments were voided.
+      await voidAccountingDocument(req, "invoice", id)
       res.json(await getInvoiceWithDetails(id))
       return
   }

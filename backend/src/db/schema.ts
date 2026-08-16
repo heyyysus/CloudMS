@@ -317,11 +317,21 @@ export const policyLogs = pgTable(
   ]
 )
 
+// What produced an attachment. "upload" is a staff member picking a file;
+// the rest are server-generated documents, and their sourceId points at the
+// record they document (the policy, invoice, or receipt).
+export const attachmentSourceTypeEnum = pgEnum("attachment_source_type", [
+  "upload",
+  "policy_change",
+  "invoice",
+  "receipt",
+])
+
 // Files (declarations pages, ID cards, correspondence, etc.) uploaded direct
 // to R2 and linked to a policy. storageKey is the R2 object key; the actual
 // URL is never stored - download links are minted on demand as short-lived
-// presigned URLs. Immutable/append-only like policyLogs: no update path, and
-// no delete in this iteration.
+// presigned URLs. Append-only like policyLogs: no delete, and the only update
+// is flipping isVoided when the invoice/payment a document records is voided.
 export const policyAttachments = pgTable(
   "policy_attachments",
   {
@@ -334,12 +344,22 @@ export const policyAttachments = pgTable(
     storageKey: text("storage_key").notNull().unique(),
     mimeType: varchar("mime_type", { length: 100 }).notNull(),
     sizeBytes: integer("size_bytes").notNull(),
+    // Set when the record this document describes is voided. The R2 object is
+    // kept either way; this only hides the row from staff (admins still see it,
+    // marked void) so the audit trail survives.
+    isVoided: boolean("is_voided").notNull().default(false),
+    sourceType: attachmentSourceTypeEnum("source_type").notNull().default("upload"),
+    // Null for uploads; otherwise the id of the policy/invoice/receipt.
+    sourceId: integer("source_id"),
     createdBy: integer("created_by")
       .notNull()
       .references(() => users.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [index("policy_attachments_policy_id_idx").on(table.policyId)]
+  (table) => [
+    index("policy_attachments_policy_id_idx").on(table.policyId),
+    index("policy_attachments_source_idx").on(table.sourceType, table.sourceId),
+  ]
 )
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 import type {
+  attachmentSourceTypeEnum,
   autoPolicies,
   carriers,
   clientEmails,
@@ -50,6 +51,7 @@ export type InvoiceItemType = (typeof invoiceItemTypeEnum.enumValues)[number]
 export type TrustLedgerEntryType = (typeof trustLedgerEntryTypeEnum.enumValues)[number]
 export type TrustLedgerDirection = (typeof trustLedgerDirectionEnum.enumValues)[number]
 export type EmailLogStatus = (typeof emailLogStatusEnum.enumValues)[number]
+export type AttachmentSourceType = (typeof attachmentSourceTypeEnum.enumValues)[number]
 
 export type Person = typeof persons.$inferSelect
 export type Driver = typeof drivers.$inferSelect

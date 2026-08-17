@@ -5,7 +5,7 @@ import { expect, fn, screen, userEvent, waitFor } from 'storybook/test'
 import { InvoiceReceiptDialog } from './invoice-receipt-dialog'
 import { ApiError } from '@/api/client'
 import type { AutoPolicy, ClientDetail, Person } from '@/api/clients'
-import type { Carrier } from '@/api/policies'
+import type { Carrier } from '@/api/carriers'
 import type { InvoiceDetail } from '@/api/invoices'
 
 const TS = '2026-07-14T17:48:07.653Z'
@@ -66,6 +66,12 @@ const carrier: Carrier = {
   id: 7,
   name: 'Progressive',
   naic: '12345',
+  isActive: true,
+  phone: null,
+  email: null,
+  website: null,
+  producerCode: null,
+  notes: null,
   createdAt: TS,
   updatedAt: TS,
 }

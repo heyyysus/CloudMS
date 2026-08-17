@@ -11,8 +11,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import type { ClientDetail } from '@/api/clients'
+import { getCarriers } from '@/api/carriers'
 import {
-  getCarriers,
   updatePolicy,
   type PolicyDetail,
   type UpdatePolicyBody,

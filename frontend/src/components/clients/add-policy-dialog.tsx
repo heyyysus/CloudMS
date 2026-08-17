@@ -40,10 +40,9 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import type { ClientDetail, Person } from '@/api/clients'
+import { getCarriers, type Carrier } from '@/api/carriers'
 import {
   createPolicy,
-  getCarriers,
-  type Carrier,
   type CreatePolicyBody,
   type CreatePolicyDriverBody,
   type PolicyDetail,
@@ -556,10 +555,17 @@ export function AddPolicyForm({
               render={({ field }) => (
                 <Combobox
                   id="add-policy-carrier"
-                  options={carriers.map((carrier) => ({
-                    value: String(carrier.id),
-                    label: carrier.name,
-                  }))}
+                  // Retired carriers drop out of the list, but one that is
+                  // already selected stays so editing an older policy doesn't
+                  // silently blank its carrier.
+                  options={carriers
+                    .filter(
+                      (carrier) => carrier.isActive || String(carrier.id) === field.value
+                    )
+                    .map((carrier) => ({
+                      value: String(carrier.id),
+                      label: carrier.isActive ? carrier.name : `${carrier.name} (inactive)`,
+                    }))}
                   value={field.value}
                   onValueChange={field.onChange}
                   placeholder={carriersLoading ? 'Loading carriers…' : 'Select carrier'}

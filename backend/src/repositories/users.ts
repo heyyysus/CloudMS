@@ -4,7 +4,7 @@ import { users } from "../db/schema"
 import type { NewUser, User } from "../types"
 
 export async function listUsers(): Promise<User[]> {
-  return db.select().from(users)
+  return db.select().from(users).orderBy(users.id)
 }
 
 export async function findUserById(id: number): Promise<User | undefined> {

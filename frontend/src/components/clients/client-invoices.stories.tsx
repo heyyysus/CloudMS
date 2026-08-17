@@ -3,13 +3,19 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test'
 import { ClientInvoices } from './client-invoices'
 import { ApiError } from '@/api/client'
-import type { Carrier } from '@/api/policies'
+import type { Carrier } from '@/api/carriers'
 import type { Invoice } from '@/api/invoices'
 
 const carrier: Carrier = {
   id: 7,
   name: 'Acme Insurance',
   naic: '12345',
+  isActive: true,
+  phone: null,
+  email: null,
+  website: null,
+  producerCode: null,
+  notes: null,
   createdAt: '2026-07-14T17:48:07.653Z',
   updatedAt: '2026-07-14T17:48:07.653Z',
 }

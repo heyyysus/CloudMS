@@ -63,7 +63,10 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
-      - run: npm run db:migrate
+      # Runs the same migrator + bootstrap (welcome email template, admin
+      # user) as the production container's dist/db/migrate.js, so tests that
+      # depend on baseline data (e.g. the welcome template) see it too.
+      - run: npx ts-node src/db/migrate.ts
       - run: npm test
       - run: npm run build
 

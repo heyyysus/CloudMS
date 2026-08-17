@@ -1,11 +1,11 @@
 import "dotenv/config"
 import { migrate } from "drizzle-orm/node-postgres/migrator"
 import { db } from "./index"
-import { users } from "./schema"
+import { emailTemplates, users } from "./schema"
 
 // Runs at container start (see Dockerfile CMD), before the server boots.
 // Unlike db:seed this is safe against live data: migrations are append-only
-// and the admin bootstrap is an insert-if-absent.
+// and the admin bootstrap / template seed are both insert-if-absent.
 async function main() {
   await migrate(db, { migrationsFolder: "drizzle" })
   console.log("Migrations applied")
@@ -18,6 +18,20 @@ async function main() {
       .onConflictDoNothing({ target: users.email })
     console.log(`Ensured admin user exists for ${adminEmail}`)
   }
+
+  await db
+    .insert(emailTemplates)
+    .values({
+      key: "welcome",
+      subject: "Welcome to CloudMS, {{name}}",
+      body: `Hi {{name}},
+
+{{inviterName}} has invited you to CloudMS as {{role}}.
+
+Sign in with your Google account ({{email}}) at {{appUrl}} - no password needed, access is already set up for this address.`,
+    })
+    .onConflictDoNothing({ target: emailTemplates.key })
+  console.log('Ensured "welcome" email template exists')
 
   process.exit(0)
 }

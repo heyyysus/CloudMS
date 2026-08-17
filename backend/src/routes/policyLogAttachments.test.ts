@@ -258,7 +258,7 @@ describe("voided documents", () => {
 
     const voided = await request(app)
       .post(`/invoices/${invoice.body.id}/void`)
-      .set("Cookie", staffCookie)
+      .set("Cookie", adminCookie)
       .send({ reason: "keyed twice" })
     expect(voided.status).toBe(200)
 

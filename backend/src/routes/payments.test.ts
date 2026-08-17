@@ -2,12 +2,13 @@ import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
 import { makeSessionCookie, TestContext } from "./testHelpers"
+import type { UserRole } from "../types"
 
 const ctx = new TestContext()
 afterEach(() => ctx.cleanup())
 
-async function authed(prefix: string) {
-  const user = await ctx.user(prefix)
+async function authed(prefix: string, role: UserRole = "staff") {
+  const user = await ctx.user(prefix, role)
   const cookie = await makeSessionCookie(user.id)
   return { user, cookie }
 }
@@ -198,7 +199,7 @@ describe("accounting activity is written to the policy log", () => {
   })
 
   it("logs a void, naming the payment and the reopened balance", async () => {
-    const { cookie } = await authed("pay-log-void")
+    const { cookie } = await authed("pay-log-void", "admin")
     const policy = await ctx.policy()
     const invoice = await makeInvoice(cookie, policy.id)
 
@@ -280,8 +281,29 @@ describe("POST /payments (errors)", () => {
 })
 
 describe("POST /payments/:id/void", () => {
+  it("refuses a staff user (403)", async () => {
+    const { cookie } = await authed("pay-void-staff")
+    const policy = await ctx.policy()
+    const invoice = await makeInvoice(cookie, policy.id)
+    const receipt = await request(app)
+      .post("/payments")
+      .set("Cookie", cookie)
+      .send({ invoiceId: invoice.id, method: "cash", amount: 400 })
+    const paymentId = receipt.body.payment.id
+
+    const res = await request(app)
+      .post(`/payments/${paymentId}/void`)
+      .set("Cookie", cookie)
+      .send({})
+    expect(res.status).toBe(403)
+
+    // Nothing reversed: the invoice is still closed by that payment.
+    const after = await request(app).get(`/invoices/${invoice.id}`).set("Cookie", cookie)
+    expect(after.body.status).toBe("closed")
+  })
+
   it("reverses the payment, reopens the invoice, and nets the trust ledger to zero", async () => {
-    const { cookie } = await authed("pay-void")
+    const { cookie } = await authed("pay-void", "admin")
     const policy = await ctx.policy()
     const invoice = await makeInvoice(cookie, policy.id)
     const receipt = await request(app)
@@ -318,7 +340,7 @@ describe("POST /payments/:id/void", () => {
   })
 
   it("returns 409 when voiding an already-voided payment", async () => {
-    const { cookie } = await authed("pay-void-twice")
+    const { cookie } = await authed("pay-void-twice", "admin")
     const policy = await ctx.policy()
     const invoice = await makeInvoice(cookie, policy.id)
     const receipt = await request(app)
@@ -336,7 +358,7 @@ describe("POST /payments/:id/void", () => {
   })
 
   it("returns 404 for a nonexistent payment", async () => {
-    const { cookie } = await authed("pay-void-404")
+    const { cookie } = await authed("pay-void-404", "admin")
     expect(
       (await request(app).post("/payments/999999999/void").set("Cookie", cookie).send({})).status
     ).toBe(404)

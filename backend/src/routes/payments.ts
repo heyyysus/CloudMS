@@ -1,5 +1,5 @@
 import { Request, Response, Router } from "express"
-import { requireAuth } from "../auth/middleware"
+import { requireAuth, requireRole } from "../auth/middleware"
 import {
   getPaymentWithDetails,
   getReceiptWithDetails,
@@ -83,30 +83,37 @@ paymentsRouter.post("/payments", requireAuth, async (req: Request, res: Response
 })
 
 // Payments are immutable: no PATCH/DELETE. A mistaken payment is voided, which
-// reverses its trust-ledger movements and reopens the invoice.
-paymentsRouter.post("/payments/:id/void", requireAuth, async (req: Request, res: Response) => {
-  const id = parseId(req.params.id, res)
-  if (id === undefined) return
+// reverses its trust-ledger movements and reopens the invoice. Admin-only, same
+// reasoning as voiding an invoice - and voiding an invoice's payments is the
+// prerequisite step for voiding the invoice itself, so the two gates match.
+paymentsRouter.post(
+  "/payments/:id/void",
+  requireAuth,
+  requireRole("admin"),
+  async (req: Request, res: Response) => {
+    const id = parseId(req.params.id, res)
+    if (id === undefined) return
 
-  const parsed = voidBody.safeParse(req.body)
-  if (!parsed.success) {
-    res.status(400).json({ error: firstIssue(parsed.error) })
-    return
-  }
+    const parsed = voidBody.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: firstIssue(parsed.error) })
+      return
+    }
 
-  const result = await voidPayment(id, req.user!.id, parsed.data.reason ?? null)
-  switch (result.status) {
-    case "not_found":
-      res.status(404).json({ error: "Payment not found" })
-      return
-    case "already_void":
-      res.status(409).json({ error: "Payment is already void" })
-      return
-    case "ok":
-      if (result.receiptId !== null) {
-        await voidAccountingDocument(req, "receipt", result.receiptId)
-      }
-      res.json(await getPaymentWithDetails(id))
-      return
+    const result = await voidPayment(id, req.user!.id, parsed.data.reason ?? null)
+    switch (result.status) {
+      case "not_found":
+        res.status(404).json({ error: "Payment not found" })
+        return
+      case "already_void":
+        res.status(409).json({ error: "Payment is already void" })
+        return
+      case "ok":
+        if (result.receiptId !== null) {
+          await voidAccountingDocument(req, "receipt", result.receiptId)
+        }
+        res.json(await getPaymentWithDetails(id))
+        return
+    }
   }
-})
+)

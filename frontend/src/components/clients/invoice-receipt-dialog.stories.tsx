@@ -180,6 +180,24 @@ const openInvoice: InvoiceDetail = {
   receipts: [],
 }
 
+const voidedInvoice: InvoiceDetail = {
+  ...openInvoice,
+  id: 44,
+  status: 'void',
+  voidedAt: TS,
+  voidedBy: 1,
+  voidReason: 'Duplicate invoice',
+}
+
+// Open but already carrying an active payment - the shape the backend refuses
+// to void until that payment is voided first.
+const paidOpenInvoice: InvoiceDetail = {
+  ...closedInvoice,
+  id: 45,
+  status: 'open',
+  amountPaid: '600.00',
+}
+
 function createTestQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
@@ -200,6 +218,7 @@ const meta = {
     client,
     policies: [policy],
     open: true,
+    isAdmin: false,
     onOpenChange: fn(),
     printFn: fn(),
   },
@@ -287,5 +306,191 @@ export const LoadError: Story = {
     await waitFor(async () =>
       expect(await screen.findByText(/failed to load the invoice/i)).toBeInTheDocument()
     )
+  },
+}
+
+export const AdminSeesVoidAction: Story = {
+  args: {
+    invoiceId: 42,
+    isAdmin: true,
+    getInvoiceFn: fn(async () => openInvoice),
+  },
+  play: async () => {
+    await expect(await screen.findByText('Invoice #42')).toBeInTheDocument()
+    await expect(screen.getByRole('button', { name: /void invoice/i })).toBeInTheDocument()
+  },
+}
+
+export const NonAdminHasNoVoidAction: Story = {
+  args: {
+    // Invoice 41 carries an active payment, so this covers both void controls.
+    invoiceId: 41,
+    isAdmin: false,
+    getInvoiceFn: fn(async () => closedInvoice),
+  },
+  play: async () => {
+    await expect(await screen.findByText('Invoice #41')).toBeInTheDocument()
+    // Print is still there - only the void actions are admin-gated.
+    await expect(screen.getByRole('button', { name: /print/i })).toBeInTheDocument()
+    await expect(screen.queryByRole('button', { name: /void invoice/i })).not.toBeInTheDocument()
+    await expect(screen.queryByRole('button', { name: 'Void' })).not.toBeInTheDocument()
+  },
+}
+
+export const VoidsASinglePayment: Story = {
+  args: {
+    invoiceId: 41,
+    isAdmin: true,
+    getInvoiceFn: fn(async () => closedInvoice),
+    voidPaymentFn: fn(async () => closedInvoice.payments[0]),
+    // Spied so the assertion below can prove the invoice was left alone.
+    voidInvoiceFn: fn(async () => ({ ...voidedInvoice, id: 41 })),
+  },
+  play: async ({ args }) => {
+    await expect(await screen.findByText('Invoice #41')).toBeInTheDocument()
+
+    // The per-payment control lives on the payment row, named just "Void".
+    await userEvent.click(screen.getByRole('button', { name: 'Void' }))
+    await expect(await screen.findByText(/void payment #5\?/i)).toBeInTheDocument()
+
+    await userEvent.type(screen.getByLabelText(/reason \(optional\)/i), 'keyed twice')
+    await userEvent.click(screen.getByRole('button', { name: /void payment/i }))
+
+    await waitFor(() =>
+      expect(args.voidPaymentFn).toHaveBeenCalledWith(5, { reason: 'keyed twice' })
+    )
+    // The invoice itself is untouched by this action.
+    await expect(args.voidInvoiceFn).not.toHaveBeenCalled()
+    await expect(await screen.findByText(/payment voided/i)).toBeInTheDocument()
+    await expect(screen.queryByText(/void payment #5\?/i)).not.toBeInTheDocument()
+  },
+}
+
+export const CascadesPaymentsThenInvoice: Story = {
+  args: {
+    invoiceId: 41,
+    isAdmin: true,
+    getInvoiceFn: fn(async () => closedInvoice),
+    voidPaymentFn: fn(async () => closedInvoice.payments[0]),
+    voidInvoiceFn: fn(async () => ({ ...voidedInvoice, id: 41 })),
+  },
+  play: async ({ args }) => {
+    await expect(await screen.findByText('Invoice #41')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /void invoice/i }))
+    // The confirm step names the payments it will take with it, so the cascade
+    // is never a surprise.
+    await expect(await screen.findByText(/these go first/i)).toBeInTheDocument()
+    await expect(screen.getByText(/Payment #5 — Credit card/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /void 1 payment\(s\) \+ invoice/i }))
+
+    // Payment first, then the invoice - the server refuses the other order.
+    await waitFor(() => expect(args.voidPaymentFn).toHaveBeenCalledWith(5, { reason: null }))
+    await waitFor(() => expect(args.voidInvoiceFn).toHaveBeenCalledWith(41, { reason: null }))
+    await expect(await screen.findByText('Void')).toBeInTheDocument()
+    await expect(await screen.findByText(/invoice and 1 payment\(s\) voided/i)).toBeInTheDocument()
+  },
+}
+
+export const CascadeReportsPartialProgress: Story = {
+  args: {
+    invoiceId: 41,
+    isAdmin: true,
+    getInvoiceFn: fn(async () => closedInvoice),
+    voidPaymentFn: fn(async () => closedInvoice.payments[0]),
+    voidInvoiceFn: fn(async () => {
+      throw new ApiError(409, 'Invoice is already void')
+    }),
+  },
+  play: async () => {
+    await expect(await screen.findByText('Invoice #41')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /void invoice/i }))
+    await userEvent.click(screen.getByRole('button', { name: /void 1 payment\(s\) \+ invoice/i }))
+
+    // The payment void landed even though the invoice void didn't - saying so
+    // is the whole point, otherwise the user can't tell what state they're in.
+    const alert = await screen.findByRole('alert')
+    await expect(alert).toHaveTextContent(/1 payment\(s\) were voided, but invoice is already void/i)
+    // Confirm step stays open so they can see what happened.
+    await expect(screen.getByText(/void invoice #41\?/i)).toBeInTheDocument()
+  },
+}
+
+export const VoidedInvoiceHidesAction: Story = {
+  args: {
+    invoiceId: 44,
+    isAdmin: true,
+    getInvoiceFn: fn(async () => voidedInvoice),
+  },
+  play: async () => {
+    await expect(await screen.findByText('Invoice #44')).toBeInTheDocument()
+    // Status line plus the banner carrying the reason.
+    await expect(screen.getByText('Void')).toBeInTheDocument()
+    await expect(screen.getByText(/^Voided /)).toBeInTheDocument()
+    await expect(screen.getByText('Duplicate invoice')).toBeInTheDocument()
+    // Nothing left to void.
+    await expect(screen.queryByRole('button', { name: /void invoice/i })).not.toBeInTheDocument()
+  },
+}
+
+export const ConfirmsThenVoids: Story = {
+  args: {
+    invoiceId: 42,
+    isAdmin: true,
+    getInvoiceFn: fn(async () => openInvoice),
+    voidInvoiceFn: fn(async () => ({ ...voidedInvoice, id: 42 })),
+  },
+  play: async ({ args }) => {
+    await expect(await screen.findByText('Invoice #42')).toBeInTheDocument()
+    await expect(screen.getByText('Open')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /void invoice/i }))
+    await expect(await screen.findByText(/void invoice #42\?/i)).toBeInTheDocument()
+    // No payments on this invoice, so there's no cascade notice and the submit
+    // is the plain single-step label.
+    await expect(screen.queryByText(/these go first/i)).not.toBeInTheDocument()
+
+    await userEvent.type(screen.getByLabelText(/reason \(optional\)/i), 'Duplicate invoice')
+    // The trigger unmounts while confirming, so this resolves to the submit.
+    await userEvent.click(screen.getByRole('button', { name: /void invoice/i }))
+
+    await waitFor(() =>
+      expect(args.voidInvoiceFn).toHaveBeenCalledWith(42, { reason: 'Duplicate invoice' })
+    )
+    // setQueryData flips the open dialog over to the voided detail.
+    await expect(await screen.findByText('Void')).toBeInTheDocument()
+    await expect(screen.getByText('Duplicate invoice')).toBeInTheDocument()
+    await expect(await screen.findByText(/invoice voided/i)).toBeInTheDocument()
+    // Confirm step closed, and there's no longer anything to void.
+    await expect(screen.queryByText(/void invoice #42\?/i)).not.toBeInTheDocument()
+    await expect(screen.queryByRole('button', { name: /void invoice/i })).not.toBeInTheDocument()
+  },
+}
+
+export const PaymentVoidRefused: Story = {
+  args: {
+    invoiceId: 45,
+    isAdmin: true,
+    getInvoiceFn: fn(async () => paidOpenInvoice),
+    voidPaymentFn: fn(async () => {
+      throw new ApiError(409, 'Payment is already void')
+    }),
+  },
+  play: async ({ args }) => {
+    await expect(await screen.findByText('Invoice #45')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Void' }))
+    // Submitted with no reason typed, so the body carries an explicit null.
+    await userEvent.click(screen.getByRole('button', { name: /void payment/i }))
+    await waitFor(() => expect(args.voidPaymentFn).toHaveBeenCalledWith(5, { reason: null }))
+
+    // No payments were voided, so the message is the server's, unprefixed.
+    const alert = await screen.findByRole('alert')
+    await expect(alert).toHaveTextContent(/^Payment is already void$/i)
+    // Nothing changed: still open, confirm step stays put.
+    await expect(screen.getByText('Open')).toBeInTheDocument()
+    await expect(screen.getByText(/void payment #5\?/i)).toBeInTheDocument()
   },
 }

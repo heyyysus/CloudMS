@@ -122,3 +122,17 @@ export interface CreateInvoiceBody {
 export function createInvoice(body: CreateInvoiceBody): Promise<Invoice> {
   return request('/invoices', { method: 'POST', body: JSON.stringify(body) })
 }
+
+export interface VoidInvoiceBody {
+  reason?: string | null
+}
+
+// Accounting records are immutable - a mistaken invoice is corrected by voiding
+// it, which posts reversing trust-ledger entries rather than editing rows. The
+// response is the full detail (status 'void' plus voidedAt/voidedBy/
+// voidReason), so callers can setQueryData with it instead of refetching.
+// Refusals arrive as ApiError 409s carrying the server's wording: "Invoice is
+// already void" / "Void the invoice's payments before voiding the invoice".
+export function voidInvoice(id: number, body: VoidInvoiceBody = {}): Promise<InvoiceDetail> {
+  return request(`/invoices/${id}/void`, { method: 'POST', body: JSON.stringify(body) })
+}

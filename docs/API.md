@@ -444,7 +444,9 @@ plus the **payments** made against it; each payment mints a **receipt**. The
 
 All accounting records are **immutable** — there is no PATCH or DELETE.
 Corrections are made by **voiding**, which posts reversing trust-ledger entries
-rather than editing or deleting rows. All invoices, payments, and receipts are
+rather than editing or deleting rows. Voiding is **admin-only** (both the
+invoice and the payment routes); everything else here is open to any
+authenticated user. All invoices, payments, and receipts are
 listable with just a `clientId` (or a `policyId`), per requirement.
 
 Every one of those writes also appends a [policy log](#policy-logs) describing
@@ -481,7 +483,7 @@ due), `closed` (paid in full), or `void`. `total`/`amountPaid` are server-manage
 | GET | `/invoices?clientId=` or `?policyId=` | any | list, newest first; one filter required |
 | GET | `/invoices/:id` | any | full detail: items (+carrier), payments, receipts, client, creator |
 | POST | `/invoices` | any | `createInvoiceBody`; 404 if `policyId` missing; 201 with detail |
-| POST | `/invoices/:id/void` | any | 409 if it has active (non-voided) payments; void those first |
+| POST | `/invoices/:id/void` | admin | 409 if it has active (non-voided) payments; void those first |
 
 Create body: `policyId` (required), `note` (optional), `items[]` (min 1) — each
 `{ category, type, carrierId?, description?, amount }`. `createdBy` is stamped
@@ -501,7 +503,7 @@ payments over time until closed. Payment methods: `cash`, `check`,
 | GET | `/payments?clientId=` or `?policyId=` | any | list, newest first |
 | GET | `/payments/:id` | any | detail with receipt + invoice |
 | POST | `/payments` | any | `recordPaymentBody`; 404 unknown invoice; 409 if invoice not `open`; **201 returns the receipt** |
-| POST | `/payments/:id/void` | any | reverses trust entries, reopens the invoice, voids the receipt; 409 if already void |
+| POST | `/payments/:id/void` | admin | reverses trust entries, reopens the invoice, voids the receipt; 409 if already void |
 | GET | `/receipts?clientId=` or `?policyId=` | any | list, newest first |
 | GET | `/receipts/:id` | any | receipt detail |
 

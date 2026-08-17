@@ -390,6 +390,7 @@ function ClientDetail() {
         client={client}
         policies={client.policies}
         invoiceId={receiptInvoiceId}
+        isAdmin={user?.role === 'admin'}
         open={receiptDialogOpen}
         onOpenChange={(next) => {
           setReceiptDialogOpen(next)

@@ -2,12 +2,13 @@ import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
 import { makeSessionCookie, TestContext } from "./testHelpers"
+import type { UserRole } from "../types"
 
 const ctx = new TestContext()
 afterEach(() => ctx.cleanup())
 
-async function authed(prefix: string) {
-  const user = await ctx.user(prefix)
+async function authed(prefix: string, role: UserRole = "staff") {
+  const user = await ctx.user(prefix, role)
   const cookie = await makeSessionCookie(user.id)
   return { user, cookie }
 }
@@ -233,8 +234,30 @@ describe("GET /invoices", () => {
 })
 
 describe("POST /invoices/:id/void", () => {
+  it("refuses a staff user (403)", async () => {
+    const { cookie } = await authed("inv-void-staff")
+    const policy = await ctx.policy()
+    const created = await request(app)
+      .post("/invoices")
+      .set("Cookie", cookie)
+      .send({
+        policyId: policy.id,
+        items: [{ category: "agency", type: "new_business_fee", amount: 10 }],
+      })
+
+    const res = await request(app)
+      .post(`/invoices/${created.body.id}/void`)
+      .set("Cookie", cookie)
+      .send({})
+    expect(res.status).toBe(403)
+
+    // The invoice is untouched - a rejected void writes nothing.
+    const after = await request(app).get(`/invoices/${created.body.id}`).set("Cookie", cookie)
+    expect(after.body.status).toBe("open")
+  })
+
   it("voids an unpaid invoice", async () => {
-    const { cookie } = await authed("inv-void")
+    const { cookie } = await authed("inv-void", "admin")
     const policy = await ctx.policy()
     const created = await request(app)
       .post("/invoices")
@@ -254,7 +277,7 @@ describe("POST /invoices/:id/void", () => {
   })
 
   it("refuses to void an invoice with an active payment (409)", async () => {
-    const { cookie } = await authed("inv-void-paid")
+    const { cookie } = await authed("inv-void-paid", "admin")
     const policy = await ctx.policy()
     const created = await request(app)
       .post("/invoices")
@@ -276,7 +299,7 @@ describe("POST /invoices/:id/void", () => {
   })
 
   it("appends a policy log recording the void", async () => {
-    const { user, cookie } = await authed("inv-void-log")
+    const { user, cookie } = await authed("inv-void-log", "admin")
     const policy = await ctx.policy()
     const created = await request(app)
       .post("/invoices")
@@ -300,7 +323,7 @@ describe("POST /invoices/:id/void", () => {
   })
 
   it("writes no void log when the void is refused", async () => {
-    const { cookie } = await authed("inv-void-refused-log")
+    const { cookie } = await authed("inv-void-refused-log", "admin")
     const policy = await ctx.policy()
     const created = await request(app)
       .post("/invoices")

@@ -1,5 +1,5 @@
 import { Request, Response, Router } from "express"
-import { requireAuth } from "../auth/middleware"
+import { requireAuth, requireRole } from "../auth/middleware"
 import {
   createInvoiceWithDetails,
   getInvoiceWithDetails,
@@ -83,33 +83,39 @@ invoicesRouter.post("/invoices", requireAuth, async (req: Request, res: Response
 })
 
 // Invoices are immutable: there is no PATCH. A mistaken invoice is voided
-// (only while it has no active payments).
-invoicesRouter.post("/invoices/:id/void", requireAuth, async (req: Request, res: Response) => {
-  const id = parseId(req.params.id, res)
-  if (id === undefined) return
+// (only while it has no active payments). Admin-only: voiding reverses money
+// out of the trust ledger, so it is not routine staff work.
+invoicesRouter.post(
+  "/invoices/:id/void",
+  requireAuth,
+  requireRole("admin"),
+  async (req: Request, res: Response) => {
+    const id = parseId(req.params.id, res)
+    if (id === undefined) return
 
-  const parsed = voidBody.safeParse(req.body)
-  if (!parsed.success) {
-    res.status(400).json({ error: firstIssue(parsed.error) })
-    return
-  }
+    const parsed = voidBody.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: firstIssue(parsed.error) })
+      return
+    }
 
-  const result = await voidInvoice(id, req.user!.id, parsed.data.reason ?? null)
-  switch (result.status) {
-    case "not_found":
-      res.status(404).json({ error: "Invoice not found" })
-      return
-    case "already_void":
-      res.status(409).json({ error: "Invoice is already void" })
-      return
-    case "has_active_payments":
-      res.status(409).json({ error: "Void the invoice's payments before voiding the invoice" })
-      return
-    case "ok":
-      // Voiding requires no active payments, so any receipt documents on this
-      // invoice were already hidden when their payments were voided.
-      await voidAccountingDocument(req, "invoice", id)
-      res.json(await getInvoiceWithDetails(id))
-      return
+    const result = await voidInvoice(id, req.user!.id, parsed.data.reason ?? null)
+    switch (result.status) {
+      case "not_found":
+        res.status(404).json({ error: "Invoice not found" })
+        return
+      case "already_void":
+        res.status(409).json({ error: "Invoice is already void" })
+        return
+      case "has_active_payments":
+        res.status(409).json({ error: "Void the invoice's payments before voiding the invoice" })
+        return
+      case "ok":
+        // Voiding requires no active payments, so any receipt documents on this
+        // invoice were already hidden when their payments were voided.
+        await voidAccountingDocument(req, "invoice", id)
+        res.json(await getInvoiceWithDetails(id))
+        return
+    }
   }
-})
+)

@@ -138,7 +138,7 @@ describe("receipt documents", () => {
 
     const voided = await request(app)
       .post(`/payments/${payment.body.payment.id}/void`)
-      .set("Cookie", staffCookie)
+      .set("Cookie", adminCookie)
       .send({ reason: "keyed twice" })
     expect(voided.status).toBe(200)
 
@@ -173,7 +173,7 @@ describe("receipt documents", () => {
 
     await request(app)
       .post(`/payments/${payment.body.payment.id}/void`)
-      .set("Cookie", staffCookie)
+      .set("Cookie", adminCookie)
       .send({})
 
     const staffLink = await request(app)
@@ -201,7 +201,7 @@ describe("voiding an invoice", () => {
 
     const voided = await request(app)
       .post(`/invoices/${invoice.id}/void`)
-      .set("Cookie", staffCookie)
+      .set("Cookie", adminCookie)
       .send({ reason: "wrong policy" })
     expect(voided.status).toBe(200)
 

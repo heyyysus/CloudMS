@@ -81,6 +81,43 @@ export const SubmitSavesAndCloses: Story = {
   },
 }
 
+// The Cmd/Ctrl+Enter shortcut comes from useSubmitShortcut, registered for
+// stories by the global decorator in .storybook/preview.tsx the same way
+// AppLayout registers it for the app.
+export const ShortcutSubmits: Story = {
+  args: {
+    createLogFn: fn(async () => savedLog),
+  },
+  play: async ({ args }) => {
+    await screen.findByRole('heading', { name: /add log/i })
+
+    await userEvent.type(screen.getByPlaceholderText(/what happened/i), 'Filed by shortcut.')
+    await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
+
+    await expect(args.createLogFn).toHaveBeenCalledWith({
+      policyId: 900,
+      body: 'Filed by shortcut.',
+    })
+  },
+}
+
+// The other half of the contract: plain Enter has to stay a newline, or the
+// shortcut would just be a slower way to lose a half-written note.
+export const PlainEnterAddsNewline: Story = {
+  args: {
+    createLogFn: fn(async () => savedLog),
+  },
+  play: async ({ args }) => {
+    await screen.findByRole('heading', { name: /add log/i })
+
+    const textarea = screen.getByPlaceholderText<HTMLTextAreaElement>(/what happened/i)
+    await userEvent.type(textarea, 'First line{Enter}Second line')
+
+    await expect(textarea).toHaveValue('First line\nSecond line')
+    await expect(args.createLogFn).not.toHaveBeenCalled()
+  },
+}
+
 export const ValidationBlocksEmptySubmit: Story = {
   args: {
     createLogFn: fn(async () => savedLog),

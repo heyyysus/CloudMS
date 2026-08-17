@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
+import { SubmitButton } from '@/components/ui/submit-button'
 import { Textarea } from '@/components/ui/textarea'
 import { Field, FieldError } from '@/components/ui/field'
 import {
@@ -65,9 +66,9 @@ export function AddLogForm({ onSubmit, onCancel, isPending, errorMessage }: AddL
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isPending}>
-          {isPending ? 'Saving…' : 'Add log'}
-        </Button>
+        <SubmitButton isPending={isPending} pendingLabel="Saving…">
+          Add log
+        </SubmitButton>
       </DialogFooter>
     </form>
   )

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
+import { SubmitButton } from '@/components/ui/submit-button'
 import {
   Dialog,
   DialogContent,
@@ -156,40 +157,52 @@ export function LinkAttachmentsToLogDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        {isError && <p className="text-sm text-destructive">Failed to load logs.</p>}
-        {isPending && (
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
-          </div>
-        )}
-        {!isPending && !isError && logs && (
-          <LogPicker
-            logs={logs}
-            selectedLogId={selectedLogId}
-            onSelect={setSelectedLogId}
-            currentUserId={currentUserId}
-          />
-        )}
+        {/* A real <form> rather than a click handler so this picker submits the
+            same way every other form does, including Cmd/Ctrl+Enter. The grid
+            classes reproduce DialogContent's own spacing, which the wrapper
+            would otherwise collapse into a single grid row. */}
+        <form
+          className="grid gap-4"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (selectedLogId !== null) mutation.mutate(selectedLogId)
+          }}
+        >
+          {isError && <p className="text-sm text-destructive">Failed to load logs.</p>}
+          {isPending && (
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+          )}
+          {!isPending && !isError && logs && (
+            <LogPicker
+              logs={logs}
+              selectedLogId={selectedLogId}
+              onSelect={setSelectedLogId}
+              currentUserId={currentUserId}
+            />
+          )}
 
-        {mutation.isError && (
-          <div role="alert" className="text-sm text-destructive">
-            {mutation.error.message}
-          </div>
-        )}
+          {mutation.isError && (
+            <div role="alert" className="text-sm text-destructive">
+              {mutation.error.message}
+            </div>
+          )}
 
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            disabled={selectedLogId === null || attachments.length === 0 || mutation.isPending}
-            onClick={() => selectedLogId !== null && mutation.mutate(selectedLogId)}
-          >
-            {mutation.isPending ? 'Linking…' : 'Link'}
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <SubmitButton
+              isPending={mutation.isPending}
+              pendingLabel="Linking…"
+              disabled={selectedLogId === null || attachments.length === 0}
+            >
+              Link
+            </SubmitButton>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

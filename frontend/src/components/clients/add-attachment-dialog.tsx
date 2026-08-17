@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
+import { SubmitButton } from '@/components/ui/submit-button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -139,9 +140,9 @@ export function AddAttachmentForm({
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isPending}>
-          {isPending ? 'Uploading…' : 'Upload'}
-        </Button>
+        <SubmitButton isPending={isPending} pendingLabel="Uploading…">
+          Upload
+        </SubmitButton>
       </DialogFooter>
     </form>
   )

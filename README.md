@@ -5,14 +5,14 @@ See [PROJECT.md](./PROJECT.md) for what this project is and where it's headed. T
 ## Prerequisites
 
 - Node.js 24
-- Docker + Docker Compose (for Postgres/Redis locally, or to run the full stack)
+- Docker + Docker Compose (for Postgres locally, or to run the full stack)
 
 ## Option A: Run the backend locally, database in Docker
 
-1. Start Postgres (and Redis) via Docker Compose:
+1. Start Postgres via Docker Compose:
 
    ```bash
-   docker compose up -d db redis
+   docker compose up -d db
    ```
 
    Postgres is exposed on host port `5433` (mapped to `5432` in the container), user `postgres`, password `password`, database `myapp`.
@@ -66,7 +66,7 @@ See [PROJECT.md](./PROJECT.md) for what this project is and where it's headed. T
 
 ## Option B: Run the full stack in Docker
 
-This brings up nginx, the app, Postgres, Redis, and Certbot together — closer to the production setup.
+This brings up nginx, the app, and Postgres together — closer to the production setup.
 
 1. Create a root-level `.env` (used by the `app` and `db` services; currently the Postgres credentials are hardcoded in `docker-compose.yml`, so an empty file is enough to get started).
 2. Build and start everything:

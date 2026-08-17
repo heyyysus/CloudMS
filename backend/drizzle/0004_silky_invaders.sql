@@ -1,1 +1,0 @@
-ALTER TABLE "policy_attachments" ADD COLUMN "description" text;

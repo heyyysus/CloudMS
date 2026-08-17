@@ -1,5 +1,6 @@
 import type { Preview } from '@storybook/react-vite'
 import { ToastProvider } from '../src/components/ui/toast'
+import { WithSubmitShortcut } from './with-submit-shortcut'
 import '../src/index.css'
 
 const preview: Preview = {
@@ -40,9 +41,11 @@ const preview: Preview = {
       document.documentElement.classList.toggle('dark', globals.theme === 'dark')
       return (
         <ToastProvider>
-          <div className="bg-background text-foreground p-4">
-            <Story />
-          </div>
+          <WithSubmitShortcut>
+            <div className="bg-background text-foreground p-4">
+              <Story />
+            </div>
+          </WithSubmitShortcut>
         </ToastProvider>
       )
     },

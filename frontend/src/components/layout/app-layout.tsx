@@ -9,6 +9,7 @@ import { UserMenu } from './user-menu'
 import { useAuth } from '@/auth/AuthContext'
 import { ClientTabsProvider, useClientTabs } from './client-tabs'
 import { useSearchShortcut } from '@/hooks/use-search-shortcut'
+import { useSubmitShortcut } from '@/hooks/use-submit-shortcut'
 import { SearchPalette } from '@/components/search/search-palette'
 import { SearchTriggerButton } from '@/components/search/search-trigger-button'
 import { AddClientDialog } from '@/components/clients/add-client-dialog'
@@ -30,6 +31,9 @@ function AppLayoutInner() {
   const [searchOpen, setSearchOpen] = useState(false)
 
   useSearchShortcut(() => setSearchOpen((open) => !open))
+  // Every form in the app renders under this layout, so registering here once
+  // gives them all Cmd/Ctrl+Enter to submit.
+  useSubmitShortcut()
 
   function handleSelectClient(client: SearchClientResult) {
     openTab({ id: client.id, label: clientDisplayName(client) })

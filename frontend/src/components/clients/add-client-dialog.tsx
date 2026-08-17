@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { PlusIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { SubmitButton } from '@/components/ui/submit-button'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -379,9 +380,9 @@ export function AddClientForm({
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isPending}>
-          {isPending ? 'Saving…' : submitLabel}
-        </Button>
+        <SubmitButton isPending={isPending} pendingLabel="Saving…">
+          {submitLabel}
+        </SubmitButton>
       </DialogFooter>
     </form>
   )

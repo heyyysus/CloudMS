@@ -11,6 +11,7 @@ import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, PlusIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { SubmitButton } from '@/components/ui/submit-button'
 import { Combobox } from '@/components/ui/combobox'
 import { Input } from '@/components/ui/input'
 import {
@@ -1298,9 +1299,9 @@ export function AddPolicyForm({
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isPending}>
-          {isPending ? 'Saving…' : submitLabel}
-        </Button>
+        <SubmitButton isPending={isPending} pendingLabel="Saving…">
+          {submitLabel}
+        </SubmitButton>
       </DialogFooter>
     </form>
   )

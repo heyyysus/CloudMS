@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PlusIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { SubmitButton } from '@/components/ui/submit-button'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -475,9 +476,9 @@ function NewInvoiceForm({
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isPending}>
-          {isPending ? 'Saving…' : 'Create invoice'}
-        </Button>
+        <SubmitButton isPending={isPending} pendingLabel="Saving…">
+          Create invoice
+        </SubmitButton>
       </DialogFooter>
     </form>
   )
@@ -657,9 +658,9 @@ function PayInvoiceForm({
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isPending}>
-          {isPending ? 'Saving…' : 'Record payment'}
-        </Button>
+        <SubmitButton isPending={isPending} pendingLabel="Saving…">
+          Record payment
+        </SubmitButton>
       </DialogFooter>
     </form>
   )

@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Button } from '@/components/ui/button'
+import { SubmitButton } from '@/components/ui/submit-button'
 import { Input } from '@/components/ui/input'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 
@@ -33,7 +33,7 @@ export function DemoForm({ onSubmit }: { onSubmit: (values: InviteFormValues) =>
           <FieldError errors={errors.email ? [errors.email] : undefined} />
         </Field>
         <Field orientation="horizontal">
-          <Button type="submit">Invite user</Button>
+          <SubmitButton>Invite user</SubmitButton>
         </Field>
       </FieldGroup>
     </form>

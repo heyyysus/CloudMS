@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button } from '@/components/ui/button'
+import { SubmitButton } from '@/components/ui/submit-button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -150,9 +150,13 @@ export function WelcomeTemplateEditor({
               )}
             </FieldGroup>
 
-            <Button type="submit" disabled={mutation.isPending} className="mt-4">
-              {mutation.isPending ? 'Saving…' : 'Save template'}
-            </Button>
+            <SubmitButton
+              isPending={mutation.isPending}
+              pendingLabel="Saving…"
+              className="mt-4"
+            >
+              Save template
+            </SubmitButton>
           </form>
         )}
       </CardContent>

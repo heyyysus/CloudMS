@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation } from '@tanstack/react-query'
-import { Button } from '@/components/ui/button'
+import { SubmitButton } from '@/components/ui/submit-button'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -111,9 +111,9 @@ export function InviteUserForm({
         )}
       </FieldGroup>
 
-      <Button type="submit" disabled={isPending} className="mt-4">
-        {isPending ? 'Inviting…' : 'Invite user'}
-      </Button>
+      <SubmitButton isPending={isPending} pendingLabel="Inviting…" className="mt-4">
+        Invite user
+      </SubmitButton>
     </form>
   )
 }

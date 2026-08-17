@@ -3,7 +3,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
 import { ImportQuoteDialog } from './import-quote-dialog'
 import type { ClientDetail, Person } from '@/api/clients'
-import type { Carrier, PolicyDetail } from '@/api/policies'
+import type { Carrier } from '@/api/carriers'
+import type { PolicyDetail } from '@/api/policies'
 import type { SearchResponse } from '@/api/search'
 import fixtureRaw from '@/lib/__fixtures__/integration-file.tt2x?raw'
 
@@ -93,6 +94,12 @@ const carriers: Carrier[] = [
     id: 9,
     name: 'Sample Mutual',
     naic: '00000',
+    isActive: true,
+    phone: null,
+    email: null,
+    website: null,
+    producerCode: null,
+    notes: null,
     createdAt: '2026-08-01T00:00:00.000Z',
     updatedAt: '2026-08-01T00:00:00.000Z',
   },

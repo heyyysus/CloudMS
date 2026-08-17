@@ -1,5 +1,5 @@
 import { request } from './client'
-import type { Carrier } from './policies'
+import type { Carrier } from './carriers'
 import { toCents } from '@/lib/money'
 
 export type InvoiceStatus = 'open' | 'closed' | 'void'

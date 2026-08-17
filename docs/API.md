@@ -423,15 +423,73 @@ everywhere else, `storageKey` is never included; download URLs come from
 ## Carriers
 
 Included because policies require a `carrierId` — without a carriers
-endpoint there'd be no way to create a policy through the API.
+endpoint there'd be no way to create a policy through the API. Reads are open
+to any signed-in user because the policy forms need the list to render their
+carrier picker; writes are admin-only, since carriers are shared reference
+data that policies, invoice items, and the trust ledger all point at.
 
 | Method | Path | Role | Notes |
 |---|---|---|---|
-| GET | `/carriers` | any | `listCarriers()` |
+| GET | `/carriers` | any | `listCarriers()` — every carrier, active and inactive |
 | GET | `/carriers/:id` | any | `findCarrierById(id)`, 404 if missing |
-| POST | `/carriers` | any | `name`, `naic` (unique) |
-| PATCH | `/carriers/:id` | any | partial |
-| DELETE | `/carriers/:id` | **admin** | 409 if the carrier still has policies |
+| POST | `/carriers` | **admin** | `name`, `naic` (unique); optional details below |
+| PATCH | `/carriers/:id` | **admin** | partial |
+| DELETE | `/carriers/:id` | **admin** | 409 if the carrier is referenced anywhere |
+
+Fields: `name` (≤150), `naic` (≤10, unique), `isActive` (default `true`),
+`phone` (≤30), `email`, `website`, `producerCode` (≤50), `notes` (≤2000).
+Every optional field accepts `null` or `""` and is stored as `NULL`; `email`
+and `website` are format-checked. A PATCH leaves any field it omits untouched.
+
+`isActive` is how a carrier is retired: every FK into `carriers` is `ON DELETE
+no action`, so a carrier that has ever been used cannot be deleted. An
+inactive carrier drops out of the picker for new policies but still displays
+on policies already written on it.
+
+Status codes specific to these routes:
+
+- `409` on POST/PATCH — a carrier with that NAIC already exists.
+- `409` on DELETE — the carrier is referenced by existing policies or invoices.
+
+## Users
+
+Account administration. Every route here is admin-only. There is no
+`DELETE /users/:id`: accounts are disabled, not removed, so the policy logs
+and records they authored keep their author.
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| POST | `/users/invite` | **admin** | creates the account and sends the welcome email; body `{ email, name?, role? }` |
+| GET | `/users` | **admin** | every user, ordered by id |
+| PATCH | `/users/:id` | **admin** | body `{ name?, role?, isActive? }` |
+| POST | `/users/:id/resend-welcome` | **admin** | re-sends the welcome email; body `{ email: <result> }` |
+
+User rows from these routes carry `id`, `email`, `name`, `role`, `isActive`,
+`hasSignedIn`, `createdAt`, and `updatedAt`. `googleSub` is never exposed;
+`hasSignedIn` reports whether it is set, which distinguishes an invited user
+who has never signed in from one who has. `email` is not editable — it is the
+identity the Google account is matched on, so changing it would orphan the
+login rather than rename it.
+
+One guard applies to PATCH:
+
+- `400` — an admin tried to change their own role or disable their own
+  account. Renaming yourself is allowed.
+
+That single rule is also what keeps the install from ever losing its last
+admin, so there is no separate "last admin" check: `requireAuth` +
+`requireRole("admin")` mean the caller is always an active admin, and they can
+only ever demote or disable someone else, so they themselves always survive
+the change.
+
+Disabling a user deletes their sessions, so they are logged out immediately
+rather than at their next request. (`requireAuth` also rejects a disabled user
+with `403 Account is disabled`, and `POST /auth/google` refuses them at login,
+so both paths are covered even if a session row survives.)
+
+The welcome-email result is never fatal: a mail failure comes back as
+`{ status: "failed", error }` alongside a `201`/`200`, because the account
+itself was created or updated successfully.
 
 ## Accounting
 

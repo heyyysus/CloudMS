@@ -41,7 +41,9 @@ export const EmailSent: Story = {
           name: null,
           role: 'staff',
           isActive: true,
+          hasSignedIn: false,
           createdAt: '2026-08-14T00:00:00.000Z',
+          updatedAt: '2026-08-14T00:00:00.000Z',
         },
         email: { status: 'sent', resendId: 'msg_1' },
       })
@@ -68,7 +70,9 @@ export const EmailFailed: Story = {
           name: null,
           role: 'staff',
           isActive: true,
+          hasSignedIn: false,
           createdAt: '2026-08-14T00:00:00.000Z',
+          updatedAt: '2026-08-14T00:00:00.000Z',
         },
         email: { status: 'failed', error: 'Email sending is not configured' },
       })

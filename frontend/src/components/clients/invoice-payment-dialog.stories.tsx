@@ -5,7 +5,7 @@ import { expect, fireEvent, fn, screen, userEvent, waitFor } from 'storybook/tes
 import { InvoicePaymentDialog } from './invoice-payment-dialog'
 import { ApiError } from '@/api/client'
 import type { ClientDetail } from '@/api/clients'
-import type { Carrier } from '@/api/policies'
+import type { Carrier } from '@/api/carriers'
 import type { Invoice } from '@/api/invoices'
 import type { ReceiptDetail } from '@/api/payments'
 
@@ -67,6 +67,12 @@ const carrier: Carrier = {
   id: 7,
   name: 'Acme Insurance',
   naic: '12345',
+  isActive: true,
+  phone: null,
+  email: null,
+  website: null,
+  producerCode: null,
+  notes: null,
   createdAt: '2026-07-14T17:48:07.653Z',
   updatedAt: '2026-07-14T17:48:07.653Z',
 }

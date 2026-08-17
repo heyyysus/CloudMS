@@ -1,13 +1,6 @@
+import type { Carrier } from './carriers'
 import { request } from './client'
 import type { AutoPolicy, Person } from './clients'
-
-export interface Carrier {
-  id: number
-  name: string
-  naic: string
-  createdAt: string
-  updatedAt: string
-}
 
 export interface Vehicle {
   id: number
@@ -71,10 +64,6 @@ export interface PolicyDetail extends AutoPolicy {
 
 export function getPolicy(id: number, signal?: AbortSignal): Promise<PolicyDetail> {
   return request(`/policies/${id}`, { signal })
-}
-
-export function getCarriers(signal?: AbortSignal): Promise<Carrier[]> {
-  return request('/carriers', { signal })
 }
 
 export interface CreatePolicyVehicleBody {

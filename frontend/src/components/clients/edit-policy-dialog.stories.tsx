@@ -4,7 +4,8 @@ import { expect, fn, screen, userEvent, waitFor, within } from 'storybook/test'
 import { EditPolicyDialog } from './edit-policy-dialog'
 import { ApiError } from '@/api/client'
 import type { ClientDetail } from '@/api/clients'
-import type { Carrier, PolicyDetail } from '@/api/policies'
+import type { Carrier } from '@/api/carriers'
+import type { PolicyDetail } from '@/api/policies'
 
 const client: ClientDetail = {
   id: 155,
@@ -44,6 +45,12 @@ const carriers: Carrier[] = [
     id: 7,
     name: 'Acme Insurance',
     naic: '12345',
+    isActive: true,
+    phone: null,
+    email: null,
+    website: null,
+    producerCode: null,
+    notes: null,
     createdAt: '2026-07-14T17:48:07.653Z',
     updatedAt: '2026-07-14T17:48:07.653Z',
   },

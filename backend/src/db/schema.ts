@@ -203,10 +203,19 @@ export const clientEmails = pgTable(
   ]
 )
 
+// Carriers are never deleted once a policy references them (every FK is ON
+// DELETE no action), so retiring one is `isActive = false`: it drops out of
+// the carrier picker for new policies but stays readable on existing records.
 export const carriers = pgTable("carriers", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 150 }).notNull(),
   naic: varchar("naic", { length: 10 }).notNull().unique(),
+  isActive: boolean("is_active").notNull().default(true),
+  phone: varchar("phone", { length: 30 }),
+  email: varchar("email", { length: 255 }),
+  website: varchar("website", { length: 255 }),
+  producerCode: varchar("producer_code", { length: 50 }),
+  notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 })

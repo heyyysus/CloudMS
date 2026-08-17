@@ -206,7 +206,28 @@ export const linkPolicyLogAttachmentsBody = z.object({
   attachmentIds: z.array(z.number().int().positive()).min(1).max(50),
 })
 
-export const createCarrierBody = insertCarrierSchema.omit(omitMeta)
+// drizzle-zod only knows the column lengths, so the optional detail fields are
+// re-declared here to validate format and to fold a blank input from the admin
+// form into a real NULL. `undefined` is passed through untouched so that
+// `updateCarrierBody` (this schema, partialed) leaves omitted fields alone
+// rather than nulling them - Drizzle skips undefined values in `.set()`.
+const blankToNull = <T extends z.ZodType>(inner: T) =>
+  z
+    .union([z.literal(""), inner])
+    .nullable()
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value || null))
+
+export const createCarrierBody = insertCarrierSchema.omit(omitMeta).extend({
+  name: z.string().trim().min(1).max(150),
+  naic: z.string().trim().min(1).max(10),
+  isActive: z.boolean().optional(),
+  phone: blankToNull(z.string().trim().max(30)),
+  email: blankToNull(z.email().max(255)),
+  website: blankToNull(z.url().max(255)),
+  producerCode: blankToNull(z.string().trim().max(50)),
+  notes: blankToNull(z.string().trim().max(2000)),
+})
 export const updateCarrierBody = createCarrierBody.partial()
 
 // Money arrives as a JSON number or a decimal string; normalize to a
@@ -295,6 +316,14 @@ export const inviteUserBody = z.object({
   email: z.email().trim().toLowerCase().max(255),
   name: z.string().trim().min(1).max(150).nullable().optional(),
   role: z.enum(userRoleEnum.enumValues).default("staff"),
+})
+
+// Email is deliberately not editable: it is the identity the Google account is
+// matched on, so changing it would orphan the login rather than rename it.
+export const updateUserBody = z.object({
+  name: z.string().trim().min(1).max(150).nullable().optional(),
+  role: z.enum(userRoleEnum.enumValues).optional(),
+  isActive: z.boolean().optional(),
 })
 
 export const updateEmailTemplateBody = z.object({

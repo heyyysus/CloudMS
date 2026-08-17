@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fireEvent, fn, screen, userEvent, within } from 'storybook/test'
 import { AddPolicyForm, type ClientAddressFields, type ExistingDriverOption } from './add-policy-dialog'
-import type { Carrier, Vehicle } from '@/api/policies'
+import type { Carrier } from '@/api/carriers'
+import type { Vehicle } from '@/api/policies'
 
 const client: ClientAddressFields = {
   mailingAddress1: '42 Wallaby Way, Sydney',
@@ -21,6 +22,12 @@ const carriers: Carrier[] = [
     id: 7,
     name: 'Acme Insurance',
     naic: '12345',
+    isActive: true,
+    phone: null,
+    email: null,
+    website: null,
+    producerCode: null,
+    notes: null,
     createdAt: '2026-07-14T17:48:07.653Z',
     updatedAt: '2026-07-14T17:48:07.653Z',
   },
@@ -28,6 +35,12 @@ const carriers: Carrier[] = [
     id: 8,
     name: 'Umbrella Corp',
     naic: '54321',
+    isActive: true,
+    phone: null,
+    email: null,
+    website: null,
+    producerCode: null,
+    notes: null,
     createdAt: '2026-07-14T17:48:07.653Z',
     updatedAt: '2026-07-14T17:48:07.653Z',
   },

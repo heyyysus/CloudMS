@@ -1,5 +1,10 @@
-import { Cloud, House, Shield, UserRound, X } from 'lucide-react'
+import { ChevronRight, Cloud, House, Shield, UserRound, X } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import {
   Sidebar,
   SidebarContent,
@@ -11,11 +16,28 @@ import {
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
 } from '@/components/ui/sidebar'
 import type { ClientTab } from '@/components/layout/client-tabs'
 
 const platformItems = [{ title: 'Home', url: '/home', icon: House }]
+
+// Admin's own url is the Invite User page, so it doubles as the first child.
+// Everything under /admin is gated by RequireRole in App.tsx.
+const adminItem = {
+  title: 'Admin',
+  url: '/admin',
+  icon: Shield,
+  children: [
+    { title: 'Invite User', url: '/admin' },
+    { title: 'Manage Users', url: '/admin/users' },
+    { title: 'Manage Carriers', url: '/admin/carriers' },
+    { title: 'Trust Accounting', url: '/admin/trust-accounting' },
+  ],
+}
 
 interface AppSidebarProps {
   openTabs?: ClientTab[]
@@ -25,9 +47,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ openTabs = [], onCloseTab, isAdmin = false }: AppSidebarProps) {
   const location = useLocation()
-  const items = isAdmin
-    ? [...platformItems, { title: 'Admin', url: '/admin', icon: Shield }]
-    : platformItems
+  const inAdmin = location.pathname.startsWith('/admin')
 
   return (
     <Sidebar collapsible="icon">
@@ -50,7 +70,7 @@ export function AppSidebar({ openTabs = [], onCloseTab, isAdmin = false }: AppSi
           <SidebarGroupLabel>Platform</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
+              {platformItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
                     asChild
@@ -64,6 +84,39 @@ export function AppSidebar({ openTabs = [], onCloseTab, isAdmin = false }: AppSi
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              {isAdmin && (
+                // The trigger only opens the group; each admin page is reached
+                // through a child link, including Invite User at /admin itself.
+                // In icon-rail mode SidebarMenuSub hides itself, so the parent
+                // stays a plain icon with a tooltip.
+                <Collapsible asChild defaultOpen={inAdmin} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton tooltip={adminItem.title} isActive={inAdmin}>
+                        <adminItem.icon />
+                        <span>{adminItem.title}</span>
+                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {adminItem.children.map((child) => (
+                          <SidebarMenuSubItem key={child.url}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={location.pathname === child.url}
+                            >
+                              <NavLink to={child.url}>
+                                <span>{child.title}</span>
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

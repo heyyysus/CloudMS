@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { useQuery, useQueries } from '@tanstack/react-query'
-import { ReceiptIcon } from 'lucide-react'
+import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query'
+import { ReceiptIcon, RefreshCwIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ClientSummaryCard } from '@/components/clients/client-summary-card'
@@ -38,6 +38,7 @@ function ClientDetail() {
   const { openTab, removeTab } = useClientTabs()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const queryClient = useQueryClient()
 
   const {
     data: client,
@@ -48,6 +49,17 @@ function ClientDetail() {
     queryFn: ({ signal }) => getClient(clientId, signal),
     enabled: isValidId,
   })
+
+  // Refetch the client and all of their policies (plus the per-policy logs and
+  // attachments the user sees) on demand. Partial keys match every query with
+  // that prefix, so ['policies'] refreshes each ['policies', id] detail query.
+  function refreshClient() {
+    queryClient.invalidateQueries({ queryKey: ['clients', clientId] })
+    queryClient.invalidateQueries({ queryKey: ['policies'] })
+    queryClient.invalidateQueries({ queryKey: ['policyLogs'] })
+    queryClient.invalidateQueries({ queryKey: ['policyAttachments'] })
+    queryClient.invalidateQueries({ queryKey: ['policyLogAttachments'] })
+  }
 
   useEffect(() => {
     if (client) {
@@ -244,6 +256,9 @@ function ClientDetail() {
                 <ReceiptIcon /> New invoice
               </Button>
             )}
+            <Button size="sm" variant="outline" onClick={refreshClient}>
+              <RefreshCwIcon /> Refresh
+            </Button>
             <EditClientDialog client={client} />
           </div>
         }

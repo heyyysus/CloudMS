@@ -58,10 +58,12 @@ export function EditPolicyDialog({
           : old
       )
       // The server auto-generates a policy log entry and a change-form
-      // attachment for this edit; refetch both so they show up without a
-      // page reload.
+      // attachment for this edit, and links them together; refetch the logs,
+      // the attachments, and the log↔attachment join so the new log, the form,
+      // and the paperclip link between them all show up without a page reload.
       queryClient.invalidateQueries({ queryKey: ['policyLogs', policy.id] })
       queryClient.invalidateQueries({ queryKey: ['policyAttachments', policy.id] })
+      queryClient.invalidateQueries({ queryKey: ['policyLogAttachments', policy.id] })
       setOpen(false)
       toast.success('Policy changes applied')
     },

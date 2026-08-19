@@ -11,18 +11,18 @@ cd "$(dirname "$0")/.." || exit 1
 echo "Pulling latest changes..."
 git pull origin main
 
-# Building while the other services are running starves the TypeScript build
-# of memory on this host and hangs the deploy, so stop everything first.
-# `down` keeps named volumes: postgres_data survives, and must never be
-# dropped by adding -v here.
-echo "Stopping containers..."
-docker compose down
+echo "Pulling app image..."
+docker compose pull app
 
-echo "Building app image..."
-docker compose build app
-
+# Never add `down -v` to this script: postgres_data is a named volume holding
+# the production database.
 echo "Starting containers..."
 docker compose up -d
+
+# `up -d` leaves nginx alone when its service definition is unchanged, so a
+# pulled nginx/conf.d edit would otherwise sit unread until the next restart.
+echo "Reloading nginx config..."
+docker compose restart nginx
 
 # Remove unused images and containers to free up space
 echo "Cleaning up unused Docker resources..."

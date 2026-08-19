@@ -1,0 +1,7 @@
+# Overlay for building the app image from source instead of pulling it from
+# GHCR: docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+services:
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile

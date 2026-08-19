@@ -72,8 +72,10 @@ This brings up nginx, the app, and Postgres together — closer to the productio
 2. Build and start everything:
 
    ```bash
-   docker compose up --build -d
+   docker compose -f docker-compose.yml -f docker-compose.build.yml up --build -d
    ```
+
+   `docker-compose.yml` on its own pulls the prebuilt `app` image from GHCR (that's what production does); the `docker-compose.build.yml` overlay replaces the pull with a local build from `backend/`.
 
 3. Requests go through nginx (`nginx/conf.d/default.conf`) to the app container on port 8000. With the default config, nginx listens on `http://localhost` (port 80).
 4. Check logs / status:
@@ -108,6 +110,8 @@ These mirror `.github/workflows/ci.yml` (backend) and `.github/workflows/fronten
 
 ## Deployment
 
-Merges to `main` that pass CI (typecheck, lint, format check, tests, build) automatically trigger `.github/workflows/ci.yml`'s `deploy` job, which SSHes into the deploy host and runs `scripts/start.sh` (`git pull` + `docker compose up --build -d`). Deploy credentials (`DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PATH`) are configured as GitHub Actions secrets.
+Merges to `main` that pass CI (typecheck, lint, format check, tests, build) trigger `.github/workflows/ci.yml`'s `image` job, which builds `backend/Dockerfile` on the runner and pushes it to `ghcr.io/heyyysus/cloudms-app` tagged `latest` and with the commit SHA. The `deploy` job then SSHes into the deploy host and runs `scripts/start.sh` (`git pull` + `docker compose pull app` + `docker compose up -d`) — nothing is built on the host. Deploy credentials (`DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PATH`) are configured as GitHub Actions secrets; pushing to GHCR uses the per-run `GITHUB_TOKEN`, and the package is public so the host pulls without credentials.
+
+To roll back, edit the `app` image on the host to a known-good SHA tag (`ghcr.io/heyyysus/cloudms-app:<sha>`) and run `docker compose up -d app`.
 
 Frontend changes deploy separately: `.github/workflows/frontend.yml` triggers on pushes to `main` under `frontend/**`, builds the Vite app in CI (using the `VITE_GOOGLE_CLIENT_ID` secret), rsyncs `frontend/dist/` to `${DEPLOY_PATH}/frontend/dist` on the deploy host, and restarts the `nginx` container so it picks up the new static files — no image to rebuild, since the frontend isn't containerized. The same workflow runs lint + build (no deploy) on PRs touching `frontend/**`.

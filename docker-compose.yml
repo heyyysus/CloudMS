@@ -16,9 +16,7 @@ services:
     restart: always
 
   app:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ghcr.io/heyyysus/cloudms-app:latest
     env_file:
       - .env
     environment:

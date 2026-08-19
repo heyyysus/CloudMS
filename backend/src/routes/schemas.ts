@@ -330,3 +330,12 @@ export const updateEmailTemplateBody = z.object({
   subject: z.string().trim().min(1).max(200),
   body: z.string().trim().min(1).max(20000),
 })
+
+export const createCorrespondenceTemplateBody = z.object({
+  name: z.string().trim().min(1).max(120),
+  subject: z.string().trim().min(1).max(200),
+  body: z.string().trim().min(1).max(20000),
+})
+
+// Full-replace PATCH: same shape as create.
+export const updateCorrespondenceTemplateBody = createCorrespondenceTemplateBody

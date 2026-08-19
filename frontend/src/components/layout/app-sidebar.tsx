@@ -35,6 +35,7 @@ const adminItem = {
     { title: 'Invite User', url: '/admin' },
     { title: 'Manage Users', url: '/admin/users' },
     { title: 'Manage Carriers', url: '/admin/carriers' },
+    { title: 'Correspondence Templates', url: '/admin/correspondence' },
     { title: 'Trust Accounting', url: '/admin/trust-accounting' },
   ],
 }

@@ -1,4 +1,5 @@
 import "dotenv/config"
+import { eq } from "drizzle-orm"
 import { migrate } from "drizzle-orm/node-postgres/migrator"
 import { db } from "./index"
 import { emailTemplates, users } from "./schema"
@@ -23,6 +24,7 @@ async function main() {
     .insert(emailTemplates)
     .values({
       key: "welcome",
+      kind: "welcome",
       subject: "Welcome to CloudMS, {{name}}",
       body: `Hi {{name}},
 
@@ -31,6 +33,12 @@ async function main() {
 Sign in with your Google account ({{email}}) at {{appUrl}} - no password needed, access is already set up for this address.`,
     })
     .onConflictDoNothing({ target: emailTemplates.key })
+  // Reclassify a welcome row created before the `kind` column existed (the
+  // column defaults to "correspondence"); insert-if-absent above won't touch it.
+  await db
+    .update(emailTemplates)
+    .set({ kind: "welcome" })
+    .where(eq(emailTemplates.key, "welcome"))
   console.log('Ensured "welcome" email template exists')
 
   process.exit(0)

@@ -15,6 +15,32 @@ export const WELCOME_TEMPLATE_KEY = "welcome"
 // editor's merge-field help stays in sync with what's actually usable.
 export const WELCOME_MERGE_FIELDS = ["name", "email", "role", "appUrl", "inviterName"] as const
 
+// The merge fields admin-authored client correspondence templates may
+// reference: the client profile, their policy, and the sending agent (the
+// logged-in user). Source of truth for server-side validation; also served
+// to the template editor so its merge-field chips stay in sync.
+export const CORRESPONDENCE_MERGE_FIELDS = [
+  // Client profile
+  "clientFirstName",
+  "clientLastName",
+  "clientFullName",
+  "clientEmail",
+  "clientPhone",
+  "clientAddress",
+  "clientCity",
+  "clientState",
+  "clientZip",
+  // Policy
+  "policyNumber",
+  "carrierName",
+  "policyEffectiveDate",
+  "policyExpirationDate",
+  "policyStatus",
+  // Sending agent (current user)
+  "agentName",
+  "agentEmail",
+] as const
+
 // Returns the distinct {{field}} names referenced in a template string, in
 // first-seen order.
 export function extractMergeFields(template: string): string[] {

@@ -187,9 +187,10 @@ mailRouter.post(
           policyId,
           authorId: req.user!.id,
           body: correspondenceSentLogBody({
-            templateName: template.name ?? template.key,
             to,
             cc,
+            subject: result.subject,
+            body: result.body,
           }),
         })
       } catch (err) {

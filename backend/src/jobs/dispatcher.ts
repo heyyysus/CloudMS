@@ -135,9 +135,10 @@ async function sendOne(row: ClaimedRow): Promise<void> {
       policyId: row.policy_id,
       authorId: automation.id,
       body: correspondenceSentLogBody({
-        templateName: template.name ?? template.key,
         to: onFile.map((e) => e.email),
         cc: [],
+        subject: result.subject,
+        body: result.body,
       }),
     })
   } catch (err) {

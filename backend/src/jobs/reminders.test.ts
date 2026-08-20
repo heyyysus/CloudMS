@@ -367,10 +367,13 @@ describe("dispatchReminders", () => {
     expect(logged[0].templateKey).toBe(template.key)
     expect(logged[0].status).toBe("sent")
 
-    // And the send shows up in the policy's own history.
+    // And the send shows up in the policy's own history as the full email:
+    // recipient, subject, and rendered body (merge fields expanded).
     const policyLogs = await listPolicyLogsByPolicyId(policy.id)
     expect(policyLogs).toHaveLength(1)
-    expect(policyLogs[0].body).toContain(template.name!)
+    expect(policyLogs[0].body.split("\n")[0]).toBe(`To: ${email.email}`)
+    expect(policyLogs[0].body).toContain(`Subject: Your policy ${policy.policyNumber}`)
+    expect(policyLogs[0].body).not.toContain("{{")
     expect(policyLogs[0].author.email).toBe(AUTOMATION_USER_EMAIL)
   })
 

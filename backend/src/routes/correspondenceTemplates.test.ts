@@ -51,9 +51,7 @@ describe("correspondence templates", () => {
       const res = await request(app).get("/correspondence-templates").set("Cookie", cookie)
 
       expect(res.status).toBe(200)
-      expect(res.body.mergeFields).toEqual(
-        expect.arrayContaining([...CORRESPONDENCE_MERGE_FIELDS])
-      )
+      expect(res.body.mergeFields).toEqual(expect.arrayContaining([...CORRESPONDENCE_MERGE_FIELDS]))
       expect(res.body.templates.map((t: { id: number }) => t.id)).toContain(created.body.id)
     })
   })
@@ -133,14 +131,15 @@ describe("correspondence templates", () => {
 
       expect(res.status).toBe(404)
     })
-
   })
 
   it("never lists the welcome template (kind-scoped)", async () => {
     const cookie = await adminCookie("corr-scope")
     const res = await request(app).get("/correspondence-templates").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.templates.every((t: { kind: string }) => t.kind === "correspondence")).toBe(true)
+    expect(res.body.templates.every((t: { kind: string }) => t.kind === "correspondence")).toBe(
+      true
+    )
     expect(res.body.templates.map((t: { key: string }) => t.key)).not.toContain("welcome")
   })
 

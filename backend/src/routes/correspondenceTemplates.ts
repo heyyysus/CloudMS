@@ -10,10 +10,7 @@ import {
   updateCorrespondenceTemplate,
 } from "../repositories"
 import { firstIssue, parseId } from "./helpers"
-import {
-  createCorrespondenceTemplateBody,
-  updateCorrespondenceTemplateBody,
-} from "./schemas"
+import { createCorrespondenceTemplateBody, updateCorrespondenceTemplateBody } from "./schemas"
 
 export const correspondenceTemplatesRouter = Router()
 

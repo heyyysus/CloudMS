@@ -35,10 +35,7 @@ Sign in with your Google account ({{email}}) at {{appUrl}} - no password needed,
     .onConflictDoNothing({ target: emailTemplates.key })
   // Reclassify a welcome row created before the `kind` column existed (the
   // column defaults to "correspondence"); insert-if-absent above won't touch it.
-  await db
-    .update(emailTemplates)
-    .set({ kind: "welcome" })
-    .where(eq(emailTemplates.key, "welcome"))
+  await db.update(emailTemplates).set({ kind: "welcome" }).where(eq(emailTemplates.key, "welcome"))
   console.log('Ensured "welcome" email template exists')
 
   process.exit(0)

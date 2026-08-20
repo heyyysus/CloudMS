@@ -4,6 +4,8 @@ import {
   invoiceItemCategoryEnum,
   invoiceItemTypeEnum,
   paymentMethodEnum,
+  reminderTriggerEnum,
+  scheduledEmailStatusEnum,
   userRoleEnum,
 } from "../db/schema"
 import {
@@ -353,3 +355,39 @@ export const createCorrespondenceTemplateBody = z.object({
 
 // Full-replace PATCH: same shape as create.
 export const updateCorrespondenceTemplateBody = createCorrespondenceTemplateBody
+
+// offsetDays is days *before* the trigger date, and is deliberately allowed to
+// go negative so a rule can chase an expired policy a week after the fact. The
+// bounds are sanity limits, not business rules: beyond a couple of years in
+// either direction a reminder is almost certainly a typo.
+export const createReminderRuleBody = z.object({
+  name: z.string().trim().min(1).max(120),
+  trigger: z.enum(reminderTriggerEnum.enumValues).default("policy_expiration"),
+  offsetDays: z.number().int().min(-730).max(730),
+  templateId: idParam,
+  enabled: z.boolean().default(false),
+})
+
+// PATCH is partial here, unlike the correspondence-template PATCH: the common
+// edit is flipping `enabled` on its own from a switch in the list.
+export const updateReminderRuleBody = z
+  .object({
+    name: z.string().trim().min(1).max(120).optional(),
+    offsetDays: z.number().int().min(-730).max(730).optional(),
+    templateId: idParam.optional(),
+    enabled: z.boolean().optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, { message: "No fields to update" })
+
+export const scheduledEmailQuery = z.object({
+  status: z
+    .string()
+    .optional()
+    .transform((raw) =>
+      raw
+        ?.split(",")
+        .map((part) => part.trim())
+        .filter(Boolean)
+    )
+    .pipe(z.array(z.enum(scheduledEmailStatusEnum.enumValues)).optional()),
+})

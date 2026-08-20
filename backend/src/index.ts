@@ -1,4 +1,5 @@
 import app from "./app"
+import { startReminderScheduler } from "./jobs/scheduler"
 import { logger } from "./logger"
 
 // Without an audience, google-auth-library skips the aud check entirely and
@@ -12,4 +13,8 @@ const PORT = process.env.PORT || 8000
 
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`)
+  // Started here rather than in app.ts so importing the app for a test never
+  // starts a timer. Safe to run on every container: the planner takes an
+  // advisory lock and the dispatcher claims rows with SKIP LOCKED.
+  startReminderScheduler()
 })

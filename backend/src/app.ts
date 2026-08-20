@@ -14,8 +14,10 @@ import { personsRouter } from "./routes/persons"
 import { policiesRouter } from "./routes/policies"
 import { policyAttachmentsRouter } from "./routes/policyAttachments"
 import { policyLogAttachmentsRouter } from "./routes/policyLogAttachments"
+import { policyActivitiesRouter } from "./routes/policyActivities"
 import { policyLogsRouter } from "./routes/policyLogs"
 import { receiptsRouter } from "./routes/receipts"
+import { reminderRulesRouter } from "./routes/reminderRules"
 import { searchRouter } from "./routes/search"
 import { trustLedgerRouter } from "./routes/trustLedger"
 import { usersRouter } from "./routes/users"
@@ -57,6 +59,8 @@ app.use(vinDecoderRouter)
 app.use(usersRouter)
 app.use(emailTemplatesRouter)
 app.use(correspondenceTemplatesRouter)
+app.use(reminderRulesRouter)
+app.use(policyActivitiesRouter)
 
 app.get("/health", (req: Request, res: Response) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() })

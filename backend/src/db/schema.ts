@@ -110,6 +110,86 @@ export const emailLog = pgTable(
   (table) => [index("email_log_recipient_idx").on(table.recipient)]
 )
 
+// A standing instruction to send a correspondence template off a date on the
+// policy - the "renewal reminder 30 days out" rule an admin configures once.
+// Rules are the schedule; scheduled_emails below is what the schedule produced.
+export const reminderTriggerEnum = pgEnum("reminder_trigger", ["policy_expiration"])
+
+export const reminderRules = pgTable(
+  "reminder_rules",
+  {
+    id: serial("id").primaryKey(),
+    name: varchar("name", { length: 120 }).notNull(),
+    trigger: reminderTriggerEnum("trigger").notNull(),
+    // Days before the trigger date. A negative value sends after it (-7 is a
+    // week past expiration), which is why this is a plain integer rather than
+    // a positive-only check.
+    offsetDays: integer("offset_days").notNull(),
+    templateId: integer("template_id")
+      .notNull()
+      .references(() => emailTemplates.id),
+    // Defaults to false so a newly-created rule can never send before an
+    // admin has read it back and turned it on deliberately.
+    enabled: boolean("enabled").notNull().default(false),
+    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [unique("reminder_rules_trigger_offset_unique").on(table.trigger, table.offsetDays)]
+)
+
+export const scheduledEmailStatusEnum = pgEnum("scheduled_email_status", [
+  "pending",
+  "sending",
+  "sent",
+  "failed",
+  "cancelled",
+])
+
+// One planned send. The planner writes rows here idempotently and the
+// dispatcher drains them; email_log remains the permanent record of what
+// actually went out, so this table is a queue, not the audit trail - which is
+// why deleting a rule is allowed to cascade its rows away.
+export const scheduledEmails = pgTable(
+  "scheduled_emails",
+  {
+    id: serial("id").primaryKey(),
+    ruleId: integer("rule_id")
+      .notNull()
+      .references(() => reminderRules.id, { onDelete: "cascade" }),
+    policyId: integer("policy_id")
+      .notNull()
+      .references(() => autoPolicies.id, { onDelete: "cascade" }),
+    // The trigger date this row is for - the policy's expiration_date as of
+    // planning. Renewing a policy moves that date and legitimately mints a new
+    // occurrence; re-planning an existing one hits the unique below and is a
+    // no-op, which is what makes the planner safe to run on every tick.
+    occurrenceDate: date("occurrence_date").notNull(),
+    scheduledFor: timestamp("scheduled_for").notNull(),
+    status: scheduledEmailStatusEnum("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    // Stamped when a dispatcher claims the row; the reaper uses it to release
+    // rows left in "sending" by a container that died mid-send.
+    claimedAt: timestamp("claimed_at"),
+    lastError: text("last_error"),
+    // Rendered subject, filled in on a successful send.
+    subject: text("subject"),
+    resendId: varchar("resend_id", { length: 64 }),
+    sentAt: timestamp("sent_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    unique("scheduled_emails_occurrence_unique").on(
+      table.ruleId,
+      table.policyId,
+      table.occurrenceDate
+    ),
+    index("scheduled_emails_due_idx").on(table.status, table.scheduledFor),
+    index("scheduled_emails_policy_id_idx").on(table.policyId),
+  ]
+)
+
 export const persons = pgTable(
   "persons",
   {

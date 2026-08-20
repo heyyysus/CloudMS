@@ -15,6 +15,13 @@
       "when": 1787172388441,
       "tag": "0001_lonely_unicorn",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787205335167,
+      "tag": "0002_married_green_goblin",
+      "breakpoints": true
     }
   ]
 }

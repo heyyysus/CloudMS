@@ -21,6 +21,7 @@ function StatefulPolicySubtabs({
         onValueChange?.(next)
       }}
       details={<p className="text-sm">Policy details content.</p>}
+      activities={<p className="text-sm">Activities content.</p>}
       accounting={<p className="text-sm">Accounting content.</p>}
       logs={<p className="text-sm">Logs content.</p>}
       attachments={<p className="text-sm">Attachments content.</p>}
@@ -47,6 +48,7 @@ export const DefaultShowsDetails: Story = {
     const tabs = canvas.getAllByRole('tab')
     await expect(tabs.map((tab) => tab.textContent)).toEqual([
       'Policy Details',
+      'Activities',
       'Logs',
       'Attachments',
       'Accounting',
@@ -109,6 +111,7 @@ function SharedSubtabAcrossPolicies() {
           value={subtab}
           onValueChange={setSubtab}
           details={<p className="text-sm">Details for {policy.policyNumber}</p>}
+          activities={<p className="text-sm">Activities for {policy.policyNumber}</p>}
           accounting={<p className="text-sm">Accounting for {policy.policyNumber}</p>}
           logs={<p className="text-sm">Logs for {policy.policyNumber}</p>}
           attachments={<p className="text-sm">Attachments for {policy.policyNumber}</p>}

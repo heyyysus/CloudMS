@@ -21,6 +21,7 @@ import { InvoiceReceiptDialog } from '@/components/clients/invoice-receipt-dialo
 import { PolicyAttachments } from '@/components/clients/policy-attachments'
 import { PolicyCard } from '@/components/clients/policy-card'
 import { PolicyLogs } from '@/components/clients/policy-logs'
+import { PolicyActivities } from '@/components/clients/policy-activities'
 import { PolicySubtabs, type PolicySubtabValue } from '@/components/clients/policy-subtabs'
 import { PolicyTabs } from '@/components/clients/policy-tabs'
 import { useClientTabs } from '@/components/layout/client-tabs'
@@ -325,6 +326,7 @@ function ClientDetail() {
                       }
                     />
                   }
+                  activities={<PolicyActivities policyId={policy.id} />}
                   accounting={
                     <ClientInvoices
                       clientId={client.id}

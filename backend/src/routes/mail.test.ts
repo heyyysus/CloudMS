@@ -378,7 +378,7 @@ describe("POST /policies/:policyId/send-correspondence", () => {
     expect(rows.every((r) => r.resendId === "msg_corr_2")).toBe(true)
   })
 
-  it("appends exactly one policy log entry naming the template and recipients", async () => {
+  it("appends exactly one policy log entry with the full sent email", async () => {
     configureMail()
     const { cookie, policy } = await makeSendFixture("send-policylog")
     const template = await makeTemplate()
@@ -391,9 +391,15 @@ describe("POST /policies/:policyId/send-correspondence", () => {
 
     const logs = await listPolicyLogsByPolicyId(policy.id)
     expect(logs).toHaveLength(1)
-    expect(logs[0].body).toBe(
-      'Correspondence sent — "Renewal Notice" to jane@example.com; cc spouse@example.com.'
-    )
+    // The log records the actual email: recipients, subject, and rendered body.
+    const lines = logs[0].body.split("\n")
+    expect(lines[0]).toBe("To: jane@example.com")
+    expect(logs[0].body).toContain("Cc: spouse@example.com")
+    // Subject renders the {{policyNumber}} merge field from the fixture template.
+    expect(logs[0].body).toContain(`Subject: Policy ${policy.policyNumber} renews soon`)
+    // And the rendered body text (merge fields expanded, no raw {{ }} left).
+    expect(logs[0].body).toContain("policy renews soon.")
+    expect(logs[0].body).not.toContain("{{")
   })
 
   it("returns 404 for an unknown policy", async () => {

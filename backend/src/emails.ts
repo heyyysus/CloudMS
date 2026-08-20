@@ -208,15 +208,20 @@ export function buildCorrespondenceMergeValues(input: {
 }
 
 // Body for the policy_logs row a send appends, so a policy's running history
-// shows the client was contacted. A pure string builder like the ones in
-// accountingLogs.ts, so the wording is unit-testable without a DB.
+// holds a faithful record of exactly what the client received — recipients,
+// subject, and the full rendered body, not just a summary. A pure string
+// builder like the ones in accountingLogs.ts, so the wording is unit-testable
+// without a DB.
 export function correspondenceSentLogBody(input: {
-  templateName: string
   to: string[]
   cc: string[]
+  subject: string
+  body: string
 }): string {
-  const ccSuffix = input.cc.length > 0 ? `; cc ${input.cc.join(", ")}` : ""
-  return `Correspondence sent — "${input.templateName}" to ${input.to.join(", ")}${ccSuffix}.`
+  const lines = [`To: ${input.to.join(", ")}`]
+  if (input.cc.length > 0) lines.push(`Cc: ${input.cc.join(", ")}`)
+  lines.push(`Subject: ${input.subject}`, "", input.body)
+  return lines.join("\n")
 }
 
 export interface SendCorrespondenceEmailResult {

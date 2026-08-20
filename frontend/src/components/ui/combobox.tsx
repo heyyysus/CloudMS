@@ -79,7 +79,14 @@ function Combobox({
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.label}
+                  // cmdk identifies an item by this string, so it has to be
+                  // the option's own value, not its label: two options that
+                  // share a label (two carriers of the same name, two
+                  // like-named templates) would otherwise collapse into one
+                  // item and highlight together on hover. `keywords` keeps
+                  // the visible label searchable.
+                  value={option.value}
+                  keywords={[option.label]}
                   data-checked={option.value === value}
                   onSelect={() => {
                     onValueChange(option.value === value ? "" : option.value)

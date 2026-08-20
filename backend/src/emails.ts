@@ -125,3 +125,143 @@ export async function sendWelcomeEmail(
     return { status: "failed", error }
   }
 }
+
+// The client and policy shape buildCorrespondenceMergeValues needs, declared
+// structurally rather than as the repositories' return types: the real
+// getClientWithDetails/getPolicyWithDetails results assign to these, but
+// tests can build a literal without touching the DB.
+export interface CorrespondenceClient {
+  namedInsured: { firstName: string; lastName: string }
+  emails: { email: string }[]
+  phones: { phoneNumber: string }[]
+  mailingAddress1: string | null
+  mailingCity: string | null
+  mailingState: string | null
+  mailingZip: string | null
+  physicalAddress1: string | null
+  physicalCity: string | null
+  physicalState: string | null
+  physicalZip: string | null
+}
+
+export interface CorrespondencePolicy {
+  policyNumber: string
+  effectiveDate: string
+  expirationDate: string
+  status: string
+  carrier: { name: string }
+}
+
+// Resolves every name in CORRESPONDENCE_MERGE_FIELDS to a string for a real
+// client/policy/agent. Every value coalesces to "" rather than null so the
+// result matches what renderTemplate does with a missing key - a template
+// referencing an address the client hasn't given us renders a blank, not the
+// word "null".
+export function buildCorrespondenceMergeValues(input: {
+  client: CorrespondenceClient
+  policy: CorrespondencePolicy
+  agent: User
+}): Record<string, string> {
+  const { client, policy, agent } = input
+  // Mailing address is the one the agency writes to; fall back to physical so
+  // a client with only a physical address on file still merges cleanly.
+  const address = client.mailingAddress1
+    ? {
+        line1: client.mailingAddress1,
+        city: client.mailingCity,
+        state: client.mailingState,
+        zip: client.mailingZip,
+      }
+    : {
+        line1: client.physicalAddress1,
+        city: client.physicalCity,
+        state: client.physicalState,
+        zip: client.physicalZip,
+      }
+
+  return {
+    clientFirstName: client.namedInsured.firstName,
+    clientLastName: client.namedInsured.lastName,
+    clientFullName: `${client.namedInsured.firstName} ${client.namedInsured.lastName}`,
+    clientEmail: client.emails[0]?.email ?? "",
+    clientPhone: client.phones[0]?.phoneNumber ?? "",
+    clientAddress: address.line1 ?? "",
+    clientCity: address.city ?? "",
+    clientState: address.state ?? "",
+    clientZip: address.zip ?? "",
+    policyNumber: policy.policyNumber,
+    carrierName: policy.carrier.name,
+    policyEffectiveDate: policy.effectiveDate,
+    policyExpirationDate: policy.expirationDate,
+    policyStatus: policy.status,
+    agentName: agent.name ?? agent.email,
+    agentEmail: agent.email,
+  }
+}
+
+// Body for the policy_logs row a send appends, so a policy's running history
+// shows the client was contacted. A pure string builder like the ones in
+// accountingLogs.ts, so the wording is unit-testable without a DB.
+export function correspondenceSentLogBody(input: {
+  templateName: string
+  to: string[]
+  cc: string[]
+}): string {
+  const ccSuffix = input.cc.length > 0 ? `; cc ${input.cc.join(", ")}` : ""
+  return `Correspondence sent — "${input.templateName}" to ${input.to.join(", ")}${ccSuffix}.`
+}
+
+export interface SendCorrespondenceEmailResult {
+  resendId: string
+  subject: string
+  body: string
+}
+
+// Sends an admin-authored correspondence template to a client. Unlike
+// sendWelcomeEmail, mail failures are rethrown after logging: the caller here
+// is a user waiting on a Send click, so the route maps them to 503/502 rather
+// than reporting success. Every address - to and cc alike - gets its own
+// email_log row so the recipient index answers "did we ever email this
+// person?" regardless of which header they were on.
+export async function sendCorrespondenceEmail(input: {
+  template: { key: string; subject: string; body: string }
+  values: Record<string, string>
+  to: string[]
+  cc: string[]
+  triggeredBy: number
+}): Promise<SendCorrespondenceEmailResult> {
+  const { template, values, to, cc, triggeredBy } = input
+
+  const subject = renderTemplate(template.subject, values)
+  const text = renderTemplate(template.body, values)
+  const html = plainTextToHtml(text)
+
+  const logAll = async (entry: {
+    resendId: string | null
+    status: "sent" | "failed"
+    error?: string
+  }) => {
+    for (const recipient of [...to, ...cc]) {
+      await createEmailLogEntry({
+        recipient,
+        templateKey: template.key,
+        subject,
+        resendId: entry.resendId,
+        status: entry.status,
+        error: entry.error,
+        triggeredBy,
+      })
+    }
+  }
+
+  try {
+    const result = await sendEmail({ to, cc: cc.length > 0 ? cc : undefined, subject, html, text })
+    await logAll({ resendId: result.id, status: "sent" })
+    return { resendId: result.id, subject, body: text }
+  } catch (err) {
+    if (err instanceof MailNotConfiguredError || err instanceof MailSendError) {
+      await logAll({ resendId: null, status: "failed", error: err.message })
+    }
+    throw err
+  }
+}

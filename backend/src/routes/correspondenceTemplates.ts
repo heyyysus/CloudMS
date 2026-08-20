@@ -5,7 +5,6 @@ import { CORRESPONDENCE_MERGE_FIELDS, extractMergeFields } from "../emails"
 import {
   createCorrespondenceTemplate,
   deleteCorrespondenceTemplate,
-  findCorrespondenceTemplateById,
   listCorrespondenceTemplates,
   updateCorrespondenceTemplate,
 } from "../repositories"
@@ -14,9 +13,13 @@ import { createCorrespondenceTemplateBody, updateCorrespondenceTemplateBody } fr
 
 export const correspondenceTemplatesRouter = Router()
 
-// Correspondence templates are admin-only client-facing email templates,
+// Correspondence templates are admin-authored client-facing email templates,
 // distinct from the singleton "welcome" invite email (see emailTemplates.ts).
 // Routed by id, so the welcome route's :key surface is untouched.
+//
+// Authoring is admin-only, but the GET is open to staff: staff send these
+// templates to clients from the policy card, so they have to be able to list
+// them. requireRole("staff") still admits admins (see auth/middleware.ts).
 
 // Derives a stable, human-readable unique key from the template name. The key
 // is kept (NOT NULL unique) for email_log durability when sends land later; a
@@ -44,7 +47,7 @@ function unknownMergeFieldError(subject: string, body: string): string | null {
 correspondenceTemplatesRouter.get(
   "/correspondence-templates",
   requireAuth,
-  requireRole("admin"),
+  requireRole("staff"),
   async (_req: Request, res: Response) => {
     const templates = await listCorrespondenceTemplates()
     res.json({ templates, mergeFields: CORRESPONDENCE_MERGE_FIELDS })

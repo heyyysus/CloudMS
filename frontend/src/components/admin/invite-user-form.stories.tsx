@@ -111,10 +111,12 @@ export const DuplicateEmail: Story = {
   play: async ({ canvasElement }) => {
     await fillAndSubmit(canvasElement, 'existing@example.com')
 
+    // The same message renders in both the inline alert and an error toast,
+    // so scope to the alert role to avoid a multiple-match on the text alone.
     await waitFor(async () =>
-      expect(
-        await screen.findByText(/a user with this email already exists/i)
-      ).toBeInTheDocument()
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        /a user with this email already exists/i
+      )
     )
   },
 }

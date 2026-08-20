@@ -96,6 +96,10 @@ export const ServerRejectsUnknownField: Story = {
 
     await userEvent.click(canvas.getByRole('button', { name: /save template/i }))
 
-    await expect(await screen.findByText(/unknown merge fields: \{\{bogus\}\}/i)).toBeInTheDocument()
+    // The same message renders in both the inline alert and an error toast,
+    // so scope to the alert role to avoid a multiple-match on the text alone.
+    await expect(await screen.findByRole('alert')).toHaveTextContent(
+      /unknown merge fields: \{\{bogus\}\}/i
+    )
   },
 }

@@ -3,10 +3,10 @@ name: Frontend
 on:
   push:
     branches: [main]
-    paths: ['frontend/**']
+    paths: ['frontend/**', '.github/workflows/frontend.yml']
   pull_request:
     branches: [main]
-    paths: ['frontend/**']
+    paths: ['frontend/**', '.github/workflows/frontend.yml']
   workflow_dispatch:
 
 jobs:
@@ -27,6 +27,13 @@ jobs:
       - run: npm ci
 
       - run: npm run lint
+
+      # Storybook interaction tests run in a real browser via the Vitest
+      # Playwright provider (see vite.config.ts), so the Chromium binary and
+      # its system deps must be installed before `npm test`.
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+
       - run: npm run build
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}

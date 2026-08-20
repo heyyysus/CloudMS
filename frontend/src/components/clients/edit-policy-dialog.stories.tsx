@@ -244,7 +244,11 @@ export const ServerError: Story = {
 
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
-    await expect(await screen.findByText('Policy number already exists')).toBeInTheDocument()
+    // The same message renders in both the inline alert and an error toast,
+    // so scope to the alert role to avoid a multiple-match on the text alone.
+    await expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Policy number already exists'
+    )
     await expect(screen.getByRole('heading', { name: /endorse policy/i })).toBeInTheDocument()
   },
 }

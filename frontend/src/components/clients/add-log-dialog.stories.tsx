@@ -144,7 +144,9 @@ export const ServerError: Story = {
     await userEvent.type(screen.getByPlaceholderText(/what happened/i), 'A note.')
     await userEvent.click(screen.getByRole('button', { name: /^add log$/i }))
 
-    await expect(await screen.findByText('Something went wrong')).toBeInTheDocument()
+    // The same message renders in both the inline alert and an error toast,
+    // so scope to the alert role to avoid a multiple-match on the text alone.
+    await expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong')
     await expect(screen.getByRole('heading', { name: /add log/i })).toBeInTheDocument()
   },
 }

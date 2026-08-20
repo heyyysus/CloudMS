@@ -341,7 +341,11 @@ export const ServerError: Story = {
     await userEvent.type(screen.getByLabelText('Line 1 amount'), '150')
     await userEvent.click(screen.getByRole('button', { name: /create invoice/i }))
 
-    await expect(await screen.findByText('A sweep item needs a carrier')).toBeInTheDocument()
+    // The same message renders in both the inline alert and an error toast,
+    // so scope to the alert role to avoid a multiple-match on the text alone.
+    await expect(await screen.findByRole('alert')).toHaveTextContent(
+      'A sweep item needs a carrier'
+    )
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: /create invoice/i })).toBeInTheDocument()
     )

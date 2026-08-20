@@ -122,7 +122,9 @@ export const ServerError: Story = {
     await userEvent.type(screen.getByLabelText(/date of birth/i), '1990-01-01')
     await userEvent.click(screen.getByRole('button', { name: /^create client$/i }))
 
-    await expect(await screen.findByText('Invalid ZIP')).toBeInTheDocument()
+    // The same message renders in both the inline alert and an error toast,
+    // so scope to the alert role to avoid a multiple-match on the text alone.
+    await expect(await screen.findByRole('alert')).toHaveTextContent('Invalid ZIP')
     await expect(screen.getByText(/add client/i)).toBeInTheDocument()
   },
 }

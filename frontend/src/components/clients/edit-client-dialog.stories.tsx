@@ -118,7 +118,9 @@ export const ServerError: Story = {
 
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
-    await expect(await screen.findByText('Invalid email')).toBeInTheDocument()
+    // The same message renders in both the inline alert and an error toast,
+    // so scope to the alert role to avoid a multiple-match on the text alone.
+    await expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email')
     await expect(screen.getByText(/edit client/i)).toBeInTheDocument()
   },
 }

@@ -152,6 +152,14 @@ export interface CorrespondencePolicy {
   carrier: { name: string }
 }
 
+// Whoever the message is "from" as far as the merge fields are concerned.
+// Structural like the two above rather than `User`, because an automated send
+// has no logged-in agent and passes the agency's own identity instead.
+export interface CorrespondenceAgent {
+  name: string | null
+  email: string
+}
+
 // Resolves every name in CORRESPONDENCE_MERGE_FIELDS to a string for a real
 // client/policy/agent. Every value coalesces to "" rather than null so the
 // result matches what renderTemplate does with a missing key - a template
@@ -160,7 +168,7 @@ export interface CorrespondencePolicy {
 export function buildCorrespondenceMergeValues(input: {
   client: CorrespondenceClient
   policy: CorrespondencePolicy
-  agent: User
+  agent: CorrespondenceAgent
 }): Record<string, string> {
   const { client, policy, agent } = input
   // Mailing address is the one the agency writes to; fall back to physical so

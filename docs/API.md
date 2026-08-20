@@ -835,3 +835,86 @@ Correspondence sent — "Renewal Notice" to jane@example.com; cc spouse@example.
 A failed send still writes its `email_log` rows, with `status: "failed"`, but
 appends no policy log entry — the policy's history never claims a message went
 out that didn't.
+
+## Automated reminders
+
+Standing rules that send a correspondence template on their own, off a date on
+the policy — the "renewal reminder 30 days out" an agency configures once
+instead of remembering. Nothing here depends on host cron: an interval timer
+inside every app container runs the same pass, and Postgres arbitrates. The
+planner takes `pg_try_advisory_xact_lock` so only one container plans per tick,
+and the dispatcher claims work with `FOR UPDATE SKIP LOCKED` so every container
+can send at once without two of them sending the same message. Running several
+app containers needs no extra configuration.
+
+A rule is `enabled = false` when created, so nothing is ever sent before an
+admin has read the rule back and turned it on. Rules are unique on
+`(trigger, offsetDays)` — two rules at the same offset would send a client two
+emails the same morning.
+
+Sends are attributed to a bootstrapped `automation@cloudms.local` user
+(`isActive: false`, so it can never sign in), which is what `policy_logs`
+requires for its non-null author and what `email_log.triggered_by` records.
+`{{agentName}}` is the one merge field that resolves differently than on a
+manual send: with no logged-in agent, it renders `AGENCY_NAME`.
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| GET | `/reminder-rules` | staff | returns `{ rules }`, each with the template it sends. Open to staff so a policy's Activities tab can name the rule behind a reminder |
+| POST | `/reminder-rules` | admin | body: `{ name, offsetDays, templateId, trigger?, enabled? }`. `offsetDays` is days *before* expiration; negative sends after it. `templateId` is looked up scoped to `kind = "correspondence"` |
+| PATCH | `/reminder-rules/:id` | admin | partial — `{ enabled }` alone is the common edit |
+| DELETE | `/reminder-rules/:id` | admin | `204`. Cascades the rule's queued (unsent) reminders; sends already made survive in `email_log` and the policy log |
+| GET | `/scheduled-emails` | any | the agency-wide queue; `?status=pending,failed` filters (comma-separated) |
+| POST | `/scheduled-emails/:id/cancel` | staff | `pending` → `cancelled` |
+| POST | `/reminders/tick` | admin | runs one plan+dispatch pass synchronously |
+
+Status codes specific to these routes:
+
+- `404` on POST/PATCH `/reminder-rules` — `templateId` names no correspondence
+  template. The `welcome` invite answers `404` here too, by design.
+- `409` on POST/PATCH `/reminder-rules` — a rule already exists at that
+  trigger/offset.
+- `409` on cancel — the reminder is no longer `pending` (already sending, sent,
+  failed, or cancelled). The guard is in the `UPDATE`'s `WHERE`, so a stale UI
+  can't cancel something already in flight.
+
+`POST /reminders/tick` skips the planner election, so an admin who asks for a
+pass always gets one rather than "another container was already planning". It
+is also the seam for driving the scheduler from outside the process — an
+external cron calling this endpoint — with no code change.
+
+## Policy activities
+
+What is scheduled to happen on a policy, behind the **Activities** subtab.
+
+The shape is deliberately generic rather than "a list of scheduled emails": the
+`id` is namespaced (`"scheduled-email:42"`) and every row carries `kind` and
+`source`, so manually created tasks can join this list later without the
+contract changing. Today `scheduled_emails` is the only source and every row is
+`source: "automation"`.
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| GET | `/policies/:policyId/activities` | any | returns `{ activities }` — upcoming *and* already-sent, so the tab shows history rather than emptying out |
+
+An unknown policy id returns `200` with an empty list rather than a `404`; the
+tab is a view over a policy the caller already has open.
+
+```json
+{
+  "activities": [
+    {
+      "id": "scheduled-email:42",
+      "kind": "reminder",
+      "title": "30-day renewal reminder",
+      "detail": "Renewal Notice",
+      "scheduledFor": "2026-09-18T14:00:00.000Z",
+      "sentAt": null,
+      "status": "pending",
+      "source": "automation",
+      "cancellable": true,
+      "lastError": null
+    }
+  ]
+}
+```

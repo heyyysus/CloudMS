@@ -4,15 +4,28 @@ import { randomInt } from "crypto"
 import { inArray } from "drizzle-orm"
 import { generateSessionToken, hashToken } from "../auth/tokens"
 import { db } from "../db"
-import { autoPolicies, carriers, clients, emailLog, persons, users, vehicles } from "../db/schema"
+import {
+  autoPolicies,
+  carriers,
+  clients,
+  emailLog,
+  emailTemplates,
+  persons,
+  reminderRules,
+  users,
+  vehicles,
+} from "../db/schema"
 import {
   addDriverToPolicy,
+  addEmailToClient,
   createAutoPolicy,
   createCarrier,
   createClient,
+  createCorrespondenceTemplate,
   createDriver,
   createPerson,
   createPolicyLog,
+  createReminderRule,
   createSession,
   createUser,
   createVehicle,
@@ -23,6 +36,7 @@ import type {
   NewClient,
   NewPerson,
   NewVehicle,
+  ReminderRule,
   User,
   UserRole,
 } from "../types"
@@ -51,6 +65,14 @@ function uniqueVin(): string {
   return randomDigits(17)
 }
 
+// An ISO date `days` from today, for lining a policy's expiration up with a
+// rule's offset so the planner matches it.
+export function isoDaysFromToday(days: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
 export async function makeTestUser(prefix: string, role: UserRole = "staff"): Promise<User> {
   return createUser({ email: `${unique(prefix)}@example.com`, role })
 }
@@ -75,6 +97,8 @@ export class TestContext {
   private carrierIds: number[] = []
   private policyIds: number[] = []
   private vehicleIds: number[] = []
+  private templateIds: number[] = []
+  private ruleIds: number[] = []
 
   async user(prefix: string, role: UserRole = "staff") {
     const u = await makeTestUser(prefix, role)
@@ -162,10 +186,53 @@ export class TestContext {
     return l
   }
 
+  // client_emails cascade-delete with their client, so nothing to track.
+  async clientEmail(clientId: number, email = `${unique("to")}@example.com`) {
+    return addEmailToClient(clientId, email)
+  }
+
+  async template(overrides: { name?: string; subject?: string; body?: string } = {}) {
+    const name = overrides.name ?? unique("Template ")
+    const t = await createCorrespondenceTemplate({
+      key: unique("correspondence-test-"),
+      name,
+      subject: overrides.subject ?? "Your policy {{policyNumber}}",
+      body:
+        overrides.body ?? "Hi {{clientFirstName}}, your policy expires {{policyExpirationDate}}.",
+      updatedBy: null,
+    })
+    this.templateIds.push(t.id)
+    return t
+  }
+
+  // offsetDays is random by default because reminder_rules is unique on
+  // (trigger, offset_days) *globally*, and vitest runs test files in parallel
+  // workers - two files both picking a natural-looking 30 would collide. Tests
+  // that need the planner to match pass an offset and then build the policy
+  // with isoDaysFromToday(offset), which lines the two up.
+  async reminderRule(
+    overrides: { offsetDays?: number; templateId?: number; enabled?: boolean; name?: string } = {}
+  ): Promise<ReminderRule> {
+    const templateId = overrides.templateId ?? (await this.template()).id
+    const rule = await createReminderRule({
+      name: overrides.name ?? unique("Rule "),
+      trigger: "policy_expiration",
+      offsetDays: overrides.offsetDays ?? randomInt(100_000, 1_000_000),
+      templateId,
+      enabled: overrides.enabled ?? true,
+      updatedBy: null,
+    })
+    this.ruleIds.push(rule.id)
+    return rule
+  }
+
   // Registers a row created some other way (e.g. through an API call under
   // test rather than via this context's own builders) so cleanup still
   // removes it.
-  track(kind: "person" | "client" | "carrier" | "policy" | "vehicle" | "user", id: number) {
+  track(
+    kind: "person" | "client" | "carrier" | "policy" | "vehicle" | "user" | "rule" | "template",
+    id: number
+  ) {
     switch (kind) {
       case "person":
         this.personIds.push(id)
@@ -185,10 +252,22 @@ export class TestContext {
       case "user":
         this.userIds.push(id)
         break
+      case "rule":
+        this.ruleIds.push(id)
+        break
+      case "template":
+        this.templateIds.push(id)
+        break
     }
   }
 
   async cleanup() {
+    // Rules first: scheduled_emails cascades from them, and email_templates
+    // is referenced with no cascade so it can only go once its rules have.
+    if (this.ruleIds.length)
+      await db.delete(reminderRules).where(inArray(reminderRules.id, this.ruleIds))
+    if (this.templateIds.length)
+      await db.delete(emailTemplates).where(inArray(emailTemplates.id, this.templateIds))
     if (this.vehicleIds.length)
       await db.delete(vehicles).where(inArray(vehicles.id, this.vehicleIds))
     if (this.policyIds.length)

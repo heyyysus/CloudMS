@@ -6,6 +6,7 @@ import {
   clientPhones,
   clients,
   drivers,
+  emailTemplates,
   invoiceItems,
   invoices,
   payments,
@@ -15,6 +16,8 @@ import {
   policyLogAttachments,
   policyLogs,
   receipts,
+  reminderRules,
+  scheduledEmails,
   sessions,
   trustLedger,
   users,
@@ -71,6 +74,7 @@ export const autoPoliciesRelations = relations(autoPolicies, ({ one, many }) => 
   payments: many(payments),
   receipts: many(receipts),
   trustLedger: many(trustLedger),
+  scheduledEmails: many(scheduledEmails),
 }))
 
 export const invoicesRelations = relations(invoices, ({ one, many }) => ({
@@ -153,4 +157,24 @@ export const usersRelations = relations(users, ({ many }) => ({
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
   user: one(users, { fields: [sessions.userId], references: [users.id] }),
+}))
+
+export const reminderRulesRelations = relations(reminderRules, ({ one, many }) => ({
+  template: one(emailTemplates, {
+    fields: [reminderRules.templateId],
+    references: [emailTemplates.id],
+  }),
+  updatedByUser: one(users, { fields: [reminderRules.updatedBy], references: [users.id] }),
+  scheduledEmails: many(scheduledEmails),
+}))
+
+export const scheduledEmailsRelations = relations(scheduledEmails, ({ one }) => ({
+  rule: one(reminderRules, {
+    fields: [scheduledEmails.ruleId],
+    references: [reminderRules.id],
+  }),
+  policy: one(autoPolicies, {
+    fields: [scheduledEmails.policyId],
+    references: [autoPolicies.id],
+  }),
 }))

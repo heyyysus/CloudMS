@@ -25,6 +25,8 @@ import type {
   policyStatusEnum,
   receipts,
   relationToInsuredEnum,
+  reminderRules,
+  scheduledEmails,
   sessions,
   trustLedger,
   trustLedgerDirectionEnum,
@@ -72,6 +74,8 @@ export type User = typeof users.$inferSelect
 export type Session = typeof sessions.$inferSelect
 export type EmailTemplate = typeof emailTemplates.$inferSelect
 export type EmailLogEntry = typeof emailLog.$inferSelect
+export type ReminderRule = typeof reminderRules.$inferSelect
+export type ScheduledEmail = typeof scheduledEmails.$inferSelect
 
 export type NewPerson = typeof persons.$inferInsert
 export type NewDriver = typeof drivers.$inferInsert
@@ -92,6 +96,8 @@ export type NewUser = typeof users.$inferInsert
 export type NewSession = typeof sessions.$inferInsert
 export type NewEmailTemplate = typeof emailTemplates.$inferInsert
 export type NewEmailLogEntry = typeof emailLog.$inferInsert
+export type NewReminderRule = typeof reminderRules.$inferInsert
+export type NewScheduledEmail = typeof scheduledEmails.$inferInsert
 
 declare global {
   // Declaration merging into Express's types requires a namespace.

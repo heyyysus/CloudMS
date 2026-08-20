@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm"
 import { migrate } from "drizzle-orm/node-postgres/migrator"
 import { db } from "./index"
 import { emailTemplates, users } from "./schema"
+import { AUTOMATION_USER_EMAIL } from "../jobs/automationUser"
 
 // Runs at container start (see Dockerfile CMD), before the server boots.
 // Unlike db:seed this is safe against live data: migrations are append-only
@@ -19,6 +20,21 @@ async function main() {
       .onConflictDoNothing({ target: users.email })
     console.log(`Ensured admin user exists for ${adminEmail}`)
   }
+
+  // The author/sender of record for anything the scheduler sends, since
+  // policy_logs.author_id is NOT NULL and sendCorrespondenceEmail wants a
+  // user id. isActive: false means requireAuth rejects it, so bootstrapping
+  // this row can never become a way to sign in.
+  await db
+    .insert(users)
+    .values({
+      email: AUTOMATION_USER_EMAIL,
+      name: "CloudMS Automation",
+      role: "staff",
+      isActive: false,
+    })
+    .onConflictDoNothing({ target: users.email })
+  console.log("Ensured automation user exists")
 
   await db
     .insert(emailTemplates)

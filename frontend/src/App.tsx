@@ -10,6 +10,7 @@ import { createQueryClient } from './lib/query-client'
 import Admin from './pages/Admin'
 import ClientDetail from './pages/ClientDetail'
 import CorrespondenceTemplates from './pages/CorrespondenceTemplates'
+import ReminderRules from './pages/ReminderRules'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Logout from './pages/Logout'
@@ -37,6 +38,7 @@ function App() {
                     <Route path="/admin/users" element={<ManageUsers />} />
                     <Route path="/admin/carriers" element={<ManageCarriers />} />
                     <Route path="/admin/correspondence" element={<CorrespondenceTemplates />} />
+                    <Route path="/admin/reminders" element={<ReminderRules />} />
                     <Route path="/admin/trust-accounting" element={<TrustAccounting />} />
                   </Route>
                 </Route>

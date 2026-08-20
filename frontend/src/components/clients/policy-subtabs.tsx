@@ -2,10 +2,18 @@ import type { ReactNode } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
-export type PolicySubtabValue = 'details' | 'accounting' | 'logs' | 'attachments'
+export type PolicySubtabValue =
+  | 'details'
+  | 'activities'
+  | 'accounting'
+  | 'logs'
+  | 'attachments'
 
 const SUBTABS: { value: PolicySubtabValue; label: string }[] = [
   { value: 'details', label: 'Policy Details' },
+  // Activities sits before Logs deliberately: it is what is coming, Logs is
+  // what already happened.
+  { value: 'activities', label: 'Activities' },
   { value: 'logs', label: 'Logs' },
   { value: 'attachments', label: 'Attachments' },
   { value: 'accounting', label: 'Accounting' },
@@ -15,6 +23,7 @@ interface PolicySubtabsProps {
   value: PolicySubtabValue
   onValueChange: (value: PolicySubtabValue) => void
   details: ReactNode
+  activities: ReactNode
   accounting: ReactNode
   logs: ReactNode
   attachments: ReactNode
@@ -24,6 +33,7 @@ export function PolicySubtabs({
   value,
   onValueChange,
   details,
+  activities,
   accounting,
   logs,
   attachments,
@@ -50,6 +60,7 @@ export function PolicySubtabs({
         ))}
       </TabsList>
       <TabsContent value="details">{details}</TabsContent>
+      <TabsContent value="activities">{activities}</TabsContent>
       <TabsContent value="logs">{logs}</TabsContent>
       <TabsContent value="attachments">{attachments}</TabsContent>
       <TabsContent value="accounting">{accounting}</TabsContent>

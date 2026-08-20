@@ -11,6 +11,7 @@ import {
   type ExistingDriverOption,
 } from '@/components/clients/add-policy-dialog'
 import { EditPolicyDialog } from '@/components/clients/edit-policy-dialog'
+import { SendCorrespondenceDialog } from '@/components/clients/send-correspondence-dialog'
 import { AddAttachmentDialog } from '@/components/clients/add-attachment-dialog'
 import { AddLogDialog } from '@/components/clients/add-log-dialog'
 import { ClientInvoices } from '@/components/clients/client-invoices'
@@ -307,12 +308,19 @@ function ClientDetail() {
                       isError={query?.isError}
                       action={
                         query?.data && (
-                          <EditPolicyDialog
-                            client={client}
-                            policy={query.data}
-                            existingVehicles={existingVehicles}
-                            existingDrivers={existingDrivers}
-                          />
+                          <div className="flex gap-2">
+                            <SendCorrespondenceDialog
+                              client={client}
+                              policy={query.data}
+                              isAdmin={user?.role === 'admin'}
+                            />
+                            <EditPolicyDialog
+                              client={client}
+                              policy={query.data}
+                              existingVehicles={existingVehicles}
+                              existingDrivers={existingDrivers}
+                            />
+                          </div>
                         )
                       }
                     />

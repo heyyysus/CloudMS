@@ -33,11 +33,15 @@ describe("correspondence templates", () => {
       expect(res.status).toBe(401)
     })
 
-    it("returns 403 for a non-admin user", async () => {
+    // Staff read this list to pick a template when sending correspondence
+    // from a policy card, so unlike the write routes below it is not
+    // admin-only.
+    it("allows a non-admin user to list templates", async () => {
       const user = await ctx.user("corr-staff", "staff")
       const cookie = await makeSessionCookie(user.id)
       const res = await request(app).get("/correspondence-templates").set("Cookie", cookie)
-      expect(res.status).toBe(403)
+      expect(res.status).toBe(200)
+      expect(Array.isArray(res.body.templates)).toBe(true)
     })
 
     it("lists templates with the merge-field catalog", async () => {
@@ -131,6 +135,25 @@ describe("correspondence templates", () => {
 
       expect(res.status).toBe(404)
     })
+
+    // Staff can list templates (see the GET above) but must not author them.
+    it("returns 403 for a non-admin user", async () => {
+      const adminCookieValue = await adminCookie("corr-update-owner")
+      const created = await request(app)
+        .post("/correspondence-templates")
+        .set("Cookie", adminCookieValue)
+        .send(VALID_BODY)
+      templateIds.push(created.body.id)
+
+      const user = await ctx.user("corr-update-staff", "staff")
+      const cookie = await makeSessionCookie(user.id)
+      const res = await request(app)
+        .patch(`/correspondence-templates/${created.body.id}`)
+        .set("Cookie", cookie)
+        .send({ ...VALID_BODY, name: "Staff edit" })
+
+      expect(res.status).toBe(403)
+    })
   })
 
   it("never lists the welcome template (kind-scoped)", async () => {
@@ -167,6 +190,23 @@ describe("correspondence templates", () => {
         .delete("/correspondence-templates/99999999")
         .set("Cookie", cookie)
       expect(res.status).toBe(404)
+    })
+
+    it("returns 403 for a non-admin user", async () => {
+      const adminCookieValue = await adminCookie("corr-delete-owner")
+      const created = await request(app)
+        .post("/correspondence-templates")
+        .set("Cookie", adminCookieValue)
+        .send(VALID_BODY)
+      templateIds.push(created.body.id)
+
+      const user = await ctx.user("corr-delete-staff", "staff")
+      const cookie = await makeSessionCookie(user.id)
+      const res = await request(app)
+        .delete(`/correspondence-templates/${created.body.id}`)
+        .set("Cookie", cookie)
+
+      expect(res.status).toBe(403)
     })
   })
 })

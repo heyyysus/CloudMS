@@ -17,6 +17,9 @@ export class MailSendError extends Error {}
 
 export interface SendEmailInput {
   to: string[]
+  // Copied recipients. Resend omits the header entirely when absent, so an
+  // empty list is normalized to undefined by the caller rather than sent.
+  cc?: string[]
   subject: string
   html: string
   text: string
@@ -56,6 +59,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       body: JSON.stringify({
         from,
         to: input.to,
+        ...(input.cc && input.cc.length > 0 ? { cc: input.cc } : {}),
         subject: input.subject,
         html: input.html,
         text: input.text,

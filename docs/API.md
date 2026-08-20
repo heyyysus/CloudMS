@@ -755,3 +755,83 @@ Example response (`POST /clients/42/send-email`, body
 ```json
 { "id": "49a3999c-0ce1-4ea6-ab68-afcd6dc2e794", "to": ["client@example.com"] }
 ```
+
+## Correspondence templates
+
+Reusable, client-facing email templates, authored by admins and sent by staff
+(see "Correspondence sends" below). Distinct from the singleton `welcome`
+invite email: these are keyed by id and scoped to `kind = "correspondence"`, so
+the welcome template never appears in this list and can never be sent to a
+client.
+
+Subject and body may reference `{{mergeField}}` tokens. The allowed names are a
+fixed server-side catalog (`CORRESPONDENCE_MERGE_FIELDS` in
+`backend/src/emails.ts`), returned alongside the list so an editor's field help
+stays in sync; a write naming an unknown field is rejected with a `400`.
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| GET | `/correspondence-templates` | staff | returns `{ templates, mergeFields }`. Open to staff because they pick a template when sending — authoring below stays admin-only |
+| POST | `/correspondence-templates` | admin | body: `{ name, subject, body }`; the unique `key` is derived from `name` |
+| PATCH | `/correspondence-templates/:id` | admin | full replace, same body as POST |
+| DELETE | `/correspondence-templates/:id` | admin | `204`. Past sends survive: `email_log.template_key` is a plain column, not an FK |
+
+## Correspondence sends
+
+Sends an admin-authored correspondence template (see above) to a client, scoped
+to one policy so the message can merge that policy's details and so the send is
+recorded in that policy's log.
+
+Open to **staff** as well as admins, unlike the free-text send above. What
+makes that safe is that the sender never supplies wording: `templateId` names
+a template, and the server re-renders its subject and body at send time. The
+recipients, however, are *not* restricted to the client's on-file addresses —
+staff routinely need to copy a lienholder or a colleague — so every address is
+written to `email_log` with the acting user in `triggered_by`.
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| GET | `/policies/:policyId/merge-fields` | any | resolved merge-field values for this policy, for previewing a template before sending |
+| POST | `/policies/:policyId/send-correspondence` | staff | body: `{ templateId, to, cc? }`; `to` is 1–20 addresses, `cc` up to 20. Addresses are lowercased, and an address may not appear in both |
+
+`GET /policies/:policyId/merge-fields` returns `{ values }`, a map keyed by
+every name in the correspondence merge-field catalog — the same map the send
+route renders the outgoing message with, so a client-side preview matches what
+the recipient receives:
+
+```json
+{
+  "values": {
+    "clientFullName": "Jane Doe",
+    "clientEmail": "jane@example.com",
+    "policyNumber": "POL-100482",
+    "carrierName": "Progressive",
+    "agentName": "Alex Agent"
+  }
+}
+```
+
+A field the client hasn't given us (say, a phone number) resolves to `""`
+rather than null, matching how the renderer treats an unknown token.
+
+Status codes specific to `POST /policies/:policyId/send-correspondence`:
+
+- `201` — sent. Body is `{ id, to, cc, subject }`, where `id` is the Resend
+  message id and `subject` is the merge-rendered subject line.
+- `400` — `to` empty or over 20, a malformed address, or an address in both
+  `to` and `cc`.
+- `404` — no policy with that id, or no *correspondence* template with that id.
+  The singleton `welcome` template is kind-scoped out of this lookup, so it can
+  never be sent to a client.
+- `502` / `503` — as for `/clients/:clientId/send-email` above.
+
+A successful send writes one `email_log` row per address (`to` and `cc` alike)
+and appends one entry to the policy's log:
+
+```
+Correspondence sent — "Renewal Notice" to jane@example.com; cc spouse@example.com.
+```
+
+A failed send still writes its `email_log` rows, with `status: "failed"`, but
+appends no policy log entry — the policy's history never claims a message went
+out that didn't.

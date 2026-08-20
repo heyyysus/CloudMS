@@ -312,6 +312,20 @@ export const sendClientEmailBody = z.object({
   to: z.array(z.email()).min(1).max(20).optional(),
 })
 
+// Recipients for a correspondence send. Unlike sendClientEmailBody above,
+// addresses are NOT restricted to the client's on-file set - staff may copy a
+// lienholder or a colleague. The body can't be forged in exchange: it is
+// always re-rendered server-side from the admin-authored template named by
+// templateId, so this can only ever relay approved wording. The 20-address
+// caps match sendClientEmailBody.
+const recipientList = z.array(z.email().trim().toLowerCase().max(255)).max(20)
+
+export const sendCorrespondenceBody = z.object({
+  templateId: idParam,
+  to: recipientList.min(1),
+  cc: recipientList.optional(),
+})
+
 export const inviteUserBody = z.object({
   email: z.email().trim().toLowerCase().max(255),
   name: z.string().trim().min(1).max(150).nullable().optional(),

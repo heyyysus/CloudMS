@@ -70,9 +70,17 @@ export const sessions = pgTable(
   (table) => [index("sessions_user_id_idx").on(table.userId)]
 )
 
+// Distinguishes the singleton "welcome" invite email (scoped to a staff
+// user's own info) from admin-authored client "correspondence" templates
+// (scoped to a client, their policy, and the sending agent).
+export const emailTemplateKindEnum = pgEnum("email_template_kind", ["welcome", "correspondence"])
+
 export const emailTemplates = pgTable("email_templates", {
   id: serial("id").primaryKey(),
   key: varchar("key", { length: 64 }).notNull().unique(),
+  // Admin-facing label for correspondence templates; null for the welcome row.
+  name: varchar("name", { length: 120 }),
+  kind: emailTemplateKindEnum("kind").notNull().default("correspondence"),
   subject: varchar("subject", { length: 200 }).notNull(),
   body: text("body").notNull(),
   updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),

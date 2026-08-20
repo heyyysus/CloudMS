@@ -5,6 +5,7 @@ import { authRouter } from "./auth/routes"
 import { logger } from "./logger"
 import { carriersRouter } from "./routes/carriers"
 import { clientsRouter } from "./routes/clients"
+import { correspondenceTemplatesRouter } from "./routes/correspondenceTemplates"
 import { emailTemplatesRouter } from "./routes/emailTemplates"
 import { invoicesRouter } from "./routes/invoices"
 import { mailRouter } from "./routes/mail"
@@ -55,6 +56,7 @@ app.use(searchRouter)
 app.use(vinDecoderRouter)
 app.use(usersRouter)
 app.use(emailTemplatesRouter)
+app.use(correspondenceTemplatesRouter)
 
 app.get("/health", (req: Request, res: Response) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() })

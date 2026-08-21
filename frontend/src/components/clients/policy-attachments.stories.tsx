@@ -6,6 +6,9 @@ import { ToastProvider } from '@/components/ui/toast'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { PolicyAttachment } from '@/api/policyAttachments'
 import type { PolicyLog } from '@/api/policyLogs'
+import type { ClientDetail } from '@/api/clients'
+import type { PolicyDetail } from '@/api/policies'
+import type { CorrespondenceTemplate } from '@/api/correspondenceTemplates'
 
 const uploaded: PolicyAttachment = {
   id: 1,
@@ -66,6 +69,25 @@ const logs: PolicyLog[] = [
     author: { id: 2, name: 'Tom Reyes', email: 'tom@example.com' },
   },
 ]
+
+// The client + policy the "Send to client" action's send dialog needs.
+const client = {
+  id: 42,
+  emails: [{ id: 1, clientId: 42, email: 'jane@example.com', createdAt: '2026-01-01T00:00:00' }],
+} as unknown as ClientDetail
+
+const policy = { id: 900, policyNumber: 'POL-100482' } as unknown as PolicyDetail
+
+const correspondenceTemplate: CorrespondenceTemplate = {
+  id: 7,
+  key: 'correspondence-renewal-notice-ab12cd34',
+  name: 'Renewal Notice',
+  subject: 'Policy {{policyNumber}} renews soon',
+  body: 'Hi {{clientFullName}}, your policy renews soon.',
+  updatedAt: '2026-02-01T00:00:00',
+}
+
+const mergeValues = { policyNumber: 'POL-100482', clientFullName: 'Jane Doe' }
 
 function createTestQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -223,6 +245,48 @@ export const LinksSelectionToALog: Story = {
     await expect(args.linkAttachmentsToLogFn).toHaveBeenCalledWith({
       logId: 2,
       attachmentIds: [1, 2],
+    })
+  },
+}
+
+// The "Send to client" bulk action opens the send dialog with the selected
+// files pre-attached; sending carries their ids through.
+export const SendsSelectionToClient: Story = {
+  args: {
+    client,
+    policy,
+    getPolicyAttachmentsFn: fn(async () => [uploaded, idCard, receipt]),
+    getCorrespondenceTemplatesFn: fn(async () => ({
+      templates: [correspondenceTemplate],
+      mergeFields: Object.keys(mergeValues),
+    })),
+    getPolicyMergeValuesFn: fn(async () => ({ values: mergeValues })),
+    sendPolicyCorrespondenceFn: fn(async () => ({
+      id: 'msg_1',
+      to: ['jane@example.com'],
+      cc: [],
+      subject: 'Policy POL-100482 renews soon',
+    })),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(await canvas.findByRole('button', { name: 'Select' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Select declarations-page' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Send to client' }))
+
+    // The send dialog is portaled outside canvasElement, and lists the file.
+    const dialog = within(await screen.findByRole('dialog'))
+    await expect(await dialog.findByText('declarations-page.pdf')).toBeInTheDocument()
+
+    await userEvent.click(await dialog.findByRole('combobox'))
+    await userEvent.click(await screen.findByRole('option', { name: 'Renewal Notice' }))
+    await userEvent.click(dialog.getByRole('button', { name: /^Send/ }))
+
+    await expect(args.sendPolicyCorrespondenceFn).toHaveBeenCalledWith(900, {
+      templateId: 7,
+      to: ['jane@example.com'],
+      cc: [],
+      attachmentIds: [1],
     })
   },
 }

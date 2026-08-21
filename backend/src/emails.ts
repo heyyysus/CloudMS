@@ -5,7 +5,13 @@
 // of the route layer and the logging concern out of the repository layer.
 import { findEmailTemplateByKey } from "./repositories/emailTemplates"
 import { createEmailLogEntry } from "./repositories/emailLog"
-import { MailNotConfiguredError, MailSendError, plainTextToHtml, sendEmail } from "./mailer"
+import {
+  MailNotConfiguredError,
+  MailSendError,
+  plainTextToHtml,
+  sendEmail,
+  type EmailAttachment,
+} from "./mailer"
 import type { User } from "./types"
 
 export const WELCOME_TEMPLATE_KEY = "welcome"
@@ -217,9 +223,15 @@ export function correspondenceSentLogBody(input: {
   cc: string[]
   subject: string
   body: string
+  // File names of any attachments that went out, listed above the message so
+  // the log records what was actually sent, not just the wording.
+  attachments?: string[]
 }): string {
   const lines = [`To: ${input.to.join(", ")}`]
   if (input.cc.length > 0) lines.push(`Cc: ${input.cc.join(", ")}`)
+  if (input.attachments && input.attachments.length > 0) {
+    lines.push(`Attachments: ${input.attachments.join(", ")}`)
+  }
   lines.push(`Subject: ${input.subject}`, "", input.body)
   return lines.join("\n")
 }
@@ -242,8 +254,9 @@ export async function sendCorrespondenceEmail(input: {
   to: string[]
   cc: string[]
   triggeredBy: number
+  attachments?: EmailAttachment[]
 }): Promise<SendCorrespondenceEmailResult> {
-  const { template, values, to, cc, triggeredBy } = input
+  const { template, values, to, cc, triggeredBy, attachments } = input
 
   const subject = renderTemplate(template.subject, values)
   const text = renderTemplate(template.body, values)
@@ -268,7 +281,14 @@ export async function sendCorrespondenceEmail(input: {
   }
 
   try {
-    const result = await sendEmail({ to, cc: cc.length > 0 ? cc : undefined, subject, html, text })
+    const result = await sendEmail({
+      to,
+      cc: cc.length > 0 ? cc : undefined,
+      subject,
+      html,
+      text,
+      attachments,
+    })
     await logAll({ resendId: result.id, status: "sent" })
     return { resendId: result.id, subject, body: text }
   } catch (err) {

@@ -9,6 +9,7 @@ import { ApiError } from '@/api/client'
 import type { ClientDetail } from '@/api/clients'
 import type { PolicyDetail } from '@/api/policies'
 import type { CorrespondenceTemplate } from '@/api/correspondenceTemplates'
+import type { PolicyAttachment } from '@/api/policyAttachments'
 
 const client = {
   id: 42,
@@ -87,6 +88,35 @@ const mergeValues = {
   agentName: 'Alex Agent',
   agentEmail: 'alex@example.com',
 }
+
+const attachments = [
+  {
+    id: 11,
+    policyId: 900,
+    fileName: 'dec-page.pdf',
+    description: null,
+    mimeType: 'application/pdf',
+    sizeBytes: 2048,
+    isVoided: false,
+    sourceType: 'upload',
+    sourceId: null,
+    createdAt: '2026-01-01T00:00:00',
+    uploadedBy: { id: 1, name: 'Alex Agent', email: 'alex@example.com' },
+  },
+  {
+    id: 12,
+    policyId: 900,
+    fileName: 'id-card.pdf',
+    description: null,
+    mimeType: 'application/pdf',
+    sizeBytes: 4096,
+    isVoided: false,
+    sourceType: 'upload',
+    sourceId: null,
+    createdAt: '2026-01-01T00:00:00',
+    uploadedBy: { id: 1, name: 'Alex Agent', email: 'alex@example.com' },
+  },
+] satisfies PolicyAttachment[]
 
 function createTestQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -311,6 +341,38 @@ export const NoTemplatesYetAsAdmin: Story = {
     await expect(
       await within(dialog).findByRole('link', { name: /create one/i })
     ).toBeInTheDocument()
+  },
+}
+
+// Opened from the Attachments card's "Send to client" action: controlled open,
+// with files pre-attached. The section lists them, a file can be dropped, and
+// the send carries the remaining ids.
+export const WithPreselectedAttachments: Story = {
+  args: {
+    open: true,
+    onOpenChange: fn(),
+    initialAttachmentIds: [11, 12],
+    getPolicyAttachmentsFn: fn(async () => attachments),
+  },
+  play: async ({ args }) => {
+    const dialog = await screen.findByRole('dialog')
+    // Both selected files are listed under Attachments.
+    await expect(await within(dialog).findByText('dec-page.pdf')).toBeInTheDocument()
+    await expect(within(dialog).getByText('id-card.pdf')).toBeInTheDocument()
+
+    // Removing one drops it, and only the remaining file is sent.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Remove id-card.pdf' }))
+    await expect(within(dialog).queryByText('id-card.pdf')).toBeNull()
+
+    await chooseTemplate('Renewal Notice')
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Send/ }))
+
+    await expect(args.sendFn).toHaveBeenCalledWith(900, {
+      templateId: 7,
+      to: ['jane@example.com'],
+      cc: [],
+      attachmentIds: [11],
+    })
   },
 }
 

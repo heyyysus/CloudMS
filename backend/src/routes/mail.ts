@@ -4,8 +4,10 @@ import {
   createPolicyLog,
   findClientById,
   findCorrespondenceTemplateById,
+  findPolicyAttachmentById,
   getClientWithDetails,
   getPolicyWithDetails,
+  linkAttachmentsToLog,
   listEmailsByClientId,
 } from "../repositories"
 import {
@@ -14,10 +16,23 @@ import {
   sendCorrespondenceEmail,
 } from "../emails"
 import { firstIssue, parseId } from "./helpers"
-import { MailNotConfiguredError, MailSendError, plainTextToHtml, sendEmail } from "../mailer"
+import {
+  MailNotConfiguredError,
+  MailSendError,
+  plainTextToHtml,
+  sendEmail,
+  type EmailAttachment,
+} from "../mailer"
+import { getObject, R2NotConfiguredError } from "../storage/r2"
 import { sendClientEmailBody, sendCorrespondenceBody } from "./schemas"
 
 export const mailRouter = Router()
+
+// Total attached bytes a single correspondence send may carry. Well under
+// Resend's 40 MB per-message ceiling, leaving room for the base64 overhead
+// (~33%) and the message body itself. Per-file size is already capped at
+// upload time.
+const MAX_ATTACHMENT_TOTAL_BYTES = 25 * 1024 * 1024
 
 // Sends an email to one or more of a client's on-file addresses. Admin-only:
 // this is a free-text send, so it's scoped to admins rather than all staff.
@@ -88,6 +103,11 @@ function handleMailError(err: unknown, req: Request, res: Response): boolean {
     res.status(502).json({ error: "Email delivery is unavailable" })
     return true
   }
+  if (err instanceof R2NotConfiguredError) {
+    req.log.error(err)
+    res.status(503).json({ error: "File storage is not configured" })
+    return true
+  }
   return false
 }
 
@@ -104,6 +124,68 @@ async function resolveMergeValues(policyId: number, agent: Express.Request["user
     policy,
     values: buildCorrespondenceMergeValues({ client, policy, agent: agent! }),
   }
+}
+
+// A policy attachment cleared for sending: DB row vetted (right policy, not
+// voided, within the size budget), bytes not yet read. The route fetches the
+// bytes from R2 only once everything else about the send has checked out.
+interface ResolvedAttachment {
+  id: number
+  fileName: string
+  storageKey: string
+}
+
+type ResolveAttachmentsResult =
+  | { status: "ok"; attachments: ResolvedAttachment[] }
+  | { status: "error"; code: number; message: string }
+
+// Vets the requested attachment ids against the policy without touching R2:
+// each must exist, belong to this policy, not be voided (no emailing a
+// reversed receipt), and the batch must fit the size budget. Duplicate ids are
+// collapsed. Returns the vetted rows, or the response the route should send.
+async function resolveAttachments(
+  policyId: number,
+  attachmentIds: number[] | undefined
+): Promise<ResolveAttachmentsResult> {
+  const ids = [...new Set(attachmentIds ?? [])]
+  if (ids.length === 0) return { status: "ok", attachments: [] }
+
+  const rows = await Promise.all(ids.map((id) => findPolicyAttachmentById(id)))
+
+  const attachments: ResolvedAttachment[] = []
+  let totalBytes = 0
+  for (const row of rows) {
+    if (!row) return { status: "error", code: 404, message: "Attachment not found" }
+    if (row.policyId !== policyId) {
+      return { status: "error", code: 400, message: "Attachment belongs to another policy" }
+    }
+    if (row.isVoided) {
+      return { status: "error", code: 400, message: "Cannot send a voided attachment" }
+    }
+    totalBytes += row.sizeBytes
+    attachments.push({ id: row.id, fileName: row.fileName, storageKey: row.storageKey })
+  }
+
+  if (totalBytes > MAX_ATTACHMENT_TOTAL_BYTES) {
+    const limitMb = Math.floor(MAX_ATTACHMENT_TOTAL_BYTES / (1024 * 1024))
+    return { status: "error", code: 400, message: `Attachments exceed the ${limitMb} MB limit` }
+  }
+
+  return { status: "ok", attachments }
+}
+
+// Reads each vetted attachment out of R2 and base64-encodes it for Resend.
+// Kept separate from resolveAttachments so its R2 failures surface inside the
+// route's try/catch (mapped to 503) rather than during validation.
+async function loadAttachmentContents(
+  attachments: ResolvedAttachment[]
+): Promise<EmailAttachment[]> {
+  return Promise.all(
+    attachments.map(async (a) => ({
+      filename: a.fileName,
+      content: (await getObject(a.storageKey)).toString("base64"),
+    }))
+  )
 }
 
 // Backs the preview pane of the send dialog. Returning the value map (rather
@@ -144,7 +226,7 @@ mailRouter.post(
       res.status(400).json({ error: firstIssue(parsed.error) })
       return
     }
-    const { templateId, to } = parsed.data
+    const { templateId, to, attachmentIds } = parsed.data
     const cc = parsed.data.cc ?? []
 
     // Both lists are already lowercased by the schema, so this catches the
@@ -170,20 +252,32 @@ mailRouter.post(
       return
     }
 
+    // Vet the attachments against the policy before sending anything; byte
+    // fetching from R2 happens below, inside the try, so its failures map to a
+    // 503 rather than escaping validation.
+    const attachmentsResult = await resolveAttachments(policyId, attachmentIds)
+    if (attachmentsResult.status === "error") {
+      res.status(attachmentsResult.code).json({ error: attachmentsResult.message })
+      return
+    }
+    const vettedAttachments = attachmentsResult.attachments
+
     try {
+      const emailAttachments = await loadAttachmentContents(vettedAttachments)
       const result = await sendCorrespondenceEmail({
         template,
         values: resolved.values,
         to,
         cc,
         triggeredBy: req.user!.id,
+        attachments: emailAttachments.length > 0 ? emailAttachments : undefined,
       })
 
       // Best-effort, and awaited before responding so the caller's next fetch
       // of the log already sees it. The mail is gone by now, so a log failure
       // is logged rather than turned into a 500 on a send that succeeded.
       try {
-        await createPolicyLog({
+        const log = await createPolicyLog({
           policyId,
           authorId: req.user!.id,
           body: correspondenceSentLogBody({
@@ -191,8 +285,19 @@ mailRouter.post(
             cc,
             subject: result.subject,
             body: result.body,
+            attachments: vettedAttachments.map((a) => a.fileName),
           }),
         })
+
+        // Tie the sent files to the log row so opening it shows exactly which
+        // documents went out. Same-policy is re-checked inside the repository.
+        if (log && vettedAttachments.length > 0) {
+          await linkAttachmentsToLog({
+            logId: log.id,
+            attachmentIds: vettedAttachments.map((a) => a.id),
+            linkedBy: req.user!.id,
+          })
+        }
       } catch (err) {
         req.log.error(err, "Failed to write correspondence policy log")
       }
@@ -205,6 +310,7 @@ mailRouter.post(
           actorId: req.user?.id,
           templateKey: template.key,
           resendId: result.resendId,
+          attachmentCount: vettedAttachments.length,
         },
         "correspondence sent"
       )

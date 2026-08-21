@@ -11,6 +11,8 @@ export interface SendCorrespondenceBody {
   templateId: number
   to: string[]
   cc?: string[]
+  // Ids of the policy's attachments to send along. Omitted for a plain send.
+  attachmentIds?: number[]
 }
 
 export interface SendCorrespondenceResult {

@@ -326,6 +326,10 @@ export const sendCorrespondenceBody = z.object({
   templateId: idParam,
   to: recipientList.min(1),
   cc: recipientList.optional(),
+  // Policy attachments to send along. Capped at 10 files; the route also
+  // enforces a total-size limit and that each belongs to the policy and isn't
+  // voided. Omitted/empty means a plain, attachment-free send.
+  attachmentIds: z.array(idParam).max(10).optional(),
 })
 
 export const inviteUserBody = z.object({

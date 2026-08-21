@@ -4,15 +4,26 @@ import request from "supertest"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
 import { db } from "../db"
-import { emailLog, emailTemplates } from "../db/schema"
+import { emailLog, emailTemplates, policyAttachments } from "../db/schema"
 import { CORRESPONDENCE_MERGE_FIELDS, WELCOME_TEMPLATE_KEY } from "../emails"
 import {
   addEmailToClient,
   createCorrespondenceTemplate,
+  createPolicyAttachment,
   findEmailTemplateByKey,
+  listPolicyLogAttachmentsByPolicyId,
   listPolicyLogsByPolicyId,
 } from "../repositories"
+import { getObject } from "../storage/r2"
 import { makeSessionCookie, TestContext } from "./testHelpers"
+
+// Attachment sends read the file bytes back out of R2 to base64-encode them.
+// Mocked so tests don't need real R2 credentials; everything else in the
+// module (R2NotConfiguredError, presign, etc.) is kept.
+vi.mock("../storage/r2", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../storage/r2")>()
+  return { ...actual, getObject: vi.fn().mockResolvedValue(Buffer.from("PDFBYTES")) }
+})
 
 const ctx = new TestContext()
 
@@ -20,6 +31,7 @@ const ORIGINAL_ENV = { ...process.env }
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.mocked(getObject).mockReset().mockResolvedValue(Buffer.from("PDFBYTES"))
   process.env = { ...ORIGINAL_ENV }
   return ctx.cleanup()
 })
@@ -284,6 +296,31 @@ describe("GET /policies/:policyId/merge-fields", () => {
   })
 })
 
+// A policy attachment row backed by a fake R2 key (getObject is mocked, so no
+// real object needs to exist). Attachments cascade-delete with their policy,
+// so TestContext teardown reaps them.
+async function makeAttachment(
+  policyId: number,
+  createdBy: number,
+  overrides: { fileName?: string; sizeBytes?: number; isVoided?: boolean } = {}
+) {
+  const attachment = await createPolicyAttachment({
+    policyId,
+    fileName: overrides.fileName ?? "declarations.pdf",
+    storageKey: `policy-attachments/${policyId}/${randomUUID()}-file.pdf`,
+    mimeType: "application/pdf",
+    sizeBytes: overrides.sizeBytes ?? 1024,
+    createdBy,
+  })
+  if (overrides.isVoided) {
+    await db
+      .update(policyAttachments)
+      .set({ isVoided: true })
+      .where(eq(policyAttachments.id, attachment.id))
+  }
+  return attachment
+}
+
 describe("POST /policies/:policyId/send-correspondence", () => {
   it("returns 401 without a cookie", async () => {
     const res = await request(app)
@@ -516,5 +553,120 @@ describe("POST /policies/:policyId/send-correspondence", () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].status).toBe("failed")
     expect(await listPolicyLogsByPolicyId(policy.id)).toHaveLength(0)
+  })
+
+  it("attaches the selected files, base64-encoded, and records them on the log", async () => {
+    configureMail()
+    const { cookie, user, policy } = await makeSendFixture("send-attach")
+    const template = await makeTemplate()
+    const first = await makeAttachment(policy.id, user.id, { fileName: "dec-page.pdf" })
+    const second = await makeAttachment(policy.id, user.id, { fileName: "id-card.pdf" })
+    const fetchMock = stubResend({ id: "msg_corr_attach" })
+
+    const res = await request(app)
+      .post(`/policies/${policy.id}/send-correspondence`)
+      .set("Cookie", cookie)
+      .send({
+        templateId: template.id,
+        to: ["jane@example.com"],
+        attachmentIds: [first.id, second.id],
+      })
+
+    expect(res.status).toBe(201)
+
+    // The Resend request carries both files, with the bytes from R2 base64'd.
+    const requestBody = JSON.parse(fetchMock.mock.calls[0][1]?.body as string)
+    expect(requestBody.attachments).toEqual([
+      { filename: "dec-page.pdf", content: Buffer.from("PDFBYTES").toString("base64") },
+      { filename: "id-card.pdf", content: Buffer.from("PDFBYTES").toString("base64") },
+    ])
+    expect(vi.mocked(getObject)).toHaveBeenCalledTimes(2)
+
+    // The policy log lists the file names, and the files are linked to it.
+    const logs = await listPolicyLogsByPolicyId(policy.id)
+    expect(logs).toHaveLength(1)
+    expect(logs[0].body).toContain("Attachments: dec-page.pdf, id-card.pdf")
+
+    const links = await listPolicyLogAttachmentsByPolicyId(policy.id)
+    expect(links.map((l) => l.attachment.id).sort()).toEqual([first.id, second.id].sort())
+  })
+
+  it("returns 400 when an attachment belongs to another policy", async () => {
+    configureMail()
+    const { cookie, user, policy } = await makeSendFixture("send-attach-crosspolicy")
+    const template = await makeTemplate()
+    const otherPolicy = await ctx.policy({ clientId: policy.clientId, carrierId: policy.carrierId })
+    const foreign = await makeAttachment(otherPolicy.id, user.id)
+    const fetchMock = stubResend({ id: "msg_never" })
+
+    const res = await request(app)
+      .post(`/policies/${policy.id}/send-correspondence`)
+      .set("Cookie", cookie)
+      .send({ templateId: template.id, to: ["jane@example.com"], attachmentIds: [foreign.id] })
+
+    expect(res.status).toBe(400)
+    // Nothing was sent, and no log was written.
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(await listPolicyLogsByPolicyId(policy.id)).toHaveLength(0)
+  })
+
+  it("returns 400 for a voided attachment", async () => {
+    configureMail()
+    const { cookie, user, policy } = await makeSendFixture("send-attach-voided")
+    const template = await makeTemplate()
+    const voided = await makeAttachment(policy.id, user.id, { isVoided: true })
+    stubResend({ id: "msg_never" })
+
+    const res = await request(app)
+      .post(`/policies/${policy.id}/send-correspondence`)
+      .set("Cookie", cookie)
+      .send({ templateId: template.id, to: ["jane@example.com"], attachmentIds: [voided.id] })
+
+    expect(res.status).toBe(400)
+  })
+
+  it("returns 404 for an unknown attachment id", async () => {
+    configureMail()
+    const { cookie, policy } = await makeSendFixture("send-attach-404")
+    const template = await makeTemplate()
+    stubResend({ id: "msg_never" })
+
+    const res = await request(app)
+      .post(`/policies/${policy.id}/send-correspondence`)
+      .set("Cookie", cookie)
+      .send({ templateId: template.id, to: ["jane@example.com"], attachmentIds: [999999999] })
+
+    expect(res.status).toBe(404)
+  })
+
+  it("returns 400 when the attachments exceed the total size limit", async () => {
+    configureMail()
+    const { cookie, user, policy } = await makeSendFixture("send-attach-toolarge")
+    const template = await makeTemplate()
+    const huge = await makeAttachment(policy.id, user.id, { sizeBytes: 26 * 1024 * 1024 })
+    stubResend({ id: "msg_never" })
+
+    const res = await request(app)
+      .post(`/policies/${policy.id}/send-correspondence`)
+      .set("Cookie", cookie)
+      .send({ templateId: template.id, to: ["jane@example.com"], attachmentIds: [huge.id] })
+
+    expect(res.status).toBe(400)
+  })
+
+  it("omits attachments from the Resend request for a plain send", async () => {
+    configureMail()
+    const { cookie, policy } = await makeSendFixture("send-attach-none")
+    const template = await makeTemplate()
+    const fetchMock = stubResend({ id: "msg_plain" })
+
+    await request(app)
+      .post(`/policies/${policy.id}/send-correspondence`)
+      .set("Cookie", cookie)
+      .send({ templateId: template.id, to: ["jane@example.com"] })
+
+    const requestBody = JSON.parse(fetchMock.mock.calls[0][1]?.body as string)
+    expect(requestBody).not.toHaveProperty("attachments")
+    expect(vi.mocked(getObject)).not.toHaveBeenCalled()
   })
 })

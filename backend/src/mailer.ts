@@ -15,6 +15,14 @@ export class MailNotConfiguredError extends Error {}
 // route can map it to a 502 instead of letting it surface as a generic 500.
 export class MailSendError extends Error {}
 
+// A file to attach. `content` is the raw bytes base64-encoded, matching the
+// shape Resend's `attachments` array expects; the caller reads the object out
+// of R2 and encodes it.
+export interface EmailAttachment {
+  filename: string
+  content: string
+}
+
 export interface SendEmailInput {
   to: string[]
   // Copied recipients. Resend omits the header entirely when absent, so an
@@ -23,6 +31,9 @@ export interface SendEmailInput {
   subject: string
   html: string
   text: string
+  // Omitted from the request body when empty, so a plain send stays byte-for-
+  // byte what it was before attachments existed.
+  attachments?: EmailAttachment[]
 }
 
 export interface SendEmailResult {
@@ -63,6 +74,9 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         subject: input.subject,
         html: input.html,
         text: input.text,
+        ...(input.attachments && input.attachments.length > 0
+          ? { attachments: input.attachments }
+          : {}),
         ...(replyTo ? { reply_to: replyTo } : {}),
       }),
       signal: AbortSignal.timeout(MAIL_TIMEOUT_MS),

@@ -105,3 +105,13 @@ export async function deleteObject(key: string): Promise<void> {
   const { client, bucket } = getClient()
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
 }
+
+// Streams an object's bytes into a Buffer. Used when the server itself needs
+// the content - e.g. base64-encoding a policy attachment to send it as an
+// email attachment - rather than handing the browser a presigned URL.
+export async function getObject(key: string): Promise<Buffer> {
+  const { client, bucket } = getClient()
+  const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))
+  if (!result.Body) throw new Error(`R2 object ${key} has no body`)
+  return Buffer.from(await result.Body.transformToByteArray())
+}

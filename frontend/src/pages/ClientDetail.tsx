@@ -347,6 +347,9 @@ function ClientDetail() {
                       policyId={policy.id}
                       onAddAttachment={() => openAttachmentDialog()}
                       currentUserId={user?.id}
+                      client={client}
+                      policy={query?.data}
+                      isAdmin={user?.role === 'admin'}
                     />
                   }
                 />

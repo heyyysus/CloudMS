@@ -66,6 +66,26 @@ describe("sendEmail", () => {
     expect(body.reply_to).toBeUndefined()
   })
 
+  it("includes attachments in the request body when given, and omits the key otherwise", async () => {
+    process.env.RESEND_API_KEY = "re_test"
+    process.env.MAIL_FROM = "Cloud CMS <noreply@example.com>"
+    const fetchMock = stubResend({ id: "msg_123" })
+
+    await sendEmail({
+      to: ["client@example.com"],
+      subject: "Hi",
+      html: "<p>Hi</p>",
+      text: "Hi",
+      attachments: [{ filename: "dec.pdf", content: "QkFTRTY0" }],
+    })
+    const withAttachments = JSON.parse(fetchMock.mock.calls[0][1]?.body as string)
+    expect(withAttachments.attachments).toEqual([{ filename: "dec.pdf", content: "QkFTRTY0" }])
+
+    await sendEmail({ to: ["client@example.com"], subject: "Hi", html: "<p>Hi</p>", text: "Hi" })
+    const withoutAttachments = JSON.parse(fetchMock.mock.calls[1][1]?.body as string)
+    expect(withoutAttachments).not.toHaveProperty("attachments")
+  })
+
   it("includes reply_to when MAIL_REPLY_TO is set", async () => {
     process.env.RESEND_API_KEY = "re_test"
     process.env.MAIL_FROM = "Cloud CMS <noreply@example.com>"

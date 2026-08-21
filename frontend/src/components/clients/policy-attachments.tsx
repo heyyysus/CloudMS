@@ -6,6 +6,7 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/componen
 import { Skeleton } from '@/components/ui/skeleton'
 import { AttachmentPreviewDialog } from '@/components/clients/attachment-preview-dialog'
 import { LinkAttachmentsToLogDialog } from '@/components/clients/link-attachments-to-log-dialog'
+import { SendCorrespondenceDialog } from '@/components/clients/send-correspondence-dialog'
 import { LogAuthorChip } from '@/components/clients/log-author-chip'
 import { attachmentIcon, stripFileExtension } from '@/lib/file-display'
 import { formatFileSize } from '@/lib/format-file-size'
@@ -18,15 +19,30 @@ import {
 } from '@/api/policyAttachments'
 import { linkAttachmentsToLog } from '@/api/policyLogAttachments'
 import { getPolicyLogs } from '@/api/policyLogs'
+import { getPolicyMergeValues, sendPolicyCorrespondence } from '@/api/correspondence'
+import { getCorrespondenceTemplates } from '@/api/correspondenceTemplates'
+import type { ClientDetail } from '@/api/clients'
+import type { PolicyDetail } from '@/api/policies'
 
 interface PolicyAttachmentsProps {
   policyId: number
   onAddAttachment: () => void
   currentUserId?: number
+  // The client and full policy detail power the "Send to client" action's send
+  // dialog. Optional so the card still renders (Select/Link only) while the
+  // policy detail is still loading; the Send action appears once both arrive.
+  client?: ClientDetail
+  policy?: PolicyDetail
+  isAdmin?: boolean
   getPolicyAttachmentsFn?: typeof getPolicyAttachments
   getPolicyAttachmentLinkFn?: typeof getPolicyAttachmentLink
   getPolicyLogsFn?: typeof getPolicyLogs
   linkAttachmentsToLogFn?: typeof linkAttachmentsToLog
+  // Send-dialog dependency injection, forwarded so stories can drive the
+  // "Send to client" flow without real network.
+  getCorrespondenceTemplatesFn?: typeof getCorrespondenceTemplates
+  getPolicyMergeValuesFn?: typeof getPolicyMergeValues
+  sendPolicyCorrespondenceFn?: typeof sendPolicyCorrespondence
   // Opens the card already in selection mode; only used by stories.
   initialSelecting?: boolean
 }
@@ -62,10 +78,16 @@ export function PolicyAttachments({
   policyId,
   onAddAttachment,
   currentUserId,
+  client,
+  policy,
+  isAdmin = false,
   getPolicyAttachmentsFn = getPolicyAttachments,
   getPolicyAttachmentLinkFn = getPolicyAttachmentLink,
   getPolicyLogsFn = getPolicyLogs,
   linkAttachmentsToLogFn = linkAttachmentsToLog,
+  getCorrespondenceTemplatesFn = getCorrespondenceTemplates,
+  getPolicyMergeValuesFn = getPolicyMergeValues,
+  sendPolicyCorrespondenceFn = sendPolicyCorrespondence,
   initialSelecting = false,
 }: PolicyAttachmentsProps) {
   const [selected, setSelected] = useState<PolicyAttachment | null>(null)
@@ -75,6 +97,10 @@ export function PolicyAttachments({
     initialSelecting ? new Set() : null
   )
   const [linkDialogOpen, setLinkDialogOpen] = useState(false)
+  const [sendDialogOpen, setSendDialogOpen] = useState(false)
+  // The "Send to client" action needs the client + policy the send dialog
+  // merges against; without them the card offers Link-to-log only.
+  const canSend = client !== undefined && policy !== undefined
 
   const { data: attachments, isPending, isError } = useQuery({
     queryKey: ['policyAttachments', policyId],
@@ -113,6 +139,17 @@ export function PolicyAttachments({
               >
                 Link to log
               </Button>
+              {canSend && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={selectedIds.size === 0}
+                  onClick={() => setSendDialogOpen(true)}
+                >
+                  Send to client
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="ghost"
@@ -242,6 +279,22 @@ export function PolicyAttachments({
         getPolicyLogsFn={getPolicyLogsFn}
         linkAttachmentsToLogFn={linkAttachmentsToLogFn}
       />
+      {client && policy && (
+        <SendCorrespondenceDialog
+          client={client}
+          policy={policy}
+          isAdmin={isAdmin}
+          open={sendDialogOpen}
+          onOpenChange={setSendDialogOpen}
+          initialAttachmentIds={selectedAttachments.map((a) => a.id)}
+          // Once the send lands, drop the selection like Link-to-log does.
+          onSent={() => setSelectedIds(null)}
+          getTemplatesFn={getCorrespondenceTemplatesFn}
+          getMergeValuesFn={getPolicyMergeValuesFn}
+          getPolicyAttachmentsFn={getPolicyAttachmentsFn}
+          sendFn={sendPolicyCorrespondenceFn}
+        />
+      )}
     </Card>
   )
 }

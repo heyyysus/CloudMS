@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Link } from 'react-router'
-import { MailIcon, PlusIcon, XIcon } from 'lucide-react'
+import { MailIcon, PaperclipIcon, PlusIcon, XIcon } from 'lucide-react'
 import type { ClientDetail } from '@/api/clients'
 import type { PolicyDetail } from '@/api/policies'
 import {
@@ -13,6 +13,8 @@ import {
   type SendCorrespondenceBody,
 } from '@/api/correspondence'
 import { getCorrespondenceTemplates } from '@/api/correspondenceTemplates'
+import { getPolicyAttachments } from '@/api/policyAttachments'
+import { formatFileSize } from '@/lib/format-file-size'
 import { Button } from '@/components/ui/button'
 import { Combobox } from '@/components/ui/combobox'
 import {
@@ -66,8 +68,21 @@ interface SendCorrespondenceDialogProps {
   // component renders in isolation (stories) without an AuthProvider - the
   // same convention InvoiceReceiptDialog uses.
   isAdmin?: boolean
+  // Controlled open, used when the dialog is opened from elsewhere (the
+  // Attachments card's "Send to client" action) rather than its own trigger
+  // button. When both are omitted the dialog manages its own state and renders
+  // the default "Send" trigger.
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  // Files to pre-attach. When non-empty the dialog shows an Attachments
+  // section listing them (removable) and includes them in the send.
+  initialAttachmentIds?: number[]
+  // Called after a successful send, so a parent that opened the dialog (the
+  // Attachments card) can drop its selection.
+  onSent?: () => void
   getTemplatesFn?: typeof getCorrespondenceTemplates
   getMergeValuesFn?: typeof getPolicyMergeValues
+  getPolicyAttachmentsFn?: typeof getPolicyAttachments
   sendFn?: typeof sendPolicyCorrespondence
 }
 
@@ -80,11 +95,24 @@ export function SendCorrespondenceDialog({
   client,
   policy,
   isAdmin = false,
+  open: controlledOpen,
+  onOpenChange,
+  initialAttachmentIds,
+  onSent,
   getTemplatesFn = getCorrespondenceTemplates,
   getMergeValuesFn = getPolicyMergeValues,
+  getPolicyAttachmentsFn = getPolicyAttachments,
   sendFn = sendPolicyCorrespondence,
 }: SendCorrespondenceDialogProps) {
-  const [open, setOpen] = useState(false)
+  // Controlled when a parent passes `open`; otherwise the dialog owns the
+  // state and renders its own trigger button.
+  const isControlled = controlledOpen !== undefined
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = isControlled ? controlledOpen : internalOpen
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setInternalOpen(next)
+    onOpenChange?.(next)
+  }
   const queryClient = useQueryClient()
   const toast = useToast()
 
@@ -98,6 +126,17 @@ export function SendCorrespondenceDialog({
     queryKey: ['policyMergeValues', policy.id],
     queryFn: ({ signal }) => getMergeValuesFn(policy.id, signal),
     enabled: open,
+  })
+
+  // The dialog only shows an attachments section when it was opened with files
+  // to send (from the Attachments card's "Send to client" action). The plain
+  // "Send" button opens it with none, and it behaves exactly as before.
+  const hasInitialAttachments = (initialAttachmentIds?.length ?? 0) > 0
+
+  const attachmentsQuery = useQuery({
+    queryKey: ['policyAttachments', policy.id],
+    queryFn: ({ signal }) => getPolicyAttachmentsFn(policy.id, signal),
+    enabled: open && hasInitialAttachments,
   })
 
   const {
@@ -127,6 +166,19 @@ export function SendCorrespondenceDialog({
     reset({ templateId: '', to: firstOnFileEmail ? [{ email: firstOnFileEmail }] : [], cc: [] })
   }, [open, firstOnFileEmail, reset])
 
+  // Attachments live in local state (not the form) so removing one is a plain
+  // filter. Seeded from the ids that opened the dialog, and reseeded each open
+  // so a reopen never carries a prior selection. Keyed on the serialized ids,
+  // not the array reference, so a parent re-render with the same files doesn't
+  // wipe removals the user just made.
+  const initialAttachmentKey = (initialAttachmentIds ?? []).join(',')
+  const [attachmentIds, setAttachmentIds] = useState<number[]>(initialAttachmentIds ?? [])
+  useEffect(() => {
+    if (!open) return
+    setAttachmentIds(initialAttachmentIds ?? [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialAttachmentKey])
+
   const watchedTemplateId = watch('templateId')
   const watchedTo = watch('to')
   const watchedCc = watch('cc')
@@ -147,18 +199,35 @@ export function SendCorrespondenceDialog({
   const subjectPreview = selectedTemplate ? renderPreview(selectedTemplate.subject, mergeValues) : ''
   const bodyPreview = selectedTemplate ? renderPreview(selectedTemplate.body, mergeValues) : ''
 
+  // The chosen attachments resolved to their metadata, in the order selected.
+  const selectedAttachments = attachmentIds.flatMap((id) => {
+    const found = attachmentsQuery.data?.find((a) => a.id === id)
+    return found ? [found] : []
+  })
+  const totalAttachmentBytes = selectedAttachments.reduce((sum, a) => sum + a.sizeBytes, 0)
+  // Don't let a send fire before we know what the files are - otherwise a
+  // removal the user is about to make wouldn't be reflected.
+  const attachmentsLoading = hasInitialAttachments && attachmentsQuery.isPending
+
   const mutation = useMutation({
     mutationFn: (body: SendCorrespondenceBody) => sendFn(policy.id, body),
     onSuccess: (result) => {
-      // The send appended a policy log entry server-side; refetch so it shows
-      // up in the Logs subtab without a page reload.
+      // The send appended a policy log entry server-side (with the sent files
+      // linked to it); refetch the logs and their attachment badges so they
+      // show up in the Logs subtab without a page reload.
       queryClient.invalidateQueries({ queryKey: ['policyLogs', policy.id] })
+      queryClient.invalidateQueries({ queryKey: ['policyLogAttachments', policy.id] })
       setOpen(false)
+      onSent?.()
       const count = result.to.length + result.cc.length
       toast.success(`Email sent to ${count} recipient${count === 1 ? '' : 's'}`)
     },
     onError: (error) => toast.error(error.message),
   })
+
+  function removeAttachment(id: number) {
+    setAttachmentIds((current) => current.filter((a) => a !== id))
+  }
 
   return (
     <Dialog
@@ -168,11 +237,13 @@ export function SendCorrespondenceDialog({
         if (!next) mutation.reset()
       }}
     >
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <MailIcon /> Send
-        </Button>
-      </DialogTrigger>
+      {!isControlled && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            <MailIcon /> Send
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Send correspondence</DialogTitle>
@@ -188,6 +259,9 @@ export function SendCorrespondenceDialog({
               templateId: Number(values.templateId),
               to: values.to.map((r) => normalize(r.email)),
               cc: values.cc.map((r) => normalize(r.email)),
+              // Only sent when files are attached, so a plain send stays a
+              // { templateId, to, cc } request exactly as before.
+              ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
             })
           )}
         >
@@ -250,6 +324,56 @@ export function SendCorrespondenceDialog({
               <FieldError errors={errors.templateId ? [errors.templateId] : undefined} />
             </Field>
 
+            {hasInitialAttachments && (
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium">Attachments</span>
+                <p className="text-xs text-muted-foreground">
+                  These files will be attached to the email. Remove any you don't want to send.
+                </p>
+                {attachmentsQuery.isPending ? (
+                  <Skeleton className="h-12 w-full" />
+                ) : selectedAttachments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No files attached — the email will be sent without attachments.
+                  </p>
+                ) : (
+                  <div className="rounded-lg border">
+                    {selectedAttachments.map((attachment) => (
+                      <div
+                        key={attachment.id}
+                        className="flex items-center gap-2 border-b px-3 py-2 last:border-b-0"
+                      >
+                        <PaperclipIcon
+                          aria-hidden="true"
+                          className="size-4 shrink-0 text-muted-foreground"
+                        />
+                        <span className="min-w-0 flex-1 truncate text-sm" title={attachment.fileName}>
+                          {attachment.fileName}
+                        </span>
+                        <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+                          {formatFileSize(attachment.sizeBytes)}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Remove ${attachment.fileName}`}
+                          onClick={() => removeAttachment(attachment.id)}
+                        >
+                          <XIcon />
+                        </Button>
+                      </div>
+                    ))}
+                    <div className="px-3 py-2 text-xs text-muted-foreground">
+                      {selectedAttachments.length} file
+                      {selectedAttachments.length === 1 ? '' : 's'} ·{' '}
+                      {formatFileSize(totalAttachmentBytes)} total
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex flex-col gap-1">
               <span className="text-sm font-medium">Preview</span>
               <p className="text-xs text-muted-foreground">
@@ -280,7 +404,11 @@ export function SendCorrespondenceDialog({
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <SubmitButton isPending={mutation.isPending} pendingLabel="Sending…">
+            <SubmitButton
+              isPending={mutation.isPending}
+              pendingLabel="Sending…"
+              disabled={attachmentsLoading}
+            >
               Send
             </SubmitButton>
           </div>

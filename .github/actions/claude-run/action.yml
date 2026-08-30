@@ -77,8 +77,15 @@ runs:
           echo "|---|---|---|---|---|---|"
           echo "| $turns | $in_tok | $cr_tok | $cw_tok | $out_tok | $cost |"
         } >> "$GITHUB_STEP_SUMMARY"
+        # On a max-turns stop the SDK returns an empty result; fall back to the last assistant text
+        # so a cap hit keeps whatever Claude had written.
+        text=$(jq -r '.result // ""' <<< "$res")
+        if [[ -z "$text" ]]; then
+          text=$(jq -r '[.[] | select(.type=="assistant") | .message.content[]? | select(.type=="text") | .text] | last // ""' "$EXEC_FILE")
+          echo "note: result empty (subtype $(jq -r '.subtype // "?"' <<< "$res")); using last assistant text" >&2
+        fi
         {
           echo "result<<__CLAUDE_RESULT__"
-          jq -r '.result // ""' <<< "$res"
+          printf '%s\n' "$text"
           echo "__CLAUDE_RESULT__"
         } >> "$GITHUB_OUTPUT"

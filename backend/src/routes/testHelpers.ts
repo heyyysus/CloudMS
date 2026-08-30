@@ -35,6 +35,7 @@ import type {
   NewCarrier,
   NewClient,
   NewPerson,
+  NewUser,
   NewVehicle,
   ReminderRule,
   User,
@@ -73,8 +74,12 @@ export function isoDaysFromToday(days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-export async function makeTestUser(prefix: string, role: UserRole = "staff"): Promise<User> {
-  return createUser({ email: `${unique(prefix)}@example.com`, role })
+export async function makeTestUser(
+  prefix: string,
+  role: UserRole = "staff",
+  overrides: Partial<NewUser> = {}
+): Promise<User> {
+  return createUser({ email: `${unique(prefix)}@example.com`, role, ...overrides })
 }
 
 export async function makeSessionCookie(userId: number): Promise<string> {
@@ -100,8 +105,8 @@ export class TestContext {
   private templateIds: number[] = []
   private ruleIds: number[] = []
 
-  async user(prefix: string, role: UserRole = "staff") {
-    const u = await makeTestUser(prefix, role)
+  async user(prefix: string, role: UserRole = "staff", overrides: Partial<NewUser> = {}) {
+    const u = await makeTestUser(prefix, role, overrides)
     this.userIds.push(u.id)
     return u
   }

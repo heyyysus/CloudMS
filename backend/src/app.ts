@@ -2,9 +2,12 @@ import cookieParser from "cookie-parser"
 import express, { Application, NextFunction, Request, Response } from "express"
 import pinoHttp from "pino-http"
 import { authRouter } from "./auth/routes"
+import { demoAuthRouter } from "./auth/demoRoutes"
+import { demoMode } from "./config"
 import { logger } from "./logger"
 import { carriersRouter } from "./routes/carriers"
 import { clientsRouter } from "./routes/clients"
+import { configRouter } from "./routes/config"
 import { correspondenceTemplatesRouter } from "./routes/correspondenceTemplates"
 import { emailTemplatesRouter } from "./routes/emailTemplates"
 import { invoicesRouter } from "./routes/invoices"
@@ -41,6 +44,10 @@ app.use(express.json({ limit: "256kb" }))
 app.use(cookieParser())
 
 app.use(authRouter)
+// Genuinely absent (not just guarded) when demo mode is off, so a real
+// instance answers with Express's default 404.
+if (demoMode()) app.use(demoAuthRouter)
+app.use(configRouter)
 app.use(personsRouter)
 app.use(clientsRouter)
 app.use(policiesRouter)

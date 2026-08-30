@@ -51,6 +51,21 @@ mechanics. What a frontend integration needs to know:
   user: `GET /auth/me`. Logout: `POST /auth/logout`.
 - There is no refresh-token flow; a session lasts 7 days and a fresh login
   is required after that (or after 401).
+- On a demo instance (`GET /config` reports `demoMode: true`), `POST
+  /auth/demo` with `{ name }` is also available: it mints a fresh admin
+  account and the same kind of session cookie, with no Google token. On a
+  real instance this route doesn't exist — it 404s. See [Config](#config)
+  below.
+
+## Config
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| GET | `/config` | none (unauthenticated) | `{ demoMode: boolean }` |
+
+Public even on a real production instance, so a frontend can decide whether
+to offer demo sign-in before any user is authenticated. It carries nothing
+else.
 
 ## No pagination
 

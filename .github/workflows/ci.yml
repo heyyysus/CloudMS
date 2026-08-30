@@ -31,6 +31,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # coverage summary comment on PRs
     defaults:
       run:
         working-directory: backend
@@ -68,7 +71,25 @@ jobs:
       # user) as the production container's dist/db/migrate.js, so tests that
       # depend on baseline data (e.g. the welcome template) see it too.
       - run: npx ts-node src/db/migrate.ts
-      - run: npm test
+      # Coverage is report-only (no thresholds in vitest.config.ts): it tracks
+      # the metric without gating the build.
+      - run: npm run test:coverage
+
+      - name: Coverage summary
+        if: always() && hashFiles('backend/coverage/coverage-summary.json') != ''
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          working-directory: backend
+          json-summary-path: coverage/coverage-summary.json
+          file-coverage-mode: changes
+
+      - uses: actions/upload-artifact@v4
+        if: always() && hashFiles('backend/coverage/lcov.info') != ''
+        with:
+          name: backend-coverage
+          path: backend/coverage/lcov.info
+          retention-days: 7
+
       - run: npm run build
 
   image:

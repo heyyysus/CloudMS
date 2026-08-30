@@ -6,7 +6,7 @@ const globals = require("globals")
 
 module.exports = tseslint.config(
   {
-    ignores: ["dist/**", "node_modules/**", "drizzle/**"],
+    ignores: ["dist/**", "node_modules/**", "drizzle/**", "coverage/**"],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

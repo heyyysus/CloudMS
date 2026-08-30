@@ -37,6 +37,7 @@ runs:
   using: composite
   steps:
     - id: claude
+      continue-on-error: true
       uses: anthropics/claude-code-action@v1
       with:
         prompt: ${{ inputs.prompt }}

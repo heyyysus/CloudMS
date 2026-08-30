@@ -2,6 +2,7 @@ import cookieParser from "cookie-parser"
 import express, { Application, NextFunction, Request, Response } from "express"
 import pinoHttp from "pino-http"
 import { authRouter } from "./auth/routes"
+import { DemoDisabledError } from "./demo"
 import { logger } from "./logger"
 import { carriersRouter } from "./routes/carriers"
 import { clientsRouter } from "./routes/clients"
@@ -77,6 +78,10 @@ interface PgError extends Error {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: PgError, req: Request, res: Response, next: NextFunction) => {
+  if (err instanceof DemoDisabledError) {
+    res.status(403).json({ error: "Disabled in demo mode" })
+    return
+  }
   const code = err.code ?? err.cause?.code
   if (code === "23505") {
     res.status(409).json({ error: "Duplicate value" })

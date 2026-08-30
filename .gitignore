@@ -99,3 +99,6 @@ Thumbs.db
 .tmp/
 *.local
 *storybook.log
+
+# Per-agent git worktrees (see CLAUDE.md - concurrent agents)
+.claude/worktrees/

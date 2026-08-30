@@ -103,3 +103,13 @@ The plan's own open questions still apply and weren't re-litigated here:
 blanket 403→logout interceptor that a demo 403 would trip (no frontend work
 in this issue's scope, so unverified — flagged for a follow-up frontend
 issue).
+
+## Docs
+
+`docs/API.md` already documents the demo-mode `403`s (mail, correspondence,
+reminder tick) as part of the implementation commits — no gaps found. No
+other doc changes needed: README.md doesn't document individual env vars
+(RESEND_API_KEY, R2_*, GOOGLE_CLIENT_ID aren't listed there either, so
+DEMO_MODE follows the same convention of living only in `.env.example`), and
+AUTH_SESSIONS_EXPLAINED.md/frontend-ui-design.md are unaffected (no
+auth/session or UI changes in this diff).

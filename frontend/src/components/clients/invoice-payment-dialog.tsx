@@ -840,6 +840,10 @@ export function InvoicePaymentDialog({
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['invoices', 'byClient', client.id] })
+      // The ledger's payments query is keyed by policy, and this dialog can
+      // bill any of the client's policies - same whole-key reasoning as
+      // policyLogs below.
+      queryClient.invalidateQueries({ queryKey: ['payments', 'byPolicy'] })
       // The backend appends a policy log for the invoice and for each payment.
       // This dialog can bill any of the client's policies, so invalidate the
       // whole key rather than plumbing a policyId through - only the mounted

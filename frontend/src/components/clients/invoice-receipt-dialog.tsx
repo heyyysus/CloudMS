@@ -245,6 +245,10 @@ export function InvoiceReceiptDialog({
   // does - only the mounted query actually refetches.
   function refreshAfterVoid() {
     queryClient.invalidateQueries({ queryKey: ['invoices', 'byClient', client.id] })
+    // Whole-key invalidation, same reasoning as policyLogs/policyAttachments
+    // below: the ledger's payments query is keyed by policy, and voiding a
+    // payment reopens its invoice, so any policy's ledger could be stale.
+    queryClient.invalidateQueries({ queryKey: ['payments', 'byPolicy'] })
     queryClient.invalidateQueries({ queryKey: ['policyLogs'] })
     queryClient.invalidateQueries({ queryKey: ['policyAttachments'] })
   }

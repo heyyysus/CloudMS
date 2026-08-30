@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { AttachmentPreviewDialog } from '@/components/clients/attachment-preview-dialog'
 import { LinkAttachmentsToLogDialog } from '@/components/clients/link-attachments-to-log-dialog'
 import { LogAuthorChip } from '@/components/clients/log-author-chip'
+import { RECORD_LIST_CONTAINER, RECORD_LIST_HEADER, RECORD_LIST_ROW } from '@/components/clients/record-list'
 import { attachmentIcon, stripFileExtension } from '@/lib/file-display'
 import { formatFileSize } from '@/lib/format-file-size'
 import { formatLogTimestamp } from '@/lib/log-datetime'
@@ -154,13 +155,8 @@ export function PolicyAttachments({
           </p>
         )}
         {!isPending && !isError && attachments && attachments.length > 0 && (
-          <div className="max-h-96 overflow-y-auto rounded-md border bg-background text-sm">
-            <div
-              className={cn(
-                selecting ? ATTACHMENT_GRID_SELECTING : ATTACHMENT_GRID,
-                'sticky top-0 z-10 border-b bg-background py-1.5 text-xs font-semibold text-muted-foreground'
-              )}
-            >
+          <div className={RECORD_LIST_CONTAINER}>
+            <div className={cn(selecting ? ATTACHMENT_GRID_SELECTING : ATTACHMENT_GRID, RECORD_LIST_HEADER)}>
               {selecting && <span aria-hidden="true" />}
               <span aria-hidden="true" />
               <span>File</span>
@@ -186,7 +182,8 @@ export function PolicyAttachments({
                   title={selecting ? 'Select' : 'Preview'}
                   className={cn(
                     selecting ? ATTACHMENT_GRID_SELECTING : ATTACHMENT_GRID,
-                    'w-full cursor-pointer py-1 text-left odd:bg-muted-foreground/15 hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none',
+                    RECORD_LIST_ROW,
+                    'cursor-pointer',
                     isSelected && 'bg-primary/10',
                     // Only admins ever receive voided rows.
                     attachment.isVoided && 'opacity-60'

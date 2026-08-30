@@ -74,3 +74,11 @@ UI flag + docs).
   filed one — leaving that decision to the reviewer/user per the plan's own
   note ("Reviewer: say if you want it folded in here instead").
 - No DB migration needed — `drivers.dl_number` was already nullable.
+
+## Docs
+
+`docs/API.md` was already updated by the implementation stage (blank/whitespace
+`dlNumber` documented as treated like an omitted value, stored as `NULL`); no
+further doc changes needed — no auth/session, setup/env, or new reusable
+design-system convention here (`MissingDlBadge` is a small feature-specific
+component reusing existing `text-warning` tokens).

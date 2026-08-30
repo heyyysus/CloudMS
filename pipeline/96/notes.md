@@ -77,3 +77,12 @@ vendored source around instead.
   section, and PROJECT.md's note that there's no separate vitest-in-CI gap
   once that suite runs) and exercises the real rendered markup and click
   behaviour, not just types.
+
+## Docs
+
+`docs/frontend-ui-design.md` was already updated as part of the implementation
+(Stack section's `table.tsx`/TanStack Table note, plus a new Conventions
+bullet for the shared record-list chrome and overlay-button click-target
+pattern). Verified both against the current code and made no further edits.
+API.md, AUTH_SESSIONS_EXPLAINED.md, and README.md are unaffected — this is a
+pure frontend visual/markup refactor with no route, auth, or setup changes.

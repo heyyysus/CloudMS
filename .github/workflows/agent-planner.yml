@@ -11,7 +11,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: agent-planner-${{ github.event.issue.number }}
+  group: agent-planner-${{ github.event.issue.number }}-${{ github.event.label.name }}
   cancel-in-progress: true
 
 jobs:

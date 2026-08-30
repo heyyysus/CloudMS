@@ -88,7 +88,7 @@ export type CreatePolicyDriverBody =
   | {
       kind: 'existing'
       personId: number
-      // required by the server when the person has no drivers row yet
+      // ignored by the server when the person already has a drivers row
       dlNumber?: string
       rating?: 'rated' | 'excluded'
       sr22?: boolean
@@ -103,7 +103,7 @@ export type CreatePolicyDriverBody =
         relationToInsured: Person['relationToInsured']
         maritalStatus?: Person['maritalStatus']
       }
-      dlNumber: string
+      dlNumber?: string
       rating: 'rated' | 'excluded'
       sr22: boolean
     }

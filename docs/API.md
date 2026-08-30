@@ -22,12 +22,18 @@ depth — this doc assumes that context and focuses on the resource routes.
   of these tables hold secrets, unlike `users`/`sessions`, so no field
   whitelisting is needed.
 - **Errors**: `{ "error": string }`. Status codes:
-  - `400` — request body/query failed validation (Zod)
+  - `400` — request body/query failed validation (Zod), or the JSON body
+    couldn't be parsed
   - `401` — no/invalid/expired session
   - `403` — authenticated but wrong role
   - `404` — no row with that id
   - `409` — a Postgres constraint would be violated (duplicate unique value,
     or a foreign key still referencing the row being deleted)
+  - `413` — request body exceeds the 256kb limit (all routes, not just the
+    ones below)
+  - `429` — only when `DEMO_MODE=true`: the table a create route writes to
+    has hit `DEMO_MAX_ROWS_PER_TABLE`, so the create is refused until the
+    next reseed
   - `500` — unexpected error (logged server-side, no detail leaked to the client)
 
 ## Auth for frontend clients

@@ -118,6 +118,41 @@ describe("POST /policies", () => {
     })
     expect(res.status).toBe(400)
   })
+
+  it("treats a blank dlNumber for a new driver as not provided", async () => {
+    const user = await ctx.user("policies-create-blankdl")
+    const cookie = await makeSessionCookie(user.id)
+    const client = await ctx.client()
+    const carrier = await ctx.carrier()
+
+    const res = await request(app)
+      .post("/policies")
+      .set("Cookie", cookie)
+      .send({
+        clientId: client.id,
+        carrierId: carrier.id,
+        policyNumber: "TESTPOL-003",
+        effectiveDate: "2026-01-01",
+        expirationDate: "2027-01-01",
+        drivers: [
+          {
+            kind: "new",
+            person: {
+              firstName: "Blank",
+              lastName: "DL",
+              dateOfBirth: "1990-01-01",
+              gender: "m",
+              relationToInsured: "self",
+            },
+            dlNumber: "",
+          },
+        ],
+      })
+    expect(res.status).toBe(201)
+    ctx.track("policy", res.body.id)
+    expect(res.body.policyDrivers).toHaveLength(1)
+    expect(res.body.policyDrivers[0].driver.dlNumber).toBeNull()
+  })
 })
 
 describe("PATCH /policies/:id", () => {
@@ -255,6 +290,21 @@ describe("PATCH /policies/:id", () => {
       .patch(`/policies/${policy.id}`)
       .set("Cookie", cookie)
       .send({ drivers: [{ kind: "existing", personId: person.id }] })
+    expect(res.status).toBe(200)
+    expect(res.body.policyDrivers).toHaveLength(1)
+    expect(res.body.policyDrivers[0].driver.dlNumber).toBeNull()
+  })
+
+  it("treats a whitespace-only dlNumber as not provided", async () => {
+    const user = await ctx.user("policies-update-blankdl")
+    const cookie = await makeSessionCookie(user.id)
+    const policy = await ctx.policy()
+    const person = await ctx.person()
+
+    const res = await request(app)
+      .patch(`/policies/${policy.id}`)
+      .set("Cookie", cookie)
+      .send({ drivers: [{ kind: "existing", personId: person.id, dlNumber: "   " }] })
     expect(res.status).toBe(200)
     expect(res.body.policyDrivers).toHaveLength(1)
     expect(res.body.policyDrivers[0].driver.dlNumber).toBeNull()

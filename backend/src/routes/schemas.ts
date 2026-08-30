@@ -94,19 +94,28 @@ export const createPolicyVehicle = insertVehicleSchema.omit({
 })
 
 // dlNumber is optional on both branches — an agency may not have it yet
-// (e.g. a prospect client), so drivers can be recorded without one.
+// (e.g. a prospect client), so drivers can be recorded without one. A form
+// client sends "" for a DL it doesn't have; that means "not on file", not an
+// invalid value.
+const optionalDlNumber = z
+  .string()
+  .trim()
+  .max(50)
+  .optional()
+  .transform((value) => (value === "" ? undefined : value))
+
 export const createPolicyDriver = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("existing"),
     personId: z.number().int().positive(),
-    dlNumber: z.string().trim().min(1).max(50).optional(),
+    dlNumber: optionalDlNumber,
     rating: z.enum(driverRatingEnum.enumValues).optional(),
     sr22: z.boolean().optional(),
   }),
   z.object({
     kind: z.literal("new"),
     person: createPersonBody,
-    dlNumber: z.string().trim().min(1).max(50).optional(),
+    dlNumber: optionalDlNumber,
     rating: z.enum(driverRatingEnum.enumValues).default("rated"),
     sr22: z.boolean().default(false),
   }),

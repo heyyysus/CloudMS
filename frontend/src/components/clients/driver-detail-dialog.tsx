@@ -51,7 +51,14 @@ export function DriverDetailDialog({ driver, onOpenChange }: DriverDetailDialogP
               <Row label="First Name" value={driver.driver.person.firstName} />
               <Row label="Last Name" value={driver.driver.person.lastName} />
               <Row label="Date of Birth" value={formatDate(driver.driver.person.dateOfBirth) ?? '—'} />
-              <Row label="DL Number" value={driver.driver.dlNumber ?? '—'} />
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">DL Number</p>
+                {driver.driver.dlNumber ? (
+                  <CopyText className="text-sm" value={driver.driver.dlNumber} label="DL Number" />
+                ) : (
+                  <p className="text-sm text-warning">Not on file</p>
+                )}
+              </div>
               <Row label="Relation to Insured" value={relationLabel(driver.driver.person.relationToInsured)} />
               <Row label="Marital Status" value={maritalLabel(driver.driver.person.maritalStatus)} />
               <Row label="Gender" value={GENDER_LABEL[driver.driver.person.gender]} />

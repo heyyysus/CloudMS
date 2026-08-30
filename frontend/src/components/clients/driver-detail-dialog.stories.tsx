@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { fn } from 'storybook/test'
+import { expect, fn, screen } from 'storybook/test'
 import { DriverDetailDialog } from './driver-detail-dialog'
 import type { PolicyDriver } from '@/api/policies'
 
@@ -46,4 +46,11 @@ export const Open: Story = {
 
 export const Closed: Story = {
   args: { driver: null },
+}
+
+export const MissingDl: Story = {
+  args: { driver: { ...driver, driver: { ...driver.driver, dlNumber: null } } },
+  play: async () => {
+    await expect(await screen.findByText('Not on file')).toBeInTheDocument()
+  },
 }

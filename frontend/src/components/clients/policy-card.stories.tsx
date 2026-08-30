@@ -173,6 +173,36 @@ export const DateExpired: Story = {
   },
 }
 
+export const DriverMissingDl: Story = {
+  args: {
+    detail: {
+      ...detail,
+      policyDrivers: [
+        {
+          ...detail.policyDrivers[0],
+          id: 61,
+          driverId: 62,
+          driver: { ...detail.policyDrivers[0].driver, id: 62, dlNumber: null },
+        },
+      ],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByText('No DL on file')).toBeInTheDocument()
+  },
+}
+
+export const DriverWithDlHasNoBadge: Story = {
+  args: {
+    detail,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.queryByText('No DL on file')).not.toBeInTheDocument()
+  },
+}
+
 export const Pending: Story = {
   args: {
     policy: { ...bare, status: 'pending' },

@@ -1,0 +1,52 @@
+name: Check pipeline eligibility
+description: >-
+  An issue is eligible for the agent pipeline only if its author is listed in
+  .github/CODEOWNERS and (unless disabled) it carries the `agent` label.
+  Every stage re-runs this so trust is re-verified at each boundary.
+
+inputs:
+  issue_number:
+    required: true
+  require_agent_label:
+    default: "true"
+  github_token:
+    required: true
+
+outputs:
+  eligible:
+    value: ${{ steps.check.outputs.eligible }}
+  reason:
+    value: ${{ steps.check.outputs.reason }}
+  author:
+    value: ${{ steps.check.outputs.author }}
+
+runs:
+  using: composite
+  steps:
+    - id: check
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        ISSUE: ${{ inputs.issue_number }}
+        REQUIRE_AGENT: ${{ inputs.require_agent_label }}
+      run: |
+        set -euo pipefail
+        author=$(gh issue view "$ISSUE" --json author -q .author.login)
+        labels=$(gh issue view "$ISSUE" --json labels -q '.labels[].name')
+        echo "author=$author" >> "$GITHUB_OUTPUT"
+
+        # Individual @user handles in CODEOWNERS (teams like @org/team are ignored).
+        owners=$(grep -v '^\s*#' .github/CODEOWNERS | grep -oE '@[A-Za-z0-9-]+' | grep -v '/' | tr -d '@' | sort -u)
+
+        if ! grep -qxF "$author" <<< "$owners"; then
+          echo "eligible=false" >> "$GITHUB_OUTPUT"
+          echo "reason=author @$author is not in CODEOWNERS" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        if [[ "$REQUIRE_AGENT" == "true" ]] && ! grep -qxF "agent" <<< "$labels"; then
+          echo "eligible=false" >> "$GITHUB_OUTPUT"
+          echo "reason=issue no longer carries the agent label (treated as abort)" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        echo "eligible=true" >> "$GITHUB_OUTPUT"
+        echo "reason=ok" >> "$GITHUB_OUTPUT"

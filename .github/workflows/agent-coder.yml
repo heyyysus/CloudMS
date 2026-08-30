@@ -1,0 +1,159 @@
+name: agent-coder
+
+# Sonnet implements the approved plan on agent/issue-<n>. Postgres is provided because the
+# repo's PreToolUse hook runs the backend test suite on every commit touching backend/.
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: agent-coder-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  code:
+    if: github.event.label.name == 'pipeline:plan-approved'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:18.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: myapp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      ISSUE: ${{ github.event.issue.number }}
+      BRANCH: agent/issue-${{ github.event.issue.number }}
+      DATABASE_URL: postgresql://postgres:password@localhost:5432/myapp
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-${{ github.event.issue.number }}
+          fetch-depth: 0
+
+      - id: gate
+        uses: ./.github/actions/check-eligibility
+        with:
+          issue_number: ${{ env.ISSUE }}
+          github_token: ${{ github.token }}
+
+      - if: steps.gate.outputs.eligible != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+          REASON: ${{ steps.gate.outputs.reason }}
+        run: |
+          gh issue edit "$ISSUE" --remove-label "pipeline:plan-approved" --add-label "needs-human"
+          gh issue comment "$ISSUE" --body "Coder stopped: $REASON."
+          exit 1
+
+      - name: Mark in progress
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+        run: gh issue edit "$ISSUE" --remove-label "pipeline:plan-approved" --add-label "pipeline:in-progress"
+
+      - name: Sync with main
+        id: sync
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge --no-edit origin/main
+          echo "base=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install and migrate
+        run: |
+          set -euo pipefail
+          (cd backend && npm ci --legacy-peer-deps && npx ts-node src/db/migrate.ts)
+          (cd frontend && npm ci)
+
+      - name: Build prompt
+        env:
+          TITLE: ${{ github.event.issue.title }}
+        run: |
+          {
+            echo "PROMPT<<__PROMPT__"
+            cat <<EOF
+          You are the implementation stage of an automated pipeline for the CloudMS repo, working on
+          branch $BRANCH for GitHub issue #$ISSUE ("$TITLE"). You are on an isolated CI runner with its
+          own Postgres (DATABASE_URL is set) and dependencies already installed. The "Concurrent agents"
+          section of CLAUDE.md (shared working tree, worktrees, shared DB container, ports) does not apply
+          here; every other rule in CLAUDE.md does. Do not run npm run db:seed. Never push to main.
+
+          1. Read .claude/pipeline/$ISSUE/plan.md and .claude/pipeline/$ISSUE/review.md, then CLAUDE.md.
+          2. Implement exactly what plan.md scopes. If you must deviate, do the minimum and record why in
+             notes.md. Do not expand scope. Reuse existing patterns; backend tests use TestContext from
+             backend/src/routes/testHelpers.ts.
+          3. Before committing, run the checks CI runs, for each area you touched:
+             backend/:  npm run typecheck && npm run lint && npm run format:check && npm test && npm run build
+             frontend/: npm run lint && npm run build
+             Fix failures. Use "npm run format" in backend/ to fix formatting.
+          4. Write .claude/pipeline/$ISSUE/notes.md: what you implemented, key decisions, deviations
+             from the plan, anything the docs stage or PR reviewer should know, and which checks you ran.
+          5. Commit with git (small, descriptive commits; no Co-Authored-By trailer). A PreToolUse hook
+             runs the backend test suite when a commit touches backend/; if it blocks the commit, fix the
+             tests — do not bypass the hook. Then push: git push origin $BRANCH
+
+          Stop when the plan is implemented, checks pass, notes.md is committed, and the branch is pushed.
+          EOF
+            echo "__PROMPT__"
+          } >> "$GITHUB_ENV"
+
+      - id: claude
+        uses: ./.github/actions/claude-run
+        with:
+          stage: coder
+          model: sonnet
+          max_turns: 80
+          allowed_tools: "Read,Edit,Write,Grep,Glob,Bash"
+          prompt: ${{ env.PROMPT }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+
+      - name: Verify work landed
+        env:
+          BASE: ${{ steps.sync.outputs.base }}
+        run: |
+          set -euo pipefail
+          git push origin "$BRANCH" || true
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "Uncommitted changes left behind:"; git status --short; exit 1
+          fi
+          n=$(git rev-list --count "$BASE..HEAD")
+          [[ "$n" -gt 0 ]] || { echo "No commits were made"; exit 1; }
+          test -s ".claude/pipeline/$ISSUE/notes.md" || { echo "notes.md missing"; exit 1; }
+          echo "$n commit(s) on $BRANCH"
+
+      - name: Advance state
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+        run: |
+          gh issue comment "$ISSUE" --body "Implementation pushed to \`$BRANCH\` — running the docs stage."
+          gh issue edit "$ISSUE" --remove-label "pipeline:in-progress" --add-label "pipeline:docs"
+
+      - if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+        run: |
+          gh issue edit "$ISSUE" --remove-label "pipeline:in-progress" --remove-label "pipeline:plan-approved" --add-label "needs-human" || true
+          gh issue comment "$ISSUE" --body "Coder failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}. Any partial work is on \`$BRANCH\`." || true

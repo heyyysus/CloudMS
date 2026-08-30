@@ -1,0 +1,136 @@
+name: agent-plan-reviewer
+
+# Sonnet reviews plan.md against CLAUDE.md / PROJECT.md / the issue. Single attempt:
+# approved → pipeline:plan-approved, rejected → needs-human.
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: agent-plan-reviewer-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event.label.name == 'pipeline:plan-ready'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ISSUE: ${{ github.event.issue.number }}
+      BRANCH: agent/issue-${{ github.event.issue.number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-${{ github.event.issue.number }}
+          fetch-depth: 0
+
+      - id: gate
+        uses: ./.github/actions/check-eligibility
+        with:
+          issue_number: ${{ env.ISSUE }}
+          github_token: ${{ github.token }}
+
+      - if: steps.gate.outputs.eligible != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+          REASON: ${{ steps.gate.outputs.reason }}
+        run: |
+          gh issue edit "$ISSUE" --remove-label "pipeline:plan-ready" --add-label "needs-human"
+          gh issue comment "$ISSUE" --body "Plan review stopped: $REASON."
+          exit 1
+
+      - name: Build prompt
+        env:
+          TITLE: ${{ github.event.issue.title }}
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          {
+            echo "PROMPT<<__PROMPT__"
+            cat <<EOF
+          You are the plan-review stage of an automated pipeline for the CloudMS repo. Review
+          .claude/pipeline/$ISSUE/plan.md for GitHub issue #$ISSUE. You may read files but must not
+          change anything except writing .claude/pipeline/$ISSUE/review.md. Do not run git.
+
+          Read CLAUDE.md, PROJECT.md and the plan. Verify only what the plan claims (spot-check the
+          referenced files); keep exploration short.
+
+          Judge:
+          1. Scope: does the plan do what the issue asks — no more, no less?
+          2. Direction: consistent with PROJECT.md (pillars, current state, roadmap order)?
+          3. Soundness: approach and file list plausible for this codebase; reuses existing patterns?
+          4. Tests: adequate, and using TestContext fixtures for backend tests?
+          5. Security: auth/session handling, input validation, secrets, data exposure.
+          6. Conventions: anything in CLAUDE.md the plan would violate (ignore the concurrent-agents
+             section; this runs on an isolated runner).
+
+          Reject only for real problems (wrong scope, unsound approach, security risk, plan says the
+          issue is too vague). Do not reject for style. A rejection goes to a human, not back to the planner.
+
+          Write review.md as:
+          # Plan review — issue #$ISSUE
+          ## Findings   – bullets, most important first, with file references
+          ## Required changes (if rejected)
+          Verdict: approved
+          (or "Verdict: rejected" — exactly one of these two lines, last line of the file)
+
+          Issue #$ISSUE: $TITLE
+
+          Issue body:
+          $BODY
+          EOF
+            echo "__PROMPT__"
+          } >> "$GITHUB_ENV"
+
+      - id: claude
+        uses: ./.github/actions/claude-run
+        with:
+          stage: plan-reviewer
+          model: sonnet
+          max_turns: 15
+          allowed_tools: "Read,Grep,Glob,Write"
+          prompt: ${{ env.PROMPT }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+
+      - id: verdict
+        run: |
+          set -euo pipefail
+          f=".claude/pipeline/$ISSUE/review.md"
+          test -s "$f" || { echo "review.md was not written"; exit 1; }
+          v=$(grep -oiE '^Verdict: *(approved|rejected)' "$f" | tail -1 | awk '{print tolower($2)}')
+          [[ "$v" == "approved" || "$v" == "rejected" ]] || { echo "No verdict line in review.md"; exit 1; }
+          echo "verdict=$v" >> "$GITHUB_OUTPUT"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$f"
+          git commit -m "pipeline: plan review for #$ISSUE ($v)"
+          git push origin "$BRANCH"
+
+      - name: Advance state
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+          VERDICT: ${{ steps.verdict.outputs.verdict }}
+        run: |
+          set -euo pipefail
+          url="https://github.com/${GITHUB_REPOSITORY}/blob/${BRANCH}/.claude/pipeline/${ISSUE}/review.md"
+          if [[ "$VERDICT" == "approved" ]]; then
+            gh issue comment "$ISSUE" --body "Plan approved: $url — starting implementation."
+            gh issue edit "$ISSUE" --remove-label "pipeline:plan-ready" --add-label "pipeline:plan-approved"
+          else
+            body=$(printf 'Plan rejected: %s\n\n%s\n\nTo resume: edit `plan.md` on `%s`, then remove `needs-human` and add `pipeline:plan-approved`.' \
+              "$url" "$(sed -n '/^## Findings/,$p' ".claude/pipeline/$ISSUE/review.md")" "$BRANCH")
+            gh issue comment "$ISSUE" --body "$body"
+            gh issue edit "$ISSUE" --remove-label "pipeline:plan-ready" --add-label "needs-human"
+          fi
+
+      - if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+        run: |
+          gh issue edit "$ISSUE" --remove-label "pipeline:plan-ready" --add-label "needs-human" || true
+          gh issue comment "$ISSUE" --body "Plan review failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" || true

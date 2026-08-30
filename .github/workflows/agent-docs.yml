@@ -1,0 +1,142 @@
+name: agent-docs
+
+# Sonnet updates docs/*.md and README.md only when user-facing behaviour or API surface changed,
+# as a separate commit, then opens the PR (with the PAT so agent-pr-review fires).
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: agent-docs-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    if: github.event.label.name == 'pipeline:docs'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ISSUE: ${{ github.event.issue.number }}
+      BRANCH: agent/issue-${{ github.event.issue.number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/issue-${{ github.event.issue.number }}
+          fetch-depth: 0
+
+      - id: gate
+        uses: ./.github/actions/check-eligibility
+        with:
+          issue_number: ${{ env.ISSUE }}
+          github_token: ${{ github.token }}
+
+      - if: steps.gate.outputs.eligible != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+          REASON: ${{ steps.gate.outputs.reason }}
+        run: |
+          gh issue edit "$ISSUE" --remove-label "pipeline:docs" --add-label "needs-human"
+          gh issue comment "$ISSUE" --body "Docs stage stopped: $REASON."
+          exit 1
+
+      - name: Prepare diff
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git diff origin/main...HEAD --stat -- . ':!.claude/pipeline' ':!**/package-lock.json' > "$RUNNER_TEMP/diff.stat"
+          git diff origin/main...HEAD -- . ':!.claude/pipeline' ':!**/package-lock.json' ':!**/dist/**' \
+            | head -n 4000 > "$RUNNER_TEMP/diff.patch"
+          { echo "DIFF_STAT<<__S__"; cat "$RUNNER_TEMP/diff.stat"; echo "__S__"; } >> "$GITHUB_ENV"
+
+      - name: Build prompt
+        env:
+          TITLE: ${{ github.event.issue.title }}
+        run: |
+          {
+            echo "PROMPT<<__PROMPT__"
+            cat <<EOF
+          You are the documentation stage of an automated pipeline for the CloudMS repo, on branch $BRANCH
+          for GitHub issue #$ISSUE ("$TITLE"). The code is already implemented.
+
+          Read .claude/pipeline/$ISSUE/notes.md, then the code diff at $RUNNER_TEMP/diff.patch (changed files:
+          $DIFF_STAT
+          ).
+
+          Update documentation ONLY if the change affects user-facing behaviour or the API surface:
+          - docs/API.md for route/endpoint/shape changes
+          - docs/AUTH_SESSIONS_EXPLAINED.md for auth/session behaviour
+          - docs/frontend-ui-design.md for new UI conventions/components users of the design system need
+          - README.md for setup, env vars, scripts, or deploy steps
+          You may only edit files under docs/ and README.md. Never edit PROJECT.md, never add code
+          comments, never touch source files. Do not run git.
+
+          Whether or not you changed anything, append a final section to .claude/pipeline/$ISSUE/notes.md:
+          ## Docs
+          one or two lines: which docs were updated, or "no doc changes needed" and why.
+          EOF
+            echo "__PROMPT__"
+          } >> "$GITHUB_ENV"
+
+      - id: claude
+        uses: ./.github/actions/claude-run
+        with:
+          stage: docs
+          model: sonnet
+          max_turns: 20
+          allowed_tools: "Read,Grep,Glob,Edit,Write"
+          prompt: ${{ env.PROMPT }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+
+      - name: Commit docs
+        run: |
+          set -euo pipefail
+          # Anything outside docs/, README.md and notes.md is discarded: the docs stage may not touch code.
+          git add docs README.md ".claude/pipeline/$ISSUE/notes.md"
+          git checkout -- . 2>/dev/null || true
+          git clean -fd -e docs -e README.md >/dev/null 2>&1 || true
+          if ! git diff --cached --quiet -- docs README.md; then
+            git commit -m "docs: update for #$ISSUE" -- docs README.md
+          fi
+          if ! git diff --cached --quiet; then
+            git commit -m "pipeline: docs notes for #$ISSUE"
+          fi
+          git push origin "$BRANCH"
+
+      - name: Open PR
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+          TITLE: ${{ github.event.issue.title }}
+        run: |
+          set -euo pipefail
+          if gh pr list --head "$BRANCH" --state open --json number -q '.[0].number' | grep -q .; then
+            echo "PR already open"
+          else
+            {
+              echo "Fixes #$ISSUE"
+              echo
+              echo "Automated implementation by the agent pipeline. Plan, plan review and execution notes are in \`.claude/pipeline/$ISSUE/\`."
+              echo
+              echo "## Plan summary"
+              sed -n '/^## Goal/,/^## Files/p' ".claude/pipeline/$ISSUE/plan.md" | sed '$d'
+              echo
+              echo "## Notes"
+              sed -n '1,40p' ".claude/pipeline/$ISSUE/notes.md"
+            } > "$RUNNER_TEMP/pr-body.md"
+            gh pr create --base main --head "$BRANCH" --title "$TITLE (#$ISSUE)" --body-file "$RUNNER_TEMP/pr-body.md"
+          fi
+          gh issue edit "$ISSUE" --remove-label "pipeline:docs" --add-label "pipeline:pr-open"
+
+      - if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+        run: |
+          gh issue edit "$ISSUE" --remove-label "pipeline:docs" --add-label "needs-human" || true
+          gh issue comment "$ISSUE" --body "Docs stage failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" || true

@@ -1,0 +1,136 @@
+name: agent-planner
+
+# Opus writes .claude/pipeline/<n>/plan.md on branch agent/issue-<n>.
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: agent-planner-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    if: github.event.label.name == 'pipeline:needs-plan'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ISSUE: ${{ github.event.issue.number }}
+      BRANCH: agent/issue-${{ github.event.issue.number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: gate
+        uses: ./.github/actions/check-eligibility
+        with:
+          issue_number: ${{ env.ISSUE }}
+          github_token: ${{ github.token }}
+
+      - if: steps.gate.outputs.eligible != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+          REASON: ${{ steps.gate.outputs.reason }}
+        run: |
+          gh issue edit "$ISSUE" --remove-label "pipeline:needs-plan" --add-label "needs-human"
+          gh issue comment "$ISSUE" --body "Planner stopped: $REASON."
+          exit 1
+
+      - name: Prepare branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
+            git checkout -B "$BRANCH" "origin/$BRANCH"
+          else
+            git checkout -b "$BRANCH" origin/main
+          fi
+          mkdir -p ".claude/pipeline/$ISSUE"
+
+      - name: Build prompt
+        env:
+          TITLE: ${{ github.event.issue.title }}
+          BODY: ${{ github.event.issue.body }}
+          LABELS: ${{ join(github.event.issue.labels.*.name, ', ') }}
+        run: |
+          {
+            echo "PROMPT<<__PROMPT__"
+            cat <<EOF
+          You are the planning stage of an automated pipeline for the CloudMS repo. You are running on an
+          isolated CI runner, so the "Concurrent agents" rules in CLAUDE.md about the shared working tree,
+          worktrees and the shared Postgres container do not apply here; everything else in CLAUDE.md does.
+
+          Task: write an implementation plan for GitHub issue #$ISSUE to the file
+          .claude/pipeline/$ISSUE/plan.md. Do not implement anything and do not run git commit/push;
+          the workflow commits the file.
+
+          First read CLAUDE.md and PROJECT.md (goals, current state, roadmap). Then explore only the
+          code areas the issue touches. Keep exploration focused; you have a limited turn budget.
+
+          plan.md format:
+          ---
+          issue: $ISSUE
+          status: pending-review
+          ---
+          # <short title>
+          ## Goal            – what "done" means, in terms of the issue
+          ## Scope check     – how this fits PROJECT.md (pillars / roadmap); note if triage labels look wrong
+          ## Files / areas   – concrete paths to add or change (backend/, frontend/, docs/)
+          ## Approach        – step-by-step, referencing existing functions/patterns to reuse
+          ## Tests           – what to add/run (backend: vitest + TestContext fixtures; frontend: existing lint/build)
+          ## Touches backend – yes/no (the commit hook runs the backend test suite when yes)
+          ## Risks / open questions
+          ## Out of scope
+
+          If the issue is too vague to plan concretely, say so explicitly in Goal and list the questions
+          that need answers instead of inventing scope.
+
+          Issue #$ISSUE: $TITLE
+          Triage labels (Haiku's guess, may be wrong): $LABELS
+
+          Issue body:
+          $BODY
+          EOF
+            echo "__PROMPT__"
+          } >> "$GITHUB_ENV"
+
+      - id: claude
+        uses: ./.github/actions/claude-run
+        with:
+          stage: planner
+          model: opus
+          max_turns: 25
+          allowed_tools: "Read,Grep,Glob,Write,Edit,Bash(git log *),Bash(git diff *),Bash(ls *)"
+          prompt: ${{ env.PROMPT }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+
+      - name: Commit plan
+        run: |
+          set -euo pipefail
+          test -s ".claude/pipeline/$ISSUE/plan.md" || { echo "plan.md was not written"; exit 1; }
+          git add ".claude/pipeline/$ISSUE/plan.md"
+          git commit -m "pipeline: plan for #$ISSUE"
+          git push origin "$BRANCH"
+
+      - name: Advance state
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+        run: |
+          url="https://github.com/${GITHUB_REPOSITORY}/blob/${BRANCH}/.claude/pipeline/${ISSUE}/plan.md"
+          gh issue comment "$ISSUE" --body "Plan written: $url — sending to plan review."
+          gh issue edit "$ISSUE" --remove-label "pipeline:needs-plan" --add-label "pipeline:plan-ready"
+
+      - if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+        run: |
+          gh issue edit "$ISSUE" --remove-label "pipeline:needs-plan" --add-label "needs-human" || true
+          gh issue comment "$ISSUE" --body "Planner failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" || true

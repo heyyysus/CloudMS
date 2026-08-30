@@ -1,0 +1,83 @@
+name: agent-triage
+
+# Haiku classifies every issue opened by a CODEOWNER: one type label
+# (bug/enhancement/documentation/question) + one area label. Never applies `agent`.
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+  contents: read
+
+concurrency:
+  group: agent-triage-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    if: ${{ !endsWith(github.actor, '[bot]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ISSUE: ${{ github.event.issue.number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: gate
+        uses: ./.github/actions/check-eligibility
+        with:
+          issue_number: ${{ env.ISSUE }}
+          require_agent_label: "false"
+          github_token: ${{ github.token }}
+
+      - if: steps.gate.outputs.eligible == 'true'
+        env:
+          TITLE: ${{ github.event.issue.title }}
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          {
+            echo "PROMPT<<__PROMPT__"
+            cat <<EOF
+          Classify this GitHub issue for the CloudMS repo (Express/TypeScript backend in backend/,
+          Vite/React frontend in frontend/, infra = CI, docker, nginx, deploy scripts).
+
+          Reply with ONLY a single line of JSON, no prose, no code fence:
+          {"type": <one of "bug","enhancement","documentation","question">, "area": <one of "backend","frontend","infra">}
+
+          Title: $TITLE
+
+          Body:
+          $BODY
+          EOF
+            echo "__PROMPT__"
+          } >> "$GITHUB_ENV"
+
+      - id: claude
+        if: steps.gate.outputs.eligible == 'true'
+        uses: ./.github/actions/claude-run
+        with:
+          stage: triage
+          model: haiku
+          max_turns: 2
+          allowed_tools: ""
+          prompt: ${{ env.PROMPT }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+
+      - if: steps.gate.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ steps.claude.outputs.result }}
+        run: |
+          set -euo pipefail
+          json=$(grep -oE '\{[^}]*\}' <<< "$RESULT" | head -1 || true)
+          type=$(jq -r '.type // ""' <<< "${json:-{}}")
+          area=$(jq -r '.area // ""' <<< "${json:-{}}")
+          labels=()
+          case "$type" in bug|enhancement|documentation|question) labels+=("$type");; esac
+          case "$area" in backend|frontend|infra) labels+=("area:$area");; esac
+          if [[ ${#labels[@]} -eq 0 ]]; then echo "No usable classification: $RESULT"; exit 0; fi
+          args=(); for l in "${labels[@]}"; do args+=(--add-label "$l"); done
+          gh issue edit "$ISSUE" "${args[@]}"

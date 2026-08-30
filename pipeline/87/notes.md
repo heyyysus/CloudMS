@@ -105,3 +105,13 @@ Plan Risk #1: a credit (negative) balance can't occur with today's backend
 The ledger arithmetic and UI both handle negative balances correctly, but
 producing one needs backend support for unapplied payments/on-account credit
 — a separate issue, per the plan.
+
+## Docs
+
+`docs/frontend-ui-design.md` was already updated in the implementation commit
+(note that the vendored `table.tsx` is presentational-only and doesn't reopen
+the deferred TanStack Table decision) — no further edit needed there. No other
+doc changes needed: `GET /payments?policyId=` was already documented in
+`docs/API.md` before this change (only a frontend client wrapper is new, no
+route/shape change), and nothing here touches auth/session behaviour or
+setup/env/deploy steps.

@@ -49,3 +49,15 @@ export function updateUser(id: number, body: UpdateUserBody): Promise<AdminUser>
 export function resendWelcome(id: number): Promise<{ email: InviteEmailResult }> {
   return request(`/users/${id}/resend-welcome`, { method: 'POST' })
 }
+
+// Soft delete: the account disappears from getUsers and can never sign in
+// again. The row itself survives server-side (see backend comment on
+// users.deletedAt) - the only way back is restoreUser, reached by re-inviting
+// the same email.
+export function deleteUser(id: number): Promise<void> {
+  return request(`/users/${id}`, { method: 'DELETE' })
+}
+
+export function restoreUser(id: number): Promise<InviteUserResult> {
+  return request(`/users/${id}/restore`, { method: 'POST' })
+}

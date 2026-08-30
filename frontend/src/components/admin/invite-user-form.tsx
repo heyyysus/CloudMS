@@ -1,8 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { SubmitButton } from '@/components/ui/submit-button'
 import { Input } from '@/components/ui/input'
 import {
@@ -14,7 +14,14 @@ import {
 } from '@/components/ui/select'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { inviteUser, type InviteUserBody, type InviteUserResult } from '@/api/users'
+import { Button } from '@/components/ui/button'
+import { ApiError } from '@/api/client'
+import {
+  inviteUser,
+  restoreUser,
+  type InviteUserBody,
+  type InviteUserResult,
+} from '@/api/users'
 import { useToast } from '@/components/ui/toast'
 
 const inviteFormSchema = z.object({
@@ -120,13 +127,53 @@ export function InviteUserForm({
 
 interface InviteUserCardProps {
   inviteUserFn?: typeof inviteUser
+  restoreUserFn?: typeof restoreUser
 }
 
-export function InviteUserCard({ inviteUserFn = inviteUser }: InviteUserCardProps) {
+// A 409 from POST /users/invite carries this shape only when the email
+// belonged to a user that was later deleted (see backend/src/routes/users.ts).
+function deletedUserId(error: unknown): number | null {
+  if (!(error instanceof ApiError) || error.status !== 409) return null
+  const id = (error.body as { deletedUserId?: unknown } | null)?.deletedUserId
+  return typeof id === 'number' ? id : null
+}
+
+export function InviteUserCard({
+  inviteUserFn = inviteUser,
+  restoreUserFn = restoreUser,
+}: InviteUserCardProps) {
   const toast = useToast()
+  const queryClient = useQueryClient()
+  // Set only when invite hits the deleted-email 409, so the admin can confirm
+  // bringing the old account back under its original id instead of the
+  // invite silently failing on a row they can no longer see.
+  const [restoreCandidate, setRestoreCandidate] = useState<{ id: number; email: string } | null>(
+    null
+  )
+
   const mutation = useMutation<InviteUserResult, Error, InviteUserBody>({
     mutationFn: inviteUserFn,
-    onSuccess: () => toast.success('New user created'),
+    onSuccess: () => {
+      setRestoreCandidate(null)
+      toast.success('New user created')
+    },
+    onError: (error, variables) => {
+      const id = deletedUserId(error)
+      if (id !== null) {
+        setRestoreCandidate({ id, email: variables.email })
+        return
+      }
+      toast.error(error.message)
+    },
+  })
+
+  const restore = useMutation({
+    mutationFn: (id: number) => restoreUserFn(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      setRestoreCandidate(null)
+      toast.success('User restored')
+    },
     onError: (error) => toast.error(error.message),
   })
 
@@ -141,11 +188,40 @@ export function InviteUserCard({ inviteUserFn = inviteUser }: InviteUserCardProp
       </CardHeader>
       <CardContent>
         <InviteUserForm
-          onSubmit={(body) => mutation.mutate(body)}
+          onSubmit={(body) => {
+            setRestoreCandidate(null)
+            mutation.mutate(body)
+          }}
           isPending={mutation.isPending}
-          errorMessage={mutation.isError ? mutation.error.message : null}
+          errorMessage={mutation.isError && !restoreCandidate ? mutation.error.message : null}
           resetToken={mutation.isSuccess ? mutation.data.user.id : undefined}
         />
+        {restoreCandidate && (
+          <div
+            role="alert"
+            className="mt-4 flex flex-col gap-2 rounded-md border border-amber-300 p-3 text-sm dark:border-amber-800"
+          >
+            <p>{restoreCandidate.email} belonged to a deleted user. Restore their account?</p>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setRestoreCandidate(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={restore.isPending}
+                onClick={() => restore.mutate(restoreCandidate.id)}
+              >
+                {restore.isPending ? 'Restoring…' : 'Restore'}
+              </Button>
+            </div>
+          </div>
+        )}
         {mutation.isSuccess && mutation.data.email.status === 'sent' && (
           <div role="status" className="mt-4 text-sm text-emerald-600 dark:text-emerald-400">
             Invited {mutation.data.user.email} — welcome email sent.

@@ -1,7 +1,8 @@
 name: agent-pr-review
 
 # Reviews agent/issue-* PRs. Diff-scoped: only commits since the last reviewed SHA
-# (tracked in a marker comment). Advisory — never a required check. Sonnet by default,
+# (tracked in a marker comment). Direct diff review in one session (no /code-review: its subagent
+# fan-out returns early in headless mode). Advisory — never a required check. Sonnet by default,
 # Opus when the PR carries `agent:deep-review`. Bot pushes never retrigger this.
 
 on:
@@ -71,26 +72,17 @@ jobs:
           set -euo pipefail
           title=$(gh issue view "$ISSUE" --json title -q .title)
           body=$(gh issue view "$ISSUE" --json body -q .body)
-          # First full-PR pass runs the bundled /code-review skill (posts inline comments itself);
-          # incremental passes review only the new diff directly.
-          if [[ "$MODE" == "full PR" ]]; then
-            lead="/code-review $PR medium --comment"
-            scope="Use the /code-review findings as the core of your review. The PR diff is also at $RUNNER_TEMP/diff.patch."
-          else
-            lead=""
-            scope="The diff to review is at $RUNNER_TEMP/diff.patch (stat: $RUNNER_TEMP/diff.stat). Review the diff,
-          not the repo: read surrounding code only where needed to judge a specific hunk."
-          fi
           {
             echo "PROMPT<<__PROMPT__"
             cat <<EOF
-          $lead
           You are the PR-review stage of an automated pipeline for the CloudMS repo. Review PR #$PR
           (branch agent/issue-$ISSUE) for GitHub issue #$ISSUE. Review mode: $MODE.
 
-          $scope
-          Read-only: do not edit files, do not commit. Also read pipeline/$ISSUE/plan.md
-          (what was supposed to happen).
+          The diff to review is at $RUNNER_TEMP/diff.patch (stat: $RUNNER_TEMP/diff.stat). Review the diff,
+          not the repo: read surrounding code only where needed to judge a specific hunk. Also read
+          pipeline/$ISSUE/plan.md (what was supposed to happen). Read-only: do not edit files, do not
+          commit, do not post comments yourself, and do not spawn subagents or use the /code-review skill —
+          do the review in this session and put the full review in your final message.
 
           Check, in order of importance:
           1. Correctness bugs and regressions (backend Express/Drizzle routes, frontend React/TanStack).
@@ -119,7 +111,7 @@ jobs:
           stage: pr-review
           model: ${{ steps.model.outputs.model }}
           max_turns: 15
-          allowed_tools: "Read,Grep,Glob,Bash(git diff *),Bash(git log *),Bash(git show *),Bash(gh pr view *),Bash(gh pr diff *),Bash(gh pr comment *),Bash(gh pr review *),Bash(gh api *)"
+          allowed_tools: "Read,Grep,Glob,Bash(git diff *),Bash(git log *),Bash(git show *)"
           prompt: ${{ env.PROMPT }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}

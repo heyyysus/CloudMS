@@ -1,0 +1,15 @@
+# Plan review — issue #101
+
+## Findings
+
+- **Hard dependency is unmerged, confirmed by spot-check.** `grep -rn "DEMO_MODE\|is_demo\|isDemo" --include="*.ts" .` returns nothing in the repo today — no demo-mode helper, no `users.is_demo` column, no demo-user seeding. The plan itself surfaces this prominently (Goal, Risks, Out of scope) and states plainly: "This issue cannot be implemented against `main` as it stands," recommending the coder either branch from the foundation PR or have the pipeline hold the issue rather than invent a divergent definition of `is_demo`. That is the right call, but it means this plan cannot proceed to implementation as-is — a human needs to decide sequencing (hold vs. supply the foundation branch) before any code is written.
+- Everything the plan claims about the current codebase checks out on spot-check: `backend/src/jobs/scheduler.ts`'s overlap guard (`running` flag, `unref()`, try/catch/finally) is exactly as described and a reasonable template for `demoReseed.ts`; `backend/src/jobs/config.ts`'s `num()` helper and resolve-at-call-site convention match; `backend/src/db/migrate.ts`'s admin/automation-user/`welcome`-template bootstrap blocks are exactly as described and are indeed the "easy thing to miss" the plan calls out in step 5; `schema.ts:72` (`sessions.userId` → `onDelete: "cascade"`) and `schema.ts:61` (`users.deletedBy` self-FK with no `onDelete` action) both confirm the plan's FK analysis; `src/index.ts`'s `GOOGLE_CLIENT_ID` fail-fast and the "timer only in `index.ts`, never `app.ts`" reasoning both check out.
+- Scope matches the issue (reseed job, wipe preservation, demo compose file, docs) with no overreach; the "Out of scope" list correctly excludes the foundation work, frontend changes, and CI/CD automation.
+- Security posture is thorough for a job that mass-deletes rows on a timer: fail-closed demo-mode check, refusal under `NODE_ENV=test`, timer kept out of `app.ts` so tests never import it, logging the target database name, no secrets in `.env.demo.example`, and an explicit warning that demo must never point at the production `DATABASE_URL`. Good line of defense given the blast radius the plan itself calls "the sharpest edge in this repo."
+- Tests correctly avoid calling the real `seed()`/`wipe()` against the shared database (consistent with CLAUDE.md's "never run `npm run db:seed`" rule) by using an injectable fake seed function for the scheduler/guard/config tests, and pushes destructive wipe-semantics verification to a throwaway database or an opt-in skipped test file. Sound given the constraints; this is job-level logic rather than route-level, so `TestContext` doesn't apply here — the injectable-fake approach is the correct substitute.
+
+## Required changes (if rejected)
+
+- Do not implement against `main` until the foundation issue (`DEMO_MODE`, `users.is_demo`) is merged, or until the coder is explicitly pointed at the foundation PR's branch to build on top of. A human should decide which, then this plan can proceed unchanged otherwise — the rest of the plan is sound.
+
+Verdict: rejected

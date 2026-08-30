@@ -2,9 +2,12 @@ import cookieParser from "cookie-parser"
 import express, { Application, NextFunction, Request, Response } from "express"
 import pinoHttp from "pino-http"
 import { authRouter } from "./auth/routes"
+import { demoAuthRouter } from "./auth/demoRoutes"
+import { demoMode } from "./config"
 import { logger } from "./logger"
 import { carriersRouter } from "./routes/carriers"
 import { clientsRouter } from "./routes/clients"
+import { configRouter } from "./routes/config"
 import { correspondenceTemplatesRouter } from "./routes/correspondenceTemplates"
 import { emailTemplatesRouter } from "./routes/emailTemplates"
 import { invoicesRouter } from "./routes/invoices"
@@ -37,10 +40,14 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 })
 
 app.use(pinoHttp({ logger }))
-app.use(express.json())
+app.use(express.json({ limit: "256kb" }))
 app.use(cookieParser())
 
 app.use(authRouter)
+// Genuinely absent (not just guarded) when demo mode is off, so a real
+// instance answers with Express's default 404.
+if (demoMode()) app.use(demoAuthRouter)
+app.use(configRouter)
 app.use(personsRouter)
 app.use(clientsRouter)
 app.use(policiesRouter)
@@ -75,8 +82,24 @@ interface PgError extends Error {
   cause?: { code?: string }
 }
 
+// body-parser rejects an oversized or malformed JSON body with its own
+// `status`/`statusCode` (no Postgres `code`); without this branch the
+// fallback below would report it as a 500.
+interface HttpError extends Error {
+  status?: number
+  statusCode?: number
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-app.use((err: PgError, req: Request, res: Response, next: NextFunction) => {
+app.use((err: PgError & HttpError, req: Request, res: Response, next: NextFunction) => {
+  const status = err.status ?? err.statusCode
+  if (typeof status === "number" && status >= 400 && status < 500) {
+    res
+      .status(status)
+      .json({ error: status === 413 ? "Request body too large" : "Invalid request body" })
+    return
+  }
+
   const code = err.code ?? err.cause?.code
   if (code === "23505") {
     res.status(409).json({ error: "Duplicate value" })

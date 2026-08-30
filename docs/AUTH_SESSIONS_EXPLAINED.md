@@ -13,6 +13,22 @@ statelessness for instant revocability (a session row can be deleted at any
 time), which matters more than statelessness here since every request
 already hits Postgres and the app handles insurance PII.
 
+### Demo mode
+
+A separate deployment can be started with `DEMO_MODE=true` (see
+`backend/src/config.ts`). That flag does two things: `GET /config` reports
+`{ demoMode: true }`, and `POST /auth/demo` (`backend/src/auth/demoRoutes.ts`)
+is mounted — with the flag off it isn't mounted at all, so the route 404s. The
+demo route takes no Google token at all: it creates a fresh `users` row
+(`role: "admin"`, `isDemo: true`, a random `demo-<hex>@example.com` address)
+and mints a session cookie exactly like `/auth/google` does — same
+`cookieOptions`, same `createSession` call — except the expiry comes from
+`DEMO_SESSION_TTL_MINUTES` (default 240 minutes) rather than the real
+`SESSION_TTL_MS` (7 days). Demo users are excluded from `GET /users`
+(`visibleToAdmin()` in `repositories/users.ts`) but are otherwise ordinary
+admin accounts — this is only safe because a demo deployment has its own,
+disposable database.
+
 ---
 
 ## `backend/src/repositories/users.ts`

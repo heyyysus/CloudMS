@@ -1,5 +1,7 @@
 import { Request, Response, Router } from "express"
 import { requireAuth, requireRole } from "../auth/middleware"
+import { clients } from "../db/schema"
+import { demoRowCeiling } from "../middleware/demoRowCeiling"
 import {
   createClient,
   deleteClient,
@@ -41,20 +43,25 @@ clientsRouter.get("/clients/:id", requireAuth, async (req: Request, res: Respons
   res.json(client)
 })
 
-clientsRouter.post("/clients", requireAuth, async (req: Request, res: Response) => {
-  const parsed = createClientBody.safeParse(req.body)
-  if (!parsed.success) {
-    res.status(400).json({ error: firstIssue(parsed.error) })
-    return
+clientsRouter.post(
+  "/clients",
+  requireAuth,
+  demoRowCeiling(clients),
+  async (req: Request, res: Response) => {
+    const parsed = createClientBody.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: firstIssue(parsed.error) })
+      return
+    }
+
+    const { phones, emails, ...clientInput } = parsed.data
+    const client = await createClient(clientInput)
+    if (phones) await replaceClientPhones(client.id, phones)
+    if (emails) await replaceClientEmails(client.id, emails)
+
+    res.status(201).json(await getClientWithDetails(client.id))
   }
-
-  const { phones, emails, ...clientInput } = parsed.data
-  const client = await createClient(clientInput)
-  if (phones) await replaceClientPhones(client.id, phones)
-  if (emails) await replaceClientEmails(client.id, emails)
-
-  res.status(201).json(await getClientWithDetails(client.id))
-})
+)
 
 clientsRouter.patch("/clients/:id", requireAuth, async (req: Request, res: Response) => {
   const id = parseId(req.params.id, res)

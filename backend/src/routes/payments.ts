@@ -1,5 +1,7 @@
 import { Request, Response, Router } from "express"
 import { requireAuth, requireRole } from "../auth/middleware"
+import { payments } from "../db/schema"
+import { demoRowCeiling } from "../middleware/demoRowCeiling"
 import {
   getPaymentWithDetails,
   getReceiptWithDetails,
@@ -49,38 +51,43 @@ paymentsRouter.get("/payments/:id", requireAuth, async (req: Request, res: Respo
 })
 
 // Records a payment against an open invoice and returns the receipt it mints.
-paymentsRouter.post("/payments", requireAuth, async (req: Request, res: Response) => {
-  const parsed = recordPaymentBody.safeParse(req.body)
-  if (!parsed.success) {
-    res.status(400).json({ error: firstIssue(parsed.error) })
-    return
-  }
+paymentsRouter.post(
+  "/payments",
+  requireAuth,
+  demoRowCeiling(payments),
+  async (req: Request, res: Response) => {
+    const parsed = recordPaymentBody.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: firstIssue(parsed.error) })
+      return
+    }
 
-  const result = await recordPayment({
-    invoiceId: parsed.data.invoiceId,
-    method: parsed.data.method,
-    amount: parsed.data.amount,
-    note: parsed.data.note ?? null,
-    receiptNote: parsed.data.receiptNote ?? null,
-    createdBy: req.user!.id,
-  })
+    const result = await recordPayment({
+      invoiceId: parsed.data.invoiceId,
+      method: parsed.data.method,
+      amount: parsed.data.amount,
+      note: parsed.data.note ?? null,
+      receiptNote: parsed.data.receiptNote ?? null,
+      createdBy: req.user!.id,
+    })
 
-  switch (result.status) {
-    case "invoice_not_found":
-      res.status(404).json({ error: "Invoice not found" })
-      return
-    case "invoice_not_open":
-      res.status(409).json({ error: "Invoice is not open for payment" })
-      return
-    case "ok":
-      // Awaited before responding so the receipt PDF is already filed on the
-      // caller's next read of the policy's attachments. logId ties it to the
-      // "Payment of $X ..." log this write appended.
-      await recordReceiptDocument(req, result.receiptId, result.logId)
-      res.status(201).json(await getReceiptWithDetails(result.receiptId))
-      return
+    switch (result.status) {
+      case "invoice_not_found":
+        res.status(404).json({ error: "Invoice not found" })
+        return
+      case "invoice_not_open":
+        res.status(409).json({ error: "Invoice is not open for payment" })
+        return
+      case "ok":
+        // Awaited before responding so the receipt PDF is already filed on the
+        // caller's next read of the policy's attachments. logId ties it to the
+        // "Payment of $X ..." log this write appended.
+        await recordReceiptDocument(req, result.receiptId, result.logId)
+        res.status(201).json(await getReceiptWithDetails(result.receiptId))
+        return
+    }
   }
-})
+)
 
 // Payments are immutable: no PATCH/DELETE. A mistaken payment is voided, which
 // reverses its trust-ledger movements and reopens the invoice. Admin-only, same

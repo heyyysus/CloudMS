@@ -2,13 +2,19 @@ import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { RECORD_LIST_CONTAINER, RECORD_LIST_HEADER, RECORD_LIST_ROW } from '@/components/clients/record-list'
 import { cn } from '@/lib/utils'
 import { formatMoney, centsToDecimalString } from '@/lib/money'
 import { formatLogTimestamp } from '@/lib/log-datetime'
 import { buildPolicyLedger, summarizeLedger, LEDGER_ROW_KIND_LABEL } from '@/lib/policy-ledger'
 import { getInvoices } from '@/api/invoices'
 import { getPaymentsByPolicy } from '@/api/payments'
+
+// Date/time (fits "MM/DD/YYYY - hh:mmpm") | type (fits "Payment void") |
+// reference ("Invoice #10" / "Payment #5") | description (the only column
+// that grows) | charge | credit | balance | action (the Pay button).
+const LEDGER_GRID =
+  'grid grid-cols-[11rem_6rem_7rem_minmax(0,1fr)_6rem_6rem_6rem_3.5rem] items-center gap-x-3 px-2'
 
 interface PolicyLedgerProps {
   clientId: number
@@ -108,76 +114,71 @@ export function PolicyLedger({
             {rows.length === 0 ? (
               <p className="text-sm text-muted-foreground">No accounting activity for this policy.</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Reference</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Charge</TableHead>
-                    <TableHead className="text-right">Credit</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row) => {
-                    const isInvoiceKind = row.kind === 'invoice' || row.kind === 'invoice_void'
-                    const isVoidRow = row.kind === 'invoice_void' || row.kind === 'payment_void'
-                    const canPay = row.kind === 'invoice' && invoiceStatusById.get(row.invoiceId) === 'open'
-                    return (
-                      <TableRow key={row.key} className={cn(row.isVoid && 'text-muted-foreground')}>
-                        <TableCell className="tabular-nums">{formatLogTimestamp(row.at)}</TableCell>
-                        <TableCell>{LEDGER_ROW_KIND_LABEL[row.kind]}</TableCell>
-                        <TableCell>
-                          {isInvoiceKind ? (
-                            <button
-                              type="button"
-                              onClick={() => onSelect(row.invoiceId)}
-                              className={cn(
-                                'underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                                row.isVoid && 'line-through'
-                              )}
-                            >
-                              {row.reference}
-                            </button>
-                          ) : (
-                            <span className={cn(row.isVoid && 'line-through')}>{row.reference}</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <span className={cn(row.isVoid && 'line-through')}>{row.description}</span>
-                          {isVoidRow && row.voidReason && (
-                            <span className="block text-xs text-muted-foreground">{row.voidReason}</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {row.chargeCents !== 0 ? formatMoney(centsToDecimalString(row.chargeCents)) : ''}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {row.creditCents !== 0 ? formatMoney(centsToDecimalString(row.creditCents)) : ''}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatMoney(centsToDecimalString(row.balanceCents))}
-                        </TableCell>
-                        <TableCell>
-                          {canPay && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => onPay(row.invoiceId)}
-                            >
-                              Pay
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
+              <div className={cn(RECORD_LIST_CONTAINER, 'overflow-x-auto font-mono')}>
+                <div className={cn(LEDGER_GRID, RECORD_LIST_HEADER)}>
+                  <span>Date</span>
+                  <span>Type</span>
+                  <span>Reference</span>
+                  <span>Description</span>
+                  <span className="text-right">Charge</span>
+                  <span className="text-right">Credit</span>
+                  <span className="text-right">Balance</span>
+                  <span aria-hidden="true" />
+                </div>
+                {rows.map((row) => {
+                  const isVoidRow = row.kind === 'invoice_void' || row.kind === 'payment_void'
+                  const canPay = row.kind === 'invoice' && invoiceStatusById.get(row.invoiceId) === 'open'
+                  return (
+                    <div
+                      key={row.key}
+                      className={cn(
+                        LEDGER_GRID,
+                        RECORD_LIST_ROW,
+                        'relative has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-inset',
+                        row.isVoid && 'text-muted-foreground'
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onSelect(row.invoiceId)}
+                        aria-label={`Open ${row.reference}`}
+                        className="absolute inset-0 focus-visible:outline-none"
+                      />
+                      <span className="tabular-nums">{formatLogTimestamp(row.at)}</span>
+                      <span>{LEDGER_ROW_KIND_LABEL[row.kind]}</span>
+                      <span className={cn(row.isVoid && 'line-through')}>{row.reference}</span>
+                      <span>
+                        <span className={cn(row.isVoid && 'line-through')}>{row.description}</span>
+                        {isVoidRow && row.voidReason && (
+                          <span className="block text-xs text-muted-foreground">{row.voidReason}</span>
+                        )}
+                      </span>
+                      <span className="text-right tabular-nums">
+                        {row.chargeCents !== 0 ? formatMoney(centsToDecimalString(row.chargeCents)) : ''}
+                      </span>
+                      <span className="text-right tabular-nums">
+                        {row.creditCents !== 0 ? formatMoney(centsToDecimalString(row.creditCents)) : ''}
+                      </span>
+                      <span className="text-right tabular-nums">
+                        {formatMoney(centsToDecimalString(row.balanceCents))}
+                      </span>
+                      <span>
+                        {canPay && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="relative z-10"
+                            onClick={() => onPay(row.invoiceId)}
+                          >
+                            Pay
+                          </Button>
+                        )}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </>
         )}

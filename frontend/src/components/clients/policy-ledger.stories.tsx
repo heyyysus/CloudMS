@@ -146,12 +146,15 @@ export const RunningBalance: Story = {
     await expect(balanceCells.length).toBeGreaterThan(0)
 
     // Selecting the invoice row opens its receipt.
-    await userEvent.click(canvas.getByText('Invoice #10'))
+    await userEvent.click(canvas.getByRole('button', { name: /open invoice #10/i }))
     await expect(args.onSelect).toHaveBeenCalledWith(10)
 
-    // The invoice is still open, so it gets a Pay button.
-    await userEvent.click(canvas.getByRole('button', { name: /pay/i }))
+    // The invoice is still open, so it gets a Pay button. Clicking it must
+    // fire only onPay - the z-10 overlay ordering exists precisely so Pay
+    // doesn't also open the receipt.
+    await userEvent.click(canvas.getByRole('button', { name: /^pay$/i }))
     await expect(args.onPay).toHaveBeenCalledWith(10)
+    await expect(args.onSelect).toHaveBeenCalledTimes(1)
   },
 }
 
@@ -173,7 +176,7 @@ export const VoidedPayment: Story = {
     getInvoicesFn: fn(async () => [openInvoice]),
     getPaymentsFn: fn(async () => [payment, voidedPayment]),
   },
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement)
     // The voided payment produces two rows sharing the same reference: the
     // original (zeroed out) and the `*_void` correction.
@@ -183,6 +186,11 @@ export const VoidedPayment: Story = {
     // The void withdraws the credit, so the balance is still 60 due (the
     // voided payment never counted).
     await expect(canvas.getByText('Balance due')).toBeInTheDocument()
+
+    // Payment rows open their invoice too, not just invoice rows - every
+    // ledger row has an invoiceId, so the click overlay covers all of them.
+    await userEvent.click(canvas.getByRole('button', { name: /open payment #5/i }))
+    await expect(args.onSelect).toHaveBeenCalledWith(10)
   },
 }
 

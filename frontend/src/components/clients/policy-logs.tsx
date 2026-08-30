@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { AttachmentPreviewDialog } from '@/components/clients/attachment-preview-dialog'
 import { LogAuthorChip } from '@/components/clients/log-author-chip'
 import { LogDetailDialog } from '@/components/clients/log-detail-dialog'
+import { RECORD_LIST_CONTAINER, RECORD_LIST_HEADER, RECORD_LIST_ROW } from '@/components/clients/record-list'
 import { useToast } from '@/components/ui/toast'
 import { formatLogTimestamp } from '@/lib/log-datetime'
 import { cn } from '@/lib/utils'
@@ -91,13 +92,8 @@ export function PolicyLogs({
           </p>
         )}
         {!isPending && !isError && logs && logs.length > 0 && (
-          <div className="max-h-96 overflow-y-auto rounded-md border bg-background font-mono text-sm">
-            <div
-              className={cn(
-                LOG_GRID,
-                'sticky top-0 z-10 border-b bg-background py-1.5 text-xs font-semibold text-muted-foreground'
-              )}
-            >
+          <div className={cn(RECORD_LIST_CONTAINER, 'font-mono')}>
+            <div className={cn(LOG_GRID, RECORD_LIST_HEADER)}>
               <span className="text-right">Log #</span>
               <span>Date/Time</span>
               <span>User</span>
@@ -109,10 +105,7 @@ export function PolicyLogs({
                 type="button"
                 onClick={() => setSelectedLog(log)}
                 aria-label={`Open log ${log.logNumber}`}
-                className={cn(
-                  LOG_GRID,
-                  'w-full cursor-grab py-1 text-left odd:bg-muted-foreground/15 hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none'
-                )}
+                className={cn(LOG_GRID, RECORD_LIST_ROW, 'cursor-grab')}
               >
                 <span className="text-right tabular-nums text-primary/80">{log.logNumber}</span>
                 <span className="whitespace-nowrap text-muted-foreground">

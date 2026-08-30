@@ -108,6 +108,33 @@ npm test               # runs the Storybook-based test suite
 
 These mirror `.github/workflows/ci.yml` (backend) and `.github/workflows/frontend.yml` (frontend) step-for-step.
 
+## Agent pipeline
+
+Issues opened by a CODEOWNER and labelled `agent` are taken through an unattended
+pipeline in GitHub Actions — planner, plan review, coder, docs, PR, PR review — with
+merging the resulting PR as the only human gate. Each issue's artifacts (`plan.md`,
+`review.md`, `notes.md`) are committed under `pipeline/<issue-number>/` on branch
+`agent/issue-<n>`, so the diff carries the full paper trail. See
+[pipeline/README.md](./pipeline/README.md) for the stage-by-stage breakdown, the label
+glossary, how to resume a halted run, and cost tracking.
+
+Before the pipeline can run on a repo (or a new fork), the labels it depends on need to
+exist:
+
+```bash
+scripts/setup-pipeline-labels.sh          # defaults to the current repo
+scripts/setup-pipeline-labels.sh owner/repo
+```
+
+This creates or updates the `agent`, `pipeline:*`, `needs-human`, `agent:deep-review` and
+`area:*` labels the workflows key off, using `gh label create --force`, so it's safe to
+re-run. It requires the GitHub CLI authenticated with label-write access, and only needs
+to be run once per repo — the workflows won't chain correctly until the labels exist.
+
+The pipeline also needs two GitHub Actions secrets, `CLAUDE_CODE_OAUTH_TOKEN` and
+`PIPELINE_BOT_TOKEN`; see `pipeline/README.md`'s "Setup (once)" section for what each is
+for and how to obtain them.
+
 ## Deployment
 
 Merges to `main` that pass CI (typecheck, lint, format check, tests, build) trigger `.github/workflows/ci.yml`'s `image` job, which builds `backend/Dockerfile` on the runner and pushes it to `ghcr.io/heyyysus/cloudms-app` tagged `latest` and with the commit SHA. The `deploy` job then SSHes into the deploy host and runs `scripts/start.sh` (`git pull` + `docker compose pull app` + `docker compose up -d`) — nothing is built on the host. Deploy credentials (`DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PATH`) are configured as GitHub Actions secrets; pushing to GHCR uses the per-run `GITHUB_TOKEN`, and the package is public so the host pulls without credentials.

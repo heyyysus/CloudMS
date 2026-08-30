@@ -1,0 +1,38 @@
+name: agent-cleanup
+
+# When an agent/issue-* PR closes: merged → strip pipeline labels and close the issue;
+# closed unmerged → mark abandoned for a human. Branch deletion is the repo's
+# "delete branch on merge" setting.
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  cleanup:
+    if: startsWith(github.event.pull_request.head.ref, 'agent/issue-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      MERGED: ${{ github.event.pull_request.merged }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - run: |
+          set -euo pipefail
+          issue="${HEAD_REF#agent/issue-}"
+          current=$(gh issue view "$issue" --json labels -q '.labels[].name' | grep '^pipeline:' || true)
+          args=(); for l in $current; do args+=(--remove-label "$l"); done
+          if [[ "$MERGED" == "true" ]]; then
+            [[ ${#args[@]} -gt 0 ]] && gh issue edit "$issue" "${args[@]}"
+            state=$(gh issue view "$issue" --json state -q .state)
+            [[ "$state" == "CLOSED" ]] || gh issue close "$issue" --comment "Merged in #$PR."
+          else
+            gh issue edit "$issue" "${args[@]}" --add-label "pipeline:abandoned" --add-label "needs-human"
+            gh issue comment "$issue" --body "PR #$PR was closed without merging. Remove \`needs-human\`/\`pipeline:abandoned\` and re-add a \`pipeline:*\` label to resume, or remove \`agent\` to drop it."
+          fi

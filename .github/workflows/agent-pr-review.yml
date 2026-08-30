@@ -1,0 +1,143 @@
+name: agent-pr-review
+
+# Reviews agent/issue-* PRs. Diff-scoped: only commits since the last reviewed SHA
+# (tracked in a marker comment). Advisory — never a required check. Sonnet by default,
+# Opus when the PR carries `agent:deep-review`. Bot pushes never retrigger this.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths-ignore:
+      - "**/package-lock.json"
+      - "**/dist/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: agent-pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: startsWith(github.event.pull_request.head.ref, 'agent/issue-') && !endsWith(github.actor, '[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PR: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      ISSUE: ${{ github.event.pull_request.head.ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Resolve issue and diff range
+        id: range
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          issue="${ISSUE#agent/issue-}"
+          echo "ISSUE=$issue" >> "$GITHUB_ENV"
+          last=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" --paginate \
+                 --jq '.[].body | capture("<!-- pipeline-reviewed: (?<sha>[0-9a-f]{40}) -->") | .sha' | tail -1 || true)
+          if [[ -n "$last" ]] && git merge-base --is-ancestor "$last" HEAD 2>/dev/null; then
+            base="$last"; mode="incremental since $last"
+          else
+            base=$(git merge-base origin/main HEAD); mode="full PR"
+          fi
+          git diff "$base"..HEAD -- . ':!**/package-lock.json' ':!**/dist/**' ':!frontend/src/components/ui/**' ':!.claude/pipeline' \
+            | head -n 6000 > "$RUNNER_TEMP/diff.patch"
+          git diff "$base"..HEAD --stat > "$RUNNER_TEMP/diff.stat"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          if [[ ! -s "$RUNNER_TEMP/diff.patch" ]]; then echo "empty=true" >> "$GITHUB_OUTPUT"; else echo "empty=false" >> "$GITHUB_OUTPUT"; fi
+
+      - id: model
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          if [[ ",$LABELS," == *",agent:deep-review,"* ]]; then echo "model=opus" >> "$GITHUB_OUTPUT"; else echo "model=sonnet" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Build prompt
+        if: steps.range.outputs.empty == 'false'
+        env:
+          MODE: ${{ steps.range.outputs.mode }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          title=$(gh issue view "$ISSUE" --json title -q .title)
+          body=$(gh issue view "$ISSUE" --json body -q .body)
+          {
+            echo "PROMPT<<__PROMPT__"
+            cat <<EOF
+          You are the PR-review stage of an automated pipeline for the CloudMS repo. Review PR #$PR
+          (branch agent/issue-$ISSUE) for GitHub issue #$ISSUE. Review mode: $MODE.
+
+          The diff to review is at $RUNNER_TEMP/diff.patch (stat: $RUNNER_TEMP/diff.stat). Review the diff,
+          not the repo: read surrounding code only where needed to judge a specific hunk. Read-only; do not
+          edit files or run git. If the /code-review skill is available, use it on the diff; otherwise
+          review directly. Also read .claude/pipeline/$ISSUE/plan.md (what was supposed to happen).
+
+          Check, in order of importance:
+          1. Correctness bugs and regressions (backend Express/Drizzle routes, frontend React/TanStack).
+          2. Security: auth/session checks on routes, input validation, injection, data exposure, secrets.
+          3. Scope: does the change match the issue and plan.md — nothing missing, nothing extra?
+          4. CLAUDE.md conventions (ignore the concurrent-agents section) and PROJECT.md direction.
+          5. Tests: present, meaningful, using TestContext fixtures for backend.
+
+          Output a Markdown review: "## PR review (\`$MODE\`)", then findings as bullets with
+          \`path:line\` references, most severe first; say "No findings" if clean. End with exactly one line:
+          PIPELINE-VERDICT: clean | advisory | blocking-security
+          (blocking-security only for an exploitable security problem that must not be merged as-is.)
+
+          Issue #$ISSUE: $title
+
+          Issue body:
+          $body
+          EOF
+            echo "__PROMPT__"
+          } >> "$GITHUB_ENV"
+
+      - id: claude
+        if: steps.range.outputs.empty == 'false'
+        uses: ./.github/actions/claude-run
+        with:
+          stage: pr-review
+          model: ${{ steps.model.outputs.model }}
+          max_turns: 15
+          allowed_tools: "Read,Grep,Glob"
+          prompt: ${{ env.PROMPT }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ github.token }}
+
+      - name: Post review and advance state
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+          RESULT: ${{ steps.claude.outputs.result }}
+          EMPTY: ${{ steps.range.outputs.empty }}
+        run: |
+          set -euo pipefail
+          if [[ "$EMPTY" == "true" ]]; then
+            body=$(printf 'No reviewable changes since the last review.\n\n<!-- pipeline-reviewed: %s -->' "$HEAD_SHA")
+            gh pr comment "$PR" --body "$body"
+            exit 0
+          fi
+          [[ -n "$RESULT" ]] || { echo "Empty review result"; exit 1; }
+          verdict=$(grep -oE 'PIPELINE-VERDICT: *(clean|advisory|blocking-security)' <<< "$RESULT" | tail -1 | awk '{print $2}')
+          body=$(printf '%s\n\n<!-- pipeline-reviewed: %s -->' "$RESULT" "$HEAD_SHA")
+          gh pr comment "$PR" --body "$body"
+          gh issue edit "$ISSUE" --remove-label "pipeline:pr-open" --add-label "pipeline:pr-reviewed" || true
+          if [[ "$verdict" == "blocking-security" ]]; then
+            gh issue edit "$ISSUE" --add-label "needs-human"
+            gh issue comment "$ISSUE" --body "PR #$PR review found a blocking security problem — do not merge as-is."
+          fi
+
+      - if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+        run: |
+          gh pr comment "$PR" --body "Automated PR review failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" || true

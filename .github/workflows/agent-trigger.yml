@@ -1,0 +1,50 @@
+name: agent-trigger
+
+# Entry point: a human adds `agent`. If the author is a CODEOWNER and the issue
+# is not already in the pipeline, start it. Uses the PAT so the label fires agent-planner.
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: write
+  contents: read
+
+concurrency:
+  group: agent-trigger-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  start:
+    if: github.event.label.name == 'agent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ISSUE: ${{ github.event.issue.number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: gate
+        uses: ./.github/actions/check-eligibility
+        with:
+          issue_number: ${{ env.ISSUE }}
+          github_token: ${{ github.token }}
+
+      - if: steps.gate.outputs.eligible != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REASON: ${{ steps.gate.outputs.reason }}
+        run: |
+          gh issue comment "$ISSUE" --body "Agent pipeline not started: $REASON."
+
+      - if: steps.gate.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh issue view "$ISSUE" --json labels -q '.labels[].name' | grep -qE '^(pipeline:|needs-human)'; then
+            echo "Issue already has a pipeline state label; not restarting."; exit 0
+          fi
+          gh issue edit "$ISSUE" --add-label "pipeline:needs-plan"
+          gh issue comment "$ISSUE" --body "Agent pipeline started. Stages: plan → plan review → code → docs → PR → PR review. Remove the \`agent\` label to abort."

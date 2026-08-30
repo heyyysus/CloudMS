@@ -1,0 +1,83 @@
+name: Run Claude (pipeline stage)
+description: >-
+  Thin wrapper over anthropics/claude-code-action that enforces the pipeline's
+  token discipline: explicit model, --max-turns, an explicit tool allow-list,
+  and per-run token/cost accounting in the job summary.
+
+inputs:
+  prompt:
+    required: true
+  model:
+    description: opus | sonnet | haiku (or a full model id)
+    required: true
+  max_turns:
+    required: true
+  allowed_tools:
+    description: Comma-separated Claude Code tool allow-list, e.g. "Read,Grep,Glob"
+    default: ""
+  extra_args:
+    description: Extra Claude CLI args (appended verbatim)
+    default: ""
+  anthropic_api_key:
+    required: true
+  github_token:
+    required: true
+  stage:
+    description: Stage name for the summary
+    required: true
+
+outputs:
+  result:
+    description: Claude's final text result
+    value: ${{ steps.parse.outputs.result }}
+  conclusion:
+    value: ${{ steps.claude.outputs.conclusion }}
+
+runs:
+  using: composite
+  steps:
+    - id: claude
+      uses: anthropics/claude-code-action@v1
+      with:
+        prompt: ${{ inputs.prompt }}
+        anthropic_api_key: ${{ inputs.anthropic_api_key }}
+        github_token: ${{ inputs.github_token }}
+        claude_args: >-
+          --model ${{ inputs.model }}
+          --max-turns ${{ inputs.max_turns }}
+          ${{ inputs.allowed_tools != '' && format('--allowedTools "{0}"', inputs.allowed_tools) || '' }}
+          ${{ inputs.extra_args }}
+
+    - id: parse
+      if: always()
+      shell: bash
+      env:
+        EXEC_FILE: ${{ steps.claude.outputs.execution_file }}
+        STAGE: ${{ inputs.stage }}
+        MODEL: ${{ inputs.model }}
+      run: |
+        set -euo pipefail
+        if [[ -z "${EXEC_FILE:-}" || ! -f "$EXEC_FILE" ]]; then
+          echo "result=" >> "$GITHUB_OUTPUT"
+          echo "### $STAGE ($MODEL): no execution file" >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+        # execution_file is a JSON array of stream events; the last "result" event carries usage.
+        res=$(jq -c '[.[] | select(.type=="result")] | last // {}' "$EXEC_FILE")
+        in_tok=$(jq -r '.usage.input_tokens // 0' <<< "$res")
+        cr_tok=$(jq -r '.usage.cache_read_input_tokens // 0' <<< "$res")
+        cw_tok=$(jq -r '.usage.cache_creation_input_tokens // 0' <<< "$res")
+        out_tok=$(jq -r '.usage.output_tokens // 0' <<< "$res")
+        cost=$(jq -r '.total_cost_usd // "n/a"' <<< "$res")
+        turns=$(jq -r '.num_turns // "n/a"' <<< "$res")
+        {
+          echo "### $STAGE ($MODEL)"
+          echo "| turns | input | cache read | cache write | output | cost (USD) |"
+          echo "|---|---|---|---|---|---|"
+          echo "| $turns | $in_tok | $cr_tok | $cw_tok | $out_tok | $cost |"
+        } >> "$GITHUB_STEP_SUMMARY"
+        {
+          echo "result<<__CLAUDE_RESULT__"
+          jq -r '.result // ""' <<< "$res"
+          echo "__CLAUDE_RESULT__"
+        } >> "$GITHUB_OUTPUT"

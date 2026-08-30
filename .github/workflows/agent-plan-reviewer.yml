@@ -12,7 +12,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: agent-plan-reviewer-${{ github.event.issue.number }}
+  group: agent-plan-reviewer-${{ github.event.issue.number }}-${{ github.event.label.name }}
   cancel-in-progress: true
 
 jobs:
@@ -53,8 +53,8 @@ jobs:
             echo "PROMPT<<__PROMPT__"
             cat <<EOF
           You are the plan-review stage of an automated pipeline for the CloudMS repo. Review
-          .claude/pipeline/$ISSUE/plan.md for GitHub issue #$ISSUE. You may read files but must not
-          change anything except writing .claude/pipeline/$ISSUE/review.md. Do not run git.
+          pipeline/$ISSUE/plan.md for GitHub issue #$ISSUE. You may read files but must not
+          change anything except writing pipeline/$ISSUE/review.md. Do not run git.
 
           Read CLAUDE.md, PROJECT.md and the plan. Verify only what the plan claims (spot-check the
           referenced files); keep exploration short.
@@ -100,7 +100,7 @@ jobs:
       - id: verdict
         run: |
           set -euo pipefail
-          f=".claude/pipeline/$ISSUE/review.md"
+          f="pipeline/$ISSUE/review.md"
           test -s "$f" || { echo "review.md was not written"; exit 1; }
           v=$(grep -oiE '^Verdict: *(approved|rejected)' "$f" | tail -1 | awk '{print tolower($2)}')
           [[ "$v" == "approved" || "$v" == "rejected" ]] || { echo "No verdict line in review.md"; exit 1; }
@@ -117,13 +117,13 @@ jobs:
           VERDICT: ${{ steps.verdict.outputs.verdict }}
         run: |
           set -euo pipefail
-          url="https://github.com/${GITHUB_REPOSITORY}/blob/${BRANCH}/.claude/pipeline/${ISSUE}/review.md"
+          url="https://github.com/${GITHUB_REPOSITORY}/blob/${BRANCH}/pipeline/${ISSUE}/review.md"
           if [[ "$VERDICT" == "approved" ]]; then
             gh issue comment "$ISSUE" --body "Plan approved: $url — starting implementation."
             gh issue edit "$ISSUE" --remove-label "pipeline:plan-ready" --add-label "pipeline:plan-approved"
           else
             body=$(printf 'Plan rejected: %s\n\n%s\n\nTo resume: edit `plan.md` on `%s`, then remove `needs-human` and add `pipeline:plan-approved`.' \
-              "$url" "$(sed -n '/^## Findings/,$p' ".claude/pipeline/$ISSUE/review.md")" "$BRANCH")
+              "$url" "$(sed -n '/^## Findings/,$p' "pipeline/$ISSUE/review.md")" "$BRANCH")
             gh issue comment "$ISSUE" --body "$body"
             gh issue edit "$ISSUE" --remove-label "pipeline:plan-ready" --add-label "needs-human"
           fi

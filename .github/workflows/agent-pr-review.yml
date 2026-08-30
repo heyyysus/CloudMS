@@ -50,7 +50,7 @@ jobs:
           else
             base=$(git merge-base origin/main HEAD); mode="full PR"
           fi
-          git diff "$base"..HEAD -- . ':!**/package-lock.json' ':!**/dist/**' ':!frontend/src/components/ui/**' ':!.claude/pipeline' \
+          git diff "$base"..HEAD -- . ':!**/package-lock.json' ':!**/dist/**' ':!frontend/src/components/ui/**' ':!pipeline' \
             | head -n 6000 > "$RUNNER_TEMP/diff.patch"
           git diff "$base"..HEAD --stat > "$RUNNER_TEMP/diff.stat"
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
@@ -89,7 +89,7 @@ jobs:
           (branch agent/issue-$ISSUE) for GitHub issue #$ISSUE. Review mode: $MODE.
 
           $scope
-          Read-only: do not edit files, do not commit. Also read .claude/pipeline/$ISSUE/plan.md
+          Read-only: do not edit files, do not commit. Also read pipeline/$ISSUE/plan.md
           (what was supposed to happen).
 
           Check, in order of importance:

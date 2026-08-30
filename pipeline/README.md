@@ -16,7 +16,7 @@ merge ─────────► agent-cleanup             strips pipeline:*
 
 ## Artifacts (this directory)
 
-Each issue gets `.claude/pipeline/<issue-number>/` on branch `agent/issue-<n>`:
+Each issue gets `pipeline/<issue-number>/` on branch `agent/issue-<n>`:
 
 | file | written by | contents |
 |---|---|---|

@@ -12,7 +12,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: agent-coder-${{ github.event.issue.number }}
+  group: agent-coder-${{ github.event.issue.number }}-${{ github.event.label.name }}
   cancel-in-progress: true
 
 jobs:
@@ -100,7 +100,7 @@ jobs:
           section of CLAUDE.md (shared working tree, worktrees, shared DB container, ports) does not apply
           here; every other rule in CLAUDE.md does. Do not run npm run db:seed. Never push to main.
 
-          1. Read .claude/pipeline/$ISSUE/plan.md and .claude/pipeline/$ISSUE/review.md, then CLAUDE.md.
+          1. Read pipeline/$ISSUE/plan.md and pipeline/$ISSUE/review.md, then CLAUDE.md.
           2. Implement exactly what plan.md scopes. If you must deviate, do the minimum and record why in
              notes.md. Do not expand scope. Reuse existing patterns; backend tests use TestContext from
              backend/src/routes/testHelpers.ts.
@@ -108,7 +108,7 @@ jobs:
              backend/:  npm run typecheck && npm run lint && npm run format:check && npm test && npm run build
              frontend/: npm run lint && npm run build
              Fix failures. Use "npm run format" in backend/ to fix formatting.
-          4. Write .claude/pipeline/$ISSUE/notes.md: what you implemented, key decisions, deviations
+          4. Write pipeline/$ISSUE/notes.md: what you implemented, key decisions, deviations
              from the plan, anything the docs stage or PR reviewer should know, and which checks you ran.
           5. Commit with git (small, descriptive commits; no Co-Authored-By trailer). A PreToolUse hook
              runs the backend test suite when a commit touches backend/; if it blocks the commit, fix the
@@ -141,7 +141,7 @@ jobs:
           fi
           n=$(git rev-list --count "$BASE..HEAD")
           [[ "$n" -gt 0 ]] || { echo "No commits were made"; exit 1; }
-          test -s ".claude/pipeline/$ISSUE/notes.md" || { echo "notes.md missing"; exit 1; }
+          test -s "pipeline/$ISSUE/notes.md" || { echo "notes.md missing"; exit 1; }
           echo "$n commit(s) on $BRANCH"
 
       - name: Advance state

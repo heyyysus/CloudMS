@@ -1,6 +1,6 @@
 name: agent-planner
 
-# Opus writes .claude/pipeline/<n>/plan.md on branch agent/issue-<n>.
+# Opus writes pipeline/<n>/plan.md on branch agent/issue-<n>.
 
 on:
   issues:
@@ -11,7 +11,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: agent-planner-${{ github.event.issue.number }}
+  group: agent-planner-${{ github.event.issue.number }}-${{ github.event.label.name }}
   cancel-in-progress: true
 
 jobs:
@@ -52,7 +52,7 @@ jobs:
           else
             git checkout -b "$BRANCH" origin/main
           fi
-          mkdir -p ".claude/pipeline/$ISSUE"
+          mkdir -p "pipeline/$ISSUE"
 
       - name: Build prompt
         env:
@@ -68,7 +68,7 @@ jobs:
           worktrees and the shared Postgres container do not apply here; everything else in CLAUDE.md does.
 
           Task: write an implementation plan for GitHub issue #$ISSUE to the file
-          .claude/pipeline/$ISSUE/plan.md. Do not implement anything and do not run git commit/push;
+          pipeline/$ISSUE/plan.md. Do not implement anything and do not run git commit/push;
           the workflow commits the file.
 
           First read CLAUDE.md and PROJECT.md (goals, current state, roadmap). Then explore only the
@@ -115,8 +115,8 @@ jobs:
       - name: Commit plan
         run: |
           set -euo pipefail
-          test -s ".claude/pipeline/$ISSUE/plan.md" || { echo "plan.md was not written"; exit 1; }
-          git add ".claude/pipeline/$ISSUE/plan.md"
+          test -s "pipeline/$ISSUE/plan.md" || { echo "plan.md was not written"; exit 1; }
+          git add "pipeline/$ISSUE/plan.md"
           git commit -m "pipeline: plan for #$ISSUE"
           git push origin "$BRANCH"
 
@@ -124,7 +124,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
         run: |
-          url="https://github.com/${GITHUB_REPOSITORY}/blob/${BRANCH}/.claude/pipeline/${ISSUE}/plan.md"
+          url="https://github.com/${GITHUB_REPOSITORY}/blob/${BRANCH}/pipeline/${ISSUE}/plan.md"
           gh issue comment "$ISSUE" --body "Plan written: $url — sending to plan review."
           gh issue edit "$ISSUE" --remove-label "pipeline:needs-plan" --add-label "pipeline:plan-ready"
 

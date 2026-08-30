@@ -18,7 +18,7 @@ inputs:
   extra_args:
     description: Extra Claude CLI args (appended verbatim)
     default: ""
-  anthropic_api_key:
+  claude_code_oauth_token:
     required: true
   github_token:
     required: true
@@ -40,7 +40,7 @@ runs:
       uses: anthropics/claude-code-action@v1
       with:
         prompt: ${{ inputs.prompt }}
-        anthropic_api_key: ${{ inputs.anthropic_api_key }}
+        claude_code_oauth_token: ${{ inputs.claude_code_oauth_token }}
         github_token: ${{ inputs.github_token }}
         claude_args: >-
           --model ${{ inputs.model }}

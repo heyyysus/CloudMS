@@ -94,7 +94,7 @@ jobs:
           max_turns: 15
           allowed_tools: "Read,Grep,Glob,Write"
           prompt: ${{ env.PROMPT }}
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
 
       - id: verdict

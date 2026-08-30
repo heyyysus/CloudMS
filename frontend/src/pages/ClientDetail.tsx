@@ -14,7 +14,7 @@ import { EditPolicyDialog } from '@/components/clients/edit-policy-dialog'
 import { SendCorrespondenceDialog } from '@/components/clients/send-correspondence-dialog'
 import { AddAttachmentDialog } from '@/components/clients/add-attachment-dialog'
 import { AddLogDialog } from '@/components/clients/add-log-dialog'
-import { ClientInvoices } from '@/components/clients/client-invoices'
+import { PolicyLedger } from '@/components/clients/policy-ledger'
 import { ImportQuoteDialog } from '@/components/clients/import-quote-dialog'
 import { InvoicePaymentDialog } from '@/components/clients/invoice-payment-dialog'
 import { InvoiceReceiptDialog } from '@/components/clients/invoice-receipt-dialog'
@@ -328,7 +328,7 @@ function ClientDetail() {
                   }
                   activities={<PolicyActivities policyId={policy.id} />}
                   accounting={
-                    <ClientInvoices
+                    <PolicyLedger
                       clientId={client.id}
                       policyId={policy.id}
                       onPay={(invoiceId) => openInvoiceDialog(invoiceId)}

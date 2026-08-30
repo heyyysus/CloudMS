@@ -57,3 +57,7 @@ export interface VoidPaymentBody {
 export function voidPayment(id: number, body: VoidPaymentBody = {}): Promise<InvoicePayment> {
   return request(`/payments/${id}/void`, { method: 'POST', body: JSON.stringify(body) })
 }
+
+export function getPaymentsByPolicy(policyId: number, signal?: AbortSignal): Promise<InvoicePayment[]> {
+  return request(`/payments?policyId=${policyId}`, { signal })
+}

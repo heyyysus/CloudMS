@@ -1,5 +1,7 @@
 import { Request, Response, Router } from "express"
 import { requireAuth, requireRole } from "../auth/middleware"
+import { autoPolicies } from "../db/schema"
+import { demoRowCeiling } from "../middleware/demoRowCeiling"
 import {
   buildPolicyChangeFormPdf,
   formatChangeSummaryText,
@@ -158,19 +160,24 @@ policiesRouter.get("/policies/:id", requireAuth, async (req: Request, res: Respo
   res.json(policy)
 })
 
-policiesRouter.post("/policies", requireAuth, async (req: Request, res: Response) => {
-  const parsed = createPolicyBody.safeParse(req.body)
-  if (!parsed.success) {
-    res.status(400).json({ error: firstIssue(parsed.error) })
-    return
-  }
+policiesRouter.post(
+  "/policies",
+  requireAuth,
+  demoRowCeiling(autoPolicies),
+  async (req: Request, res: Response) => {
+    const parsed = createPolicyBody.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: firstIssue(parsed.error) })
+      return
+    }
 
-  try {
-    res.status(201).json(await createAutoPolicyWithDetails(parsed.data))
-  } catch (err) {
-    if (!handlePolicyWriteError(err, res)) throw err
+    try {
+      res.status(201).json(await createAutoPolicyWithDetails(parsed.data))
+    } catch (err) {
+      if (!handlePolicyWriteError(err, res)) throw err
+    }
   }
-})
+)
 
 policiesRouter.patch("/policies/:id", requireAuth, async (req: Request, res: Response) => {
   const id = parseId(req.params.id, res)

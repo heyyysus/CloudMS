@@ -18,3 +18,24 @@ describe("GET /health", () => {
     expect(res.headers["etag"]).toBeUndefined()
   })
 })
+
+describe("request body limit", () => {
+  it("rejects an oversized JSON body with a 413 and the standard error shape", async () => {
+    const res = await request(app)
+      .post("/health")
+      .set("Content-Type", "application/json")
+      .send({ big: "x".repeat(300_000) })
+
+    expect(res.status).toBe(413)
+    expect(res.body).toEqual({ error: expect.any(String) })
+  })
+
+  it("does not reject a small JSON body on the same path", async () => {
+    const res = await request(app)
+      .post("/health")
+      .set("Content-Type", "application/json")
+      .send({ small: "x" })
+
+    expect(res.status).not.toBe(413)
+  })
+})

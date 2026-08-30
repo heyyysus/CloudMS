@@ -1,5 +1,7 @@
 import { Request, Response, Router } from "express"
 import { requireAuth, requireRole } from "../auth/middleware"
+import { carriers } from "../db/schema"
+import { demoRowCeiling } from "../middleware/demoRowCeiling"
 import {
   createCarrier,
   deleteCarrier,
@@ -38,6 +40,7 @@ carriersRouter.post(
   "/carriers",
   requireAuth,
   requireRole("admin"),
+  demoRowCeiling(carriers),
   async (req: Request, res: Response) => {
     const parsed = createCarrierBody.safeParse(req.body)
     if (!parsed.success) {

@@ -11,6 +11,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
+import { DemoDisabledError, demoMode } from "../demo"
 
 const UPLOAD_URL_EXPIRY_SECONDS = 5 * 60
 const DOWNLOAD_URL_EXPIRY_SECONDS = 15 * 60
@@ -20,6 +21,10 @@ const DOWNLOAD_URL_EXPIRY_SECONDS = 15 * 60
 export class R2NotConfiguredError extends Error {}
 
 function getClient(): { client: S3Client; bucket: string } {
+  if (demoMode()) {
+    throw new DemoDisabledError("File storage is disabled in demo mode")
+  }
+
   const accountId = process.env.R2_ACCOUNT_ID
   const accessKeyId = process.env.R2_ACCESS_KEY_ID
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY

@@ -37,7 +37,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 })
 
 app.use(pinoHttp({ logger }))
-app.use(express.json())
+app.use(express.json({ limit: "256kb" }))
 app.use(cookieParser())
 
 app.use(authRouter)
@@ -75,8 +75,24 @@ interface PgError extends Error {
   cause?: { code?: string }
 }
 
+// body-parser rejects an oversized or malformed JSON body with its own
+// `status`/`statusCode` (no Postgres `code`); without this branch the
+// fallback below would report it as a 500.
+interface HttpError extends Error {
+  status?: number
+  statusCode?: number
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-app.use((err: PgError, req: Request, res: Response, next: NextFunction) => {
+app.use((err: PgError & HttpError, req: Request, res: Response, next: NextFunction) => {
+  const status = err.status ?? err.statusCode
+  if (typeof status === "number" && status >= 400 && status < 500) {
+    res
+      .status(status)
+      .json({ error: status === 413 ? "Request body too large" : "Invalid request body" })
+    return
+  }
+
   const code = err.code ?? err.cause?.code
   if (code === "23505") {
     res.status(409).json({ error: "Duplicate value" })

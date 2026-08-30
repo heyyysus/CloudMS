@@ -1,24 +1,29 @@
 import request from "supertest"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
-import { createPolicyAttachment } from "../repositories"
-import { getPresignedDownloadUrl } from "../storage/r2"
+import { attachmentKeyPrefix, createPolicyAttachment } from "../repositories"
+import { getPresignedDownloadUrl, headObject } from "../storage/r2"
 import { makeSessionCookie, TestContext } from "./testHelpers"
 
-// getPresignedDownloadUrl is mocked so tests don't need real R2 credentials;
-// asserting on its call args is how these tests check the disposition/
-// fileName plumbing without hitting R2.
+// getPresignedDownloadUrl and headObject are mocked so tests don't need real
+// R2 credentials; asserting on the download call's args is how these tests
+// check the disposition/fileName plumbing without hitting R2, and stubbing
+// the head lets /confirm run against an object that was never uploaded.
+const HEAD = { sizeBytes: 100, contentType: "application/pdf" }
+
 vi.mock("../storage/r2", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../storage/r2")>()
   return {
     ...actual,
     getPresignedDownloadUrl: vi.fn().mockResolvedValue("https://example.com/signed"),
+    headObject: vi.fn(),
   }
 })
 
 const ctx = new TestContext()
 afterEach(() => {
   vi.mocked(getPresignedDownloadUrl).mockReset().mockResolvedValue("https://example.com/signed")
+  vi.mocked(headObject).mockReset()
   return ctx.cleanup()
 })
 
@@ -100,5 +105,69 @@ describe("GET /policy-attachments/:id/link", () => {
       `policy-attachments/${policy.id}/declarations-page.pdf`,
       { downloadFileName: "declarations-page.pdf" }
     )
+  })
+})
+
+describe("POST /policy-attachments/confirm", () => {
+  // Presign already sanitizes the name it builds the storage key from, so
+  // these cover the second use: the name persisted to the database.
+  it("strips path separators and control characters from the stored file name", async () => {
+    const user = await ctx.user("attach-confirm-sanitize")
+    const cookie = await makeSessionCookie(user.id)
+    const policy = await ctx.policy()
+    vi.mocked(headObject).mockResolvedValue(HEAD)
+
+    const res = await request(app)
+      .post("/policy-attachments/confirm")
+      .set("Cookie", cookie)
+      .send({
+        policyId: policy.id,
+        storageKey: `${attachmentKeyPrefix(policy.id)}uuid-decl.pdf`,
+        fileName: "../../etc/passwd\u0007.pdf",
+      })
+
+    expect(res.status).toBe(201)
+    expect(res.body.fileName).toBe(".._.._etc_passwd.pdf")
+  })
+
+  it("keeps an ordinary file name intact", async () => {
+    const user = await ctx.user("attach-confirm-plain")
+    const cookie = await makeSessionCookie(user.id)
+    const policy = await ctx.policy()
+    vi.mocked(headObject).mockResolvedValue(HEAD)
+
+    const res = await request(app)
+      .post("/policy-attachments/confirm")
+      .set("Cookie", cookie)
+      .send({
+        policyId: policy.id,
+        storageKey: `${attachmentKeyPrefix(policy.id)}uuid-decl.pdf`,
+        fileName: "declarations page (2026).pdf",
+      })
+
+    expect(res.status).toBe(201)
+    expect(res.body.fileName).toBe("declarations page (2026).pdf")
+  })
+
+  // description isn't sanitized - a NUL byte there reaches Postgres, which
+  // raises 22021. app.ts maps that to a 400 rather than letting it 500.
+  it("returns 400 when a text field carries a NUL byte", async () => {
+    const user = await ctx.user("attach-confirm-nul")
+    const cookie = await makeSessionCookie(user.id)
+    const policy = await ctx.policy()
+    vi.mocked(headObject).mockResolvedValue(HEAD)
+
+    const res = await request(app)
+      .post("/policy-attachments/confirm")
+      .set("Cookie", cookie)
+      .send({
+        policyId: policy.id,
+        storageKey: `${attachmentKeyPrefix(policy.id)}uuid-decl.pdf`,
+        fileName: "decl.pdf",
+        description: "before\u0000after",
+      })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("Invalid characters in request")
   })
 })

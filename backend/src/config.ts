@@ -16,3 +16,10 @@ export function demoMode(): boolean {
 export function demoSessionTtlMs(): number {
   return num("DEMO_SESSION_TTL_MINUTES", 240) * 60 * 1000
 }
+
+// Demo-only ceiling: once a table holds this many rows, creates on it are
+// refused until the next reseed. Guards against one visitor filling the demo
+// database; deliberately generous relative to the seeded fixture set.
+export function demoMaxRowsPerTable(): number {
+  return num("DEMO_MAX_ROWS_PER_TABLE", 5000)
+}

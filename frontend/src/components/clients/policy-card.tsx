@@ -4,6 +4,7 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CopyText } from '@/components/ui/copy-text'
 import { DriverDetailDialog } from '@/components/clients/driver-detail-dialog'
+import { MissingDlBadge } from '@/components/clients/missing-dl-badge'
 import { VehicleDetailDialog } from '@/components/clients/vehicle-detail-dialog'
 import { cn } from '@/lib/utils'
 import { formatDate } from '@/lib/date-display'
@@ -115,17 +116,21 @@ export function PolicyCard({
           )}
           {!isLoading && !isError && detail && detail.policyDrivers.length > 0 && (
             <div className="flex flex-col gap-1">
-              {detail.policyDrivers.map((policyDriver) => (
-                <button
-                  key={policyDriver.id}
-                  type="button"
-                  onClick={() => setSelectedDriver(policyDriver)}
-                  aria-label={`View ${formatNameLastFirst(policyDriver.driver.person)}`}
-                  className={ROW_CLASS}
-                >
-                  {formatNameLastFirst(policyDriver.driver.person)}
-                </button>
-              ))}
+              {detail.policyDrivers.map((policyDriver) => {
+                const missingDl = !policyDriver.driver.dlNumber
+                return (
+                  <button
+                    key={policyDriver.id}
+                    type="button"
+                    onClick={() => setSelectedDriver(policyDriver)}
+                    aria-label={`View ${formatNameLastFirst(policyDriver.driver.person)}${missingDl ? ' — no DL number on file' : ''}`}
+                    className={cn(ROW_CLASS, 'flex items-center gap-2')}
+                  >
+                    <span>{formatNameLastFirst(policyDriver.driver.person)}</span>
+                    {missingDl && <MissingDlBadge />}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>

@@ -227,7 +227,8 @@ Both POST and PATCH additionally accept:
   which creates the person and driver in the same transaction. `dlNumber` is
   optional on both branches: an agency may not have a driver's license
   number yet (e.g. a prospect client), so a `drivers` row can be created or
-  reused without one.
+  reused without one. A blank or whitespace-only `dlNumber` is treated the
+  same as an omitted one and is stored as `NULL`.
 
 **On PATCH, `vehicles`/`drivers` are replace-all, not diffed**: omitting the
 key leaves that collection untouched; `[]` deletes every row in it;

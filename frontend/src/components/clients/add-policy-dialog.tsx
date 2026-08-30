@@ -49,6 +49,7 @@ import {
   type Vehicle,
 } from '@/api/policies'
 import { COVERAGE_LABELS } from '@/components/clients/policy-card'
+import { MissingDlBadge } from '@/components/clients/missing-dl-badge'
 import { useToast } from '@/components/ui/toast'
 import { AddressFields } from '@/components/clients/address-fields'
 import { decodeVIN } from '@/api/vinDecoder'
@@ -355,16 +356,18 @@ function toBody(values: AddPolicyFormValues, clientId: number): CreatePolicyBody
       .filter((driver) => driver.checked)
       .map((driver): CreatePolicyDriverBody => {
         if (driver.hasDriverRow) return { kind: 'existing', personId: driver.personId }
+        const trimmed = driver.dlNumber.trim()
         return {
           kind: 'existing',
           personId: driver.personId,
-          dlNumber: driver.dlNumber.trim(),
+          ...(trimmed ? { dlNumber: trimmed } : {}),
           rating: driver.rating,
           sr22: driver.sr22,
         }
       }),
-    ...values.newDrivers.map(
-      (driver): CreatePolicyDriverBody => ({
+    ...values.newDrivers.map((driver): CreatePolicyDriverBody => {
+      const trimmed = driver.dlNumber.trim()
+      return {
         kind: 'new',
         person: {
           firstName: driver.firstName.trim(),
@@ -374,11 +377,11 @@ function toBody(values: AddPolicyFormValues, clientId: number): CreatePolicyBody
           relationToInsured: driver.relationToInsured,
           maritalStatus: driver.maritalStatus === 'none' ? undefined : driver.maritalStatus,
         },
-        dlNumber: driver.dlNumber.trim(),
+        ...(trimmed ? { dlNumber: trimmed } : {}),
         rating: driver.rating,
         sr22: driver.sr22,
-      })
-    ),
+      }
+    }),
   ]
 
   return {
@@ -1035,6 +1038,7 @@ export function AddPolicyForm({
                       {field.hasDriverRow && field.dlNumber && (
                         <span className="text-xs text-muted-foreground">DL {field.dlNumber}</span>
                       )}
+                      {field.hasDriverRow && !field.dlNumber && <MissingDlBadge />}
                     </label>
                     {row?.checked && !field.hasDriverRow && (
                       <div className="mt-2 grid gap-2 sm:grid-cols-3">

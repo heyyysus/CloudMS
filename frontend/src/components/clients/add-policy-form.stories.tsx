@@ -239,3 +239,29 @@ export const SubmitFansOutCoverages: Story = {
     )
   },
 }
+
+// A driver missing a DL number is a normal state (e.g. a prospect who
+// hasn't provided one yet), not a submission error - the field is left
+// blank and the driver is still submitted, just without a dlNumber key.
+export const SubmitOmitsBlankDl: Story = {
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+
+    await userEvent.click(canvas.getByRole('combobox', { name: /carrier/i }))
+    await userEvent.click(await screen.findByRole('option', { name: /acme insurance/i }))
+    await userEvent.type(canvas.getByLabelText(/policy number/i), 'POL-124')
+
+    // Existing person without a drivers row, DL left blank.
+    await userEvent.click(canvas.getByRole('checkbox', { name: /doe, jane/i }))
+
+    await userEvent.click(canvas.getByRole('button', { name: /create policy/i }))
+
+    await expect(args.onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        // Exact object (not objectContaining): asserts dlNumber is absent,
+        // not just falsy.
+        drivers: [{ kind: 'existing', personId: 229, rating: 'rated', sr22: false }],
+      })
+    )
+  },
+}

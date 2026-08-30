@@ -43,3 +43,11 @@ section. Manual checks run instead:
 No backend or frontend code was touched, so `npm run typecheck/lint/format:check/test/
 build` (backend) and `npm run lint/build` (frontend) were not run — nothing in those
 trees changed.
+
+## Docs
+
+No doc changes needed: the diff is a README addition documenting a CI/ops script
+(`scripts/setup-pipeline-labels.sh`) and the agent pipeline; it has no route, auth/session,
+or UI-component surface, so `docs/API.md`, `docs/AUTH_SESSIONS_EXPLAINED.md`, and
+`docs/frontend-ui-design.md` don't apply, and none of them reference the pipeline or the
+script already.

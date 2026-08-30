@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 5
     env:
       GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+      GH_REPO: ${{ github.repository }}
       HEAD_REF: ${{ github.event.pull_request.head.ref }}
       MERGED: ${{ github.event.pull_request.merged }}
       PR: ${{ github.event.pull_request.number }}

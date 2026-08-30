@@ -54,7 +54,7 @@ planner unless you add `agent:deep-review`. `/code-review ultra` is never automa
 ## Setup (once)
 
 1. Secrets: `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`, bills your subscription), `PIPELINE_BOT_TOKEN` (fine-grained PAT, this repo:
-   Issues RW, Contents RW, Pull requests RW). Labels applied with the default
+   Issues RW, Pull requests RW, Contents read-only). Labels applied with the default
    `GITHUB_TOKEN` do not trigger other workflows, so every chaining label write uses the PAT.
 2. `scripts/setup-pipeline-labels.sh`
 3. Repo setting: delete branch on merge.

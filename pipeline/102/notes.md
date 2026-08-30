@@ -56,3 +56,10 @@ all green (392 tests passed, including the new 413 tests in `app.test.ts` and th
   written as a side effect of a covered create (drivers, policyDrivers, invoiceItems,
   receipts, trustLedger, clientPhones, clientEmails) are intentionally not directly ceilinged
   — they're bounded transitively by their parent create's ceiling.
+
+## Docs
+
+Updated `docs/API.md`'s Conventions status-code list: `400` now also covers unparsable JSON
+bodies, and added the new global `413` (256kb body cap) and demo-only `429` (row ceiling)
+codes. No other doc changes: no auth/session behavior changed, no UI, and README/`.env.example`
+already document env vars there rather than in prose.

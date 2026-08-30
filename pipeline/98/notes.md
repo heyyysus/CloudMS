@@ -81,3 +81,13 @@ None. `migrate.ts` was left unchanged as the plan called for (DDL comes from
 - Demo users are hidden from `GET /users` only; they can still author policy
   logs, invoices, etc., and their names will show there — correct per the
   plan, noted here so it isn't a surprise in review.
+
+## Docs
+
+No doc changes needed: `docs/API.md` (`## Config` section + demo bullet) and
+`docs/AUTH_SESSIONS_EXPLAINED.md` ("Demo mode" subsection) were already
+updated as part of the implementation commit, and both were checked against
+the code (endpoint paths, response shape, TTL default, `GET /users` exclusion)
+and are accurate. `README.md` doesn't enumerate individual env vars — it just
+points to `.env.example`, which already documents `DEMO_MODE` and
+`DEMO_SESSION_TTL_MINUTES`. No frontend UI changed (issue #C).

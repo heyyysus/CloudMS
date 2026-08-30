@@ -86,6 +86,12 @@ app.use((err: PgError, req: Request, res: Response, next: NextFunction) => {
     res.status(409).json({ error: "Referenced by or references other records" })
     return
   }
+  // Raised when a text field carries a NUL byte or other invalid UTF-8 -
+  // Postgres can't store it, and this is a bad request, not a server fault.
+  if (code === "22021") {
+    res.status(400).json({ error: "Invalid characters in request" })
+    return
+  }
   req.log.error(err)
   res.status(500).json({ error: "Internal server error" })
 })

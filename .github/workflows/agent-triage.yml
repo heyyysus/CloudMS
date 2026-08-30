@@ -72,9 +72,9 @@ jobs:
           RESULT: ${{ steps.claude.outputs.result }}
         run: |
           set -euo pipefail
-          json=$(grep -oE '\{[^}]*\}' <<< "$RESULT" | head -1 || true)
-          type=$(jq -r '.type // ""' <<< "${json:-{}}")
-          area=$(jq -r '.area // ""' <<< "${json:-{}}")
+          json=$(grep -oE '\{[^}]*\}' <<< "$RESULT" | head -1 || true); [[ -n "$json" ]] || json="{}"
+          type=$(jq -r '.type // ""' <<< "$json")
+          area=$(jq -r '.area // ""' <<< "$json")
           labels=()
           case "$type" in bug|enhancement|documentation|question) labels+=("$type");; esac
           case "$area" in backend|frontend|infra) labels+=("area:$area");; esac

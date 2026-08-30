@@ -64,6 +64,7 @@ const meta = {
       name: 'Updated',
     })),
     resendWelcomeFn: fn(async () => ({ email: { status: 'sent' as const, resendId: 'msg_1' } })),
+    deleteUserFn: fn(async () => undefined),
   },
   decorators: [
     (Story) => (
@@ -147,6 +148,38 @@ export const ResendsTheWelcomeEmail: Story = {
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Resend welcome email' }))
 
     await expect(args.resendWelcomeFn).toHaveBeenCalledWith(2)
+  },
+}
+
+export const DeletesAUser: Story = {
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    await canvas.findByText('Blake Staffer')
+
+    await userEvent.click(canvas.getByRole('button', { name: /actions for blake staffer/i }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete user' }))
+
+    const dialog = await screen.findByRole('dialog')
+    await expect(dialog).toHaveTextContent('Blake Staffer')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    await expect(args.deleteUserFn).toHaveBeenCalledWith(2)
+  },
+}
+
+// Self-delete would leave no one to undo it, so it's disabled on the actor's
+// own row rather than only rejected server-side.
+export const DeleteDisabledForSelf: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await canvas.findByText('Ada Owner')
+
+    await userEvent.click(canvas.getByRole('button', { name: /actions for ada owner/i }))
+
+    await expect(await screen.findByRole('menuitem', { name: 'Delete user' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
   },
 }
 

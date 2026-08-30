@@ -120,3 +120,38 @@ export const DuplicateEmail: Story = {
     )
   },
 }
+
+// A deleted user's email surfaces this shape of 409 (see deletedUserId on
+// backend/src/routes/users.ts) instead of the plain duplicate-email message.
+export const OfferstoRestoreADeletedUser: Story = {
+  args: {
+    inviteUserFn: fn(async () => {
+      throw new ApiError(409, 'This email belonged to a deleted user', { deletedUserId: 7 })
+    }),
+    restoreUserFn: fn(
+      async (): Promise<InviteUserResult> => ({
+        user: {
+          id: 7,
+          email: 'wasdeleted@example.com',
+          name: 'Riley Restored',
+          role: 'staff',
+          isActive: true,
+          hasSignedIn: true,
+          createdAt: '2025-01-01T00:00:00.000Z',
+          updatedAt: '2026-08-14T00:00:00.000Z',
+        },
+        email: { status: 'sent', resendId: 'msg_restore' },
+      })
+    ),
+  },
+  play: async ({ canvasElement, args }) => {
+    await fillAndSubmit(canvasElement, 'wasdeleted@example.com')
+
+    const alert = await screen.findByRole('alert')
+    await expect(alert).toHaveTextContent('wasdeleted@example.com belonged to a deleted user')
+
+    await userEvent.click(within(alert).getByRole('button', { name: 'Restore' }))
+    await expect(args.restoreUserFn).toHaveBeenCalledWith(7)
+    await expect(await screen.findByText(/user restored/i)).toBeInTheDocument()
+  },
+}

@@ -1,7 +1,15 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { MoreHorizontal } from 'lucide-react'
-import { getUsers, resendWelcome, updateUser, type AdminUser, type UpdateUserBody } from '@/api/users'
+import {
+  deleteUser,
+  getUsers,
+  resendWelcome,
+  updateUser,
+  type AdminUser,
+  type UpdateUserBody,
+} from '@/api/users'
+import { DeleteUserDialog } from '@/components/admin/delete-user-dialog'
 import { EditUserDialog } from '@/components/admin/edit-user-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,6 +32,7 @@ interface ManageUsersCardProps {
   getUsersFn?: typeof getUsers
   updateUserFn?: typeof updateUser
   resendWelcomeFn?: typeof resendWelcome
+  deleteUserFn?: typeof deleteUser
 }
 
 export function ManageUsersCard({
@@ -31,11 +40,13 @@ export function ManageUsersCard({
   getUsersFn = getUsers,
   updateUserFn = updateUser,
   resendWelcomeFn = resendWelcome,
+  deleteUserFn = deleteUser,
 }: ManageUsersCardProps) {
   const selfId = currentUserId
   const queryClient = useQueryClient()
   const toast = useToast()
   const [editing, setEditing] = useState<AdminUser | null>(null)
+  const [deleting, setDeleting] = useState<AdminUser | null>(null)
 
   const {
     data: users,
@@ -157,6 +168,17 @@ export function ManageUsersCard({
                       >
                         Resend welcome email
                       </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      {/* Self-delete would lock the admin out with no one
+                          left to undo it, so it's disabled here rather than
+                          relying on the server's own guard. */}
+                      <DropdownMenuItem
+                        variant="destructive"
+                        disabled={isSelf}
+                        onSelect={() => setDeleting(user)}
+                      >
+                        Delete user
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -178,6 +200,12 @@ export function ManageUsersCard({
         onSubmit={(body) => editing && update.mutate({ id: editing.id, body })}
         isPending={update.isPending}
         errorMessage={update.isError ? update.error.message : null}
+      />
+
+      <DeleteUserDialog
+        user={deleting}
+        onOpenChange={(next) => !next && setDeleting(null)}
+        deleteUserFn={deleteUserFn}
       />
     </Card>
   )

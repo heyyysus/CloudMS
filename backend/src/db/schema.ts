@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm"
 import {
+  type AnyPgColumn,
   boolean,
   date,
   index,
@@ -52,6 +53,12 @@ export const users = pgTable("users", {
   googleSub: varchar("google_sub", { length: 64 }).unique(),
   role: userRoleEnum("role").notNull().default("staff"),
   isActive: boolean("is_active").notNull().default(true),
+  // A deleted user is hidden from the admin list and can never sign in, but
+  // the row stays: policy_logs.author_id and eight other NOT NULL FKs point
+  // at it, so the audit trail would break if the row went away. Distinct
+  // from isActive, which is a reversible "disable" the admin can see and undo.
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: integer("deleted_by").references((): AnyPgColumn => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 })

@@ -226,3 +226,17 @@ export const LinksSelectionToALog: Story = {
     })
   },
 }
+
+// Demo deployments have no object storage: the button greys out and the empty
+// state stops inviting a drop.
+export const UploadDisabled: Story = {
+  args: {
+    uploadDisabled: true,
+    getPolicyAttachmentsFn: fn(async () => []),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(await canvas.findByText('No attachments yet. Uploads are disabled in the demo.')).toBeInTheDocument()
+    await expect(canvas.getByRole('button', { name: 'Add attachment' })).toBeDisabled()
+  },
+}

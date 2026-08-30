@@ -24,6 +24,9 @@ interface PolicyAttachmentsProps {
   policyId: number
   onAddAttachment: () => void
   currentUserId?: number
+  // Demo deployments have no object storage; the button is greyed out and
+  // the empty-state copy stops inviting a drop that will not work.
+  uploadDisabled?: boolean
   getPolicyAttachmentsFn?: typeof getPolicyAttachments
   getPolicyAttachmentLinkFn?: typeof getPolicyAttachmentLink
   getPolicyLogsFn?: typeof getPolicyLogs
@@ -63,6 +66,7 @@ export function PolicyAttachments({
   policyId,
   onAddAttachment,
   currentUserId,
+  uploadDisabled = false,
   getPolicyAttachmentsFn = getPolicyAttachments,
   getPolicyAttachmentLinkFn = getPolicyAttachmentLink,
   getPolicyLogsFn = getPolicyLogs,
@@ -134,7 +138,14 @@ export function PolicyAttachments({
               >
                 Select
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={onAddAttachment}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={uploadDisabled}
+                title={uploadDisabled ? 'Disabled in the demo' : undefined}
+                onClick={onAddAttachment}
+              >
                 Add attachment
               </Button>
             </>
@@ -151,7 +162,9 @@ export function PolicyAttachments({
         )}
         {!isPending && !isError && attachments && attachments.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            No attachments yet. Drop a file anywhere on this page, or use "Add attachment".
+            {uploadDisabled
+              ? 'No attachments yet. Uploads are disabled in the demo.'
+              : 'No attachments yet. Drop a file anywhere on this page, or use "Add attachment".'}
           </p>
         )}
         {!isPending && !isError && attachments && attachments.length > 0 && (

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { AuthProvider } from './auth/AuthContext'
+import { AppConfigProvider } from './config/AppConfigContext'
 import { RequireAuth } from './auth/RequireAuth'
 import { RequireRole } from './auth/RequireRole'
 import { AppLayout } from './components/layout/app-layout'
@@ -25,28 +26,30 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <BrowserRouter>
-          <AuthProvider>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/logout" element={<Logout />} />
-              <Route element={<RequireAuth />}>
-                <Route element={<AppLayout />}>
-                  <Route path="/home" element={<Home />} />
-                  <Route path="/clients/:clientId" element={<ClientDetail />} />
-                  <Route element={<RequireRole role="admin" />}>
-                    <Route path="/admin" element={<Admin />} />
-                    <Route path="/admin/users" element={<ManageUsers />} />
-                    <Route path="/admin/carriers" element={<ManageCarriers />} />
-                    <Route path="/admin/correspondence" element={<CorrespondenceTemplates />} />
-                    <Route path="/admin/reminders" element={<ReminderRules />} />
-                    <Route path="/admin/trust-accounting" element={<TrustAccounting />} />
+          <AppConfigProvider>
+            <AuthProvider>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/logout" element={<Logout />} />
+                <Route element={<RequireAuth />}>
+                  <Route element={<AppLayout />}>
+                    <Route path="/home" element={<Home />} />
+                    <Route path="/clients/:clientId" element={<ClientDetail />} />
+                    <Route element={<RequireRole role="admin" />}>
+                      <Route path="/admin" element={<Admin />} />
+                      <Route path="/admin/users" element={<ManageUsers />} />
+                      <Route path="/admin/carriers" element={<ManageCarriers />} />
+                      <Route path="/admin/correspondence" element={<CorrespondenceTemplates />} />
+                      <Route path="/admin/reminders" element={<ReminderRules />} />
+                      <Route path="/admin/trust-accounting" element={<TrustAccounting />} />
+                    </Route>
                   </Route>
                 </Route>
-              </Route>
-              <Route path="/" element={<Navigate to="/home" replace />} />
-              <Route path="*" element={<Navigate to="/home" replace />} />
-            </Routes>
-          </AuthProvider>
+                <Route path="/" element={<Navigate to="/home" replace />} />
+                <Route path="*" element={<Navigate to="/home" replace />} />
+              </Routes>
+            </AuthProvider>
+          </AppConfigProvider>
         </BrowserRouter>
       </ToastProvider>
     </QueryClientProvider>

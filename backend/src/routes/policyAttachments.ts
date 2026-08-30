@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { Request, Response, Router } from "express"
 import { requireAuth } from "../auth/middleware"
-import { DemoDisabledError } from "../demo"
 import {
   attachmentKeyPrefix,
   countAttachmentsCreatedTodayByUser,
@@ -28,14 +27,9 @@ import {
 export const policyAttachmentsRouter = Router()
 
 // R2NotConfiguredError maps to 503 (mirrors MailNotConfiguredError in
-// mail.ts) and DemoDisabledError to 403; returns false (and lets the caller's
-// catch rethrow) for anything else, since app.ts's generic error handler
-// should see those.
-function handleStorageError(err: unknown, res: Response): boolean {
-  if (err instanceof DemoDisabledError) {
-    res.status(403).json({ error: "Disabled in demo mode" })
-    return true
-  }
+// mail.ts); returns false (and lets the caller's catch rethrow) for anything
+// else, since app.ts's generic error handler should see those.
+function isR2NotConfigured(err: unknown, res: Response): boolean {
   if (err instanceof R2NotConfiguredError) {
     res.status(503).json({ error: "File storage is not configured" })
     return true
@@ -111,7 +105,7 @@ policyAttachmentsRouter.get(
       )
       res.json({ url })
     } catch (err) {
-      if (handleStorageError(err, res)) return
+      if (isR2NotConfigured(err, res)) return
       throw err
     }
   }
@@ -149,7 +143,7 @@ policyAttachmentsRouter.post(
       const uploadUrl = await getPresignedUploadUrl(storageKey, parsed.data.contentType)
       res.json({ uploadUrl, storageKey })
     } catch (err) {
-      if (handleStorageError(err, res)) return
+      if (isR2NotConfigured(err, res)) return
       throw err
     }
   }
@@ -183,7 +177,7 @@ policyAttachmentsRouter.post(
     try {
       head = await headObject(parsed.data.storageKey)
     } catch (err) {
-      if (handleStorageError(err, res)) return
+      if (isR2NotConfigured(err, res)) return
       throw err
     }
     if (!head) {
@@ -195,7 +189,7 @@ policyAttachmentsRouter.post(
       try {
         await deleteObject(parsed.data.storageKey)
       } catch (err) {
-        if (handleStorageError(err, res)) return
+        if (isR2NotConfigured(err, res)) return
         throw err
       }
       res.status(413).json({ error: "File exceeds the maximum allowed size" })

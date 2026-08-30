@@ -3,8 +3,6 @@
 // of the client and every send goes through the app's own auth. Config is
 // read inline from process.env per call (not cached at module load) so tests
 // can stub it and so a missing key surfaces per-request rather than at boot.
-import { DemoDisabledError, demoMode } from "./demo"
-
 const RESEND_ENDPOINT = "https://api.resend.com/emails"
 
 const MAIL_TIMEOUT_MS = 10_000
@@ -42,10 +40,6 @@ interface ResendErrorResponse {
 }
 
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
-  if (demoMode()) {
-    throw new DemoDisabledError("Email sending is disabled in demo mode")
-  }
-
   const apiKey = process.env.RESEND_API_KEY
   const from = process.env.MAIL_FROM
   if (!apiKey || !from) {

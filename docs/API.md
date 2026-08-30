@@ -749,9 +749,6 @@ Status codes specific to this route:
 - `502` — Resend was unreachable, timed out (10s), or answered with an error
   status (e.g. rate limited).
 - `503` — `RESEND_API_KEY` or `MAIL_FROM` isn't configured on the server.
-- `403` — `DEMO_MODE=true` on the server; body `{ error: "Disabled in demo
-  mode" }`. A demo instance holds no outbound mail credentials at all, so this
-  takes precedence over the `503` above.
 
 Example response (`POST /clients/42/send-email`, body
 `{ "subject": "Renewal", "body": "Your policy renews soon." }`):
@@ -827,7 +824,7 @@ Status codes specific to `POST /policies/:policyId/send-correspondence`:
 - `404` — no policy with that id, or no *correspondence* template with that id.
   The singleton `welcome` template is kind-scoped out of this lookup, so it can
   never be sent to a client.
-- `502` / `503` / `403` — as for `/clients/:clientId/send-email` above.
+- `502` / `503` — as for `/clients/:clientId/send-email` above.
 
 A successful send writes one `email_log` row per address (`to` and `cc` alike)
 and appends one entry to the policy's log:
@@ -886,9 +883,6 @@ Status codes specific to these routes:
 pass always gets one rather than "another container was already planning". It
 is also the seam for driving the scheduler from outside the process — an
 external cron calling this endpoint — with no code change.
-
-With `DEMO_MODE=true`, the scheduler never starts and `POST /reminders/tick`
-answers `403 { error: "Disabled in demo mode" }` instead of running a pass.
 
 ## Policy activities
 

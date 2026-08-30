@@ -1,6 +1,5 @@
 import { Request, Response, Router } from "express"
 import { requireAuth, requireRole } from "../auth/middleware"
-import { demoMode } from "../demo"
 import { runReminderTickNow } from "../jobs/scheduler"
 import {
   cancelScheduledEmail,
@@ -172,10 +171,6 @@ reminderRulesRouter.post(
   requireAuth,
   requireRole("admin"),
   async (req: Request, res: Response) => {
-    if (demoMode()) {
-      res.status(403).json({ error: "Disabled in demo mode" })
-      return
-    }
     const result = await runReminderTickNow()
     req.log.info({ ...result, actorId: req.user?.id }, "reminder tick (manual)")
     res.json(result)

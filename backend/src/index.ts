@@ -1,5 +1,4 @@
 import app from "./app"
-import { demoMode, forbiddenDemoEnvPresent } from "./demo"
 import { startReminderScheduler } from "./jobs/scheduler"
 import { logger } from "./logger"
 
@@ -8,16 +7,6 @@ import { logger } from "./logger"
 if (!process.env.GOOGLE_CLIENT_ID) {
   logger.fatal("GOOGLE_CLIENT_ID is not set — refusing to start")
   process.exit(1)
-}
-
-// A demo instance may not hold outbound credentials at all, so refuse to
-// start rather than run with them present and unused.
-if (demoMode()) {
-  const present = forbiddenDemoEnvPresent()
-  if (present.length > 0) {
-    logger.fatal(`DEMO_MODE is set but ${present.join(", ")} is configured — refusing to start`)
-    process.exit(1)
-  }
 }
 
 const PORT = process.env.PORT || 8000

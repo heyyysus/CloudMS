@@ -3,7 +3,7 @@ import request from "supertest"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
 import { db } from "../db"
-import { emailLog } from "../db/schema"
+import { emailLog, users } from "../db/schema"
 import { makeSessionCookie, makeTestUser, TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
@@ -396,5 +396,146 @@ describe("POST /users/:id/resend-welcome", () => {
 
     expect(res.status).toBe(200)
     expect(res.body.email.status).toBe("failed")
+  })
+})
+
+describe("DELETE /users/:id", () => {
+  it("returns 401 without a cookie", async () => {
+    expect((await request(app).delete("/users/1")).status).toBe(401)
+  })
+
+  it("returns 403 for a non-admin user", async () => {
+    const staff = await ctx.user("delete-user-staff", "staff")
+    const target = await ctx.user("delete-user-staff-target", "staff")
+    const cookie = await makeSessionCookie(staff.id)
+
+    const res = await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)
+    expect(res.status).toBe(403)
+  })
+
+  it("returns 404 for an unknown id", async () => {
+    const admin = await ctx.user("delete-user-404", "admin")
+    const cookie = await makeSessionCookie(admin.id)
+
+    const res = await request(app).delete("/users/999999999").set("Cookie", cookie)
+    expect(res.status).toBe(404)
+  })
+
+  it("refuses to let an admin delete their own account", async () => {
+    const admin = await ctx.user("delete-self", "admin")
+    const cookie = await makeSessionCookie(admin.id)
+
+    const res = await request(app).delete(`/users/${admin.id}`).set("Cookie", cookie)
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("You cannot delete your own account")
+  })
+
+  it("deletes a user: hides them, drops their sessions, but keeps the row", async () => {
+    const admin = await ctx.user("delete-user-admin", "admin")
+    const target = await ctx.user("delete-user-target", "staff")
+    const adminCookie = await makeSessionCookie(admin.id)
+    const targetCookie = await makeSessionCookie(target.id)
+
+    const res = await request(app).delete(`/users/${target.id}`).set("Cookie", adminCookie)
+    expect(res.status).toBe(204)
+
+    // Gone from the admin's view...
+    const list = await request(app).get("/users").set("Cookie", adminCookie)
+    expect(list.body.map((u: { id: number }) => u.id)).not.toContain(target.id)
+
+    // ...and logged out immediately...
+    expect((await request(app).get("/auth/me").set("Cookie", targetCookie)).status).toBe(401)
+
+    // ...but the row itself, and its history, still exist.
+    const [row] = await db.select().from(users).where(eq(users.id, target.id))
+    expect(row).toBeDefined()
+    expect(row.deletedAt).not.toBeNull()
+    expect(row.deletedBy).toBe(admin.id)
+  })
+
+  it("returns 404 for a user that is already deleted", async () => {
+    const admin = await ctx.user("delete-user-twice-admin", "admin")
+    const target = await ctx.user("delete-user-twice-target", "staff")
+    const cookie = await makeSessionCookie(admin.id)
+
+    await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)
+    const res = await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)
+    expect(res.status).toBe(404)
+  })
+
+  it("returns 404 when PATCHing a deleted user", async () => {
+    const admin = await ctx.user("delete-then-patch-admin", "admin")
+    const target = await ctx.user("delete-then-patch-target", "staff")
+    const cookie = await makeSessionCookie(admin.id)
+
+    await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)
+    const res = await request(app)
+      .patch(`/users/${target.id}`)
+      .set("Cookie", cookie)
+      .send({ isActive: true })
+    expect(res.status).toBe(404)
+  })
+
+  it("offers the automation user's own email a 409, not a delete", async () => {
+    // The automation user is excluded from listUsers, but the route itself is
+    // the real guard - this checks that guard directly rather than trusting
+    // the list filter alone.
+    const admin = await ctx.user("delete-automation-admin", "admin")
+    const cookie = await makeSessionCookie(admin.id)
+    const [automation] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, "automation@cloudms.local"))
+
+    const res = await request(app).delete(`/users/${automation.id}`).set("Cookie", cookie)
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe("This account cannot be deleted")
+  })
+})
+
+describe("re-inviting a deleted user's email", () => {
+  it("returns 409 with the deleted user's id instead of creating a duplicate", async () => {
+    const admin = await ctx.user("reinvite-admin", "admin")
+    const target = await ctx.user("reinvite-target", "staff")
+    const cookie = await makeSessionCookie(admin.id)
+
+    await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)
+
+    const res = await request(app)
+      .post("/users/invite")
+      .set("Cookie", cookie)
+      .send({ email: target.email })
+
+    expect(res.status).toBe(409)
+    expect(res.body.deletedUserId).toBe(target.id)
+  })
+})
+
+describe("POST /users/:id/restore", () => {
+  it("returns 404 for a user that was never deleted", async () => {
+    const admin = await ctx.user("restore-not-deleted-admin", "admin")
+    const target = await ctx.user("restore-not-deleted-target", "staff")
+    const cookie = await makeSessionCookie(admin.id)
+
+    const res = await request(app).post(`/users/${target.id}/restore`).set("Cookie", cookie)
+    expect(res.status).toBe(404)
+  })
+
+  it("brings a deleted user back, active and visible again", async () => {
+    configureMail()
+    const admin = await ctx.user("restore-admin", "admin")
+    const target = await ctx.user("restore-target", "staff")
+    const cookie = await makeSessionCookie(admin.id)
+    stubResend({ id: "msg_restore" })
+
+    await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)
+
+    const res = await request(app).post(`/users/${target.id}/restore`).set("Cookie", cookie)
+    expect(res.status).toBe(200)
+    expect(res.body.user.isActive).toBe(true)
+    expect(res.body.user).not.toHaveProperty("deletedAt")
+
+    const list = await request(app).get("/users").set("Cookie", cookie)
+    expect(list.body.map((u: { id: number }) => u.id)).toContain(target.id)
   })
 })

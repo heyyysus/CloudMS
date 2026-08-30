@@ -2,10 +2,15 @@ const BASE = '/api/v1'
 
 export class ApiError extends Error {
   status: number
+  // The parsed error body, when the response had one - lets a caller read a
+  // field beyond `error` (e.g. the invite endpoint's `deletedUserId`) without
+  // every other call site needing to know it exists.
+  body?: unknown
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, body?: unknown) {
     super(message)
     this.status = status
+    this.body = body
   }
 }
 
@@ -22,7 +27,7 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => null)
-    throw new ApiError(res.status, body?.error ?? res.statusText)
+    throw new ApiError(res.status, body?.error ?? res.statusText, body)
   }
 
   // DELETE endpoints answer 204 with no body, which res.json() would choke on.

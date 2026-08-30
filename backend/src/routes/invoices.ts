@@ -1,5 +1,7 @@
 import { Request, Response, Router } from "express"
 import { requireAuth, requireRole } from "../auth/middleware"
+import { invoices } from "../db/schema"
+import { demoRowCeiling } from "../middleware/demoRowCeiling"
 import {
   createInvoiceWithDetails,
   getInvoiceWithDetails,
@@ -50,37 +52,42 @@ invoicesRouter.get("/invoices/:id", requireAuth, async (req: Request, res: Respo
   res.json(invoice)
 })
 
-invoicesRouter.post("/invoices", requireAuth, async (req: Request, res: Response) => {
-  const parsed = createInvoiceBody.safeParse(req.body)
-  if (!parsed.success) {
-    res.status(400).json({ error: firstIssue(parsed.error) })
-    return
-  }
+invoicesRouter.post(
+  "/invoices",
+  requireAuth,
+  demoRowCeiling(invoices),
+  async (req: Request, res: Response) => {
+    const parsed = createInvoiceBody.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: firstIssue(parsed.error) })
+      return
+    }
 
-  try {
-    const created = await createInvoiceWithDetails({
-      policyId: parsed.data.policyId,
-      note: parsed.data.note ?? null,
-      items: parsed.data.items,
-      createdBy: req.user!.id,
-    })
-    if (!created) {
-      res.status(404).json({ error: "Policy not found" })
-      return
+    try {
+      const created = await createInvoiceWithDetails({
+        policyId: parsed.data.policyId,
+        note: parsed.data.note ?? null,
+        items: parsed.data.items,
+        createdBy: req.user!.id,
+      })
+      if (!created) {
+        res.status(404).json({ error: "Policy not found" })
+        return
+      }
+      // Awaited before responding so the attachment is already there on the
+      // caller's next read of the policy's attachments. logId ties the PDF to
+      // the "Invoice #N created" log the same write appended.
+      await recordInvoiceDocument(req, created.invoice, created.logId)
+      res.status(201).json(created.invoice)
+    } catch (err) {
+      if (err instanceof InvoiceWriteError) {
+        res.status(400).json({ error: err.message })
+        return
+      }
+      throw err
     }
-    // Awaited before responding so the attachment is already there on the
-    // caller's next read of the policy's attachments. logId ties the PDF to
-    // the "Invoice #N created" log the same write appended.
-    await recordInvoiceDocument(req, created.invoice, created.logId)
-    res.status(201).json(created.invoice)
-  } catch (err) {
-    if (err instanceof InvoiceWriteError) {
-      res.status(400).json({ error: err.message })
-      return
-    }
-    throw err
   }
-})
+)
 
 // Invoices are immutable: there is no PATCH. A mistaken invoice is voided
 // (only while it has no active payments). Admin-only: voiding reverses money

@@ -53,6 +53,9 @@ export const users = pgTable("users", {
   googleSub: varchar("google_sub", { length: 64 }).unique(),
   role: userRoleEnum("role").notNull().default("staff"),
   isActive: boolean("is_active").notNull().default(true),
+  // Set only by POST /auth/demo on a demo instance (DEMO_MODE=true). Lets
+  // visibleToAdmin() hide these rows from GET /users without a separate table.
+  isDemo: boolean("is_demo").notNull().default(false),
   // A deleted user is hidden from the admin list and can never sign in, but
   // the row stays: policy_logs.author_id and eight other NOT NULL FKs point
   // at it, so the audit trail would break if the row went away. Distinct

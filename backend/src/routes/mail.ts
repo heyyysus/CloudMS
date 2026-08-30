@@ -13,7 +13,6 @@ import {
   correspondenceSentLogBody,
   sendCorrespondenceEmail,
 } from "../emails"
-import { DemoDisabledError } from "../demo"
 import { firstIssue, parseId } from "./helpers"
 import { MailNotConfiguredError, MailSendError, plainTextToHtml, sendEmail } from "../mailer"
 import { sendClientEmailBody, sendCorrespondenceBody } from "./schemas"
@@ -79,11 +78,6 @@ mailRouter.post(
 // the correspondence send below answer 503/502 identically. Returns false for
 // anything else, which the caller rethrows.
 function handleMailError(err: unknown, req: Request, res: Response): boolean {
-  if (err instanceof DemoDisabledError) {
-    req.log.error(err)
-    res.status(403).json({ error: "Disabled in demo mode" })
-    return true
-  }
   if (err instanceof MailNotConfiguredError) {
     req.log.error(err)
     res.status(503).json({ error: "Email sending is not configured" })

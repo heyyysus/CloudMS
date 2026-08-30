@@ -3,7 +3,6 @@
 // call the functions here, which load the template, merge fields, send, and
 // log the attempt to email_log. Keeps the merge-field/template concerns out
 // of the route layer and the logging concern out of the repository layer.
-import { DemoDisabledError } from "./demo"
 import { findEmailTemplateByKey } from "./repositories/emailTemplates"
 import { createEmailLogEntry } from "./repositories/emailLog"
 import { MailNotConfiguredError, MailSendError, plainTextToHtml, sendEmail } from "./mailer"
@@ -107,9 +106,7 @@ export async function sendWelcomeEmail(
     return { status: "sent", resendId: result.id }
   } catch (err) {
     let error: string
-    if (err instanceof DemoDisabledError) {
-      error = "Disabled in demo mode"
-    } else if (err instanceof MailNotConfiguredError) {
+    if (err instanceof MailNotConfiguredError) {
       error = "Email sending is not configured"
     } else if (err instanceof MailSendError) {
       error = "Email delivery is unavailable"
@@ -275,11 +272,7 @@ export async function sendCorrespondenceEmail(input: {
     await logAll({ resendId: result.id, status: "sent" })
     return { resendId: result.id, subject, body: text }
   } catch (err) {
-    if (
-      err instanceof MailNotConfiguredError ||
-      err instanceof MailSendError ||
-      err instanceof DemoDisabledError
-    ) {
+    if (err instanceof MailNotConfiguredError || err instanceof MailSendError) {
       await logAll({ resendId: null, status: "failed", error: err.message })
     }
     throw err

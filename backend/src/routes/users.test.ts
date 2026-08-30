@@ -177,6 +177,17 @@ describe("GET /users", () => {
     expect(row.hasSignedIn).toBe(false)
     expect(row).not.toHaveProperty("googleSub")
   })
+
+  it("excludes demo users", async () => {
+    const admin = await ctx.user("list-users-admin2", "admin")
+    const cookie = await makeSessionCookie(admin.id)
+    const demoUser = await ctx.user("demo-hidden", "admin", { isDemo: true })
+
+    const res = await request(app).get("/users").set("Cookie", cookie)
+    expect(res.status).toBe(200)
+
+    expect(res.body.find((u: { id: number }) => u.id === demoUser.id)).toBeUndefined()
+  })
 })
 
 describe("PATCH /users/:id", () => {

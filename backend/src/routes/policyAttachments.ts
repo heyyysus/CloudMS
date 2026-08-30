@@ -198,7 +198,7 @@ policyAttachmentsRouter.post(
 
     const attachment = await createPolicyAttachment({
       policyId: parsed.data.policyId,
-      fileName: parsed.data.fileName,
+      fileName: sanitizeFileName(parsed.data.fileName),
       description: parsed.data.description ?? null,
       storageKey: parsed.data.storageKey,
       mimeType: head.contentType ?? "application/octet-stream",

@@ -14,6 +14,15 @@ export function loginWithGoogle(idToken: string): Promise<User> {
   }).then((data) => data.user)
 }
 
+// Demo deployments only: mints a throwaway admin session for the given
+// display name. The route is not mounted outside DEMO_MODE (404).
+export function loginAsDemoUser(name: string): Promise<User> {
+  return request<{ user: User }>('/auth/demo', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  }).then((data) => data.user)
+}
+
 export function getMe(): Promise<User> {
   return request<{ user: User }>('/auth/me').then((data) => data.user)
 }

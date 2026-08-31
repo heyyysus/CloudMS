@@ -330,3 +330,15 @@ export const SendFails: Story = {
     )
   },
 }
+
+// Demo deployments cannot send mail: the trigger is greyed out and the dialog
+// never opens.
+export const Disabled: Story = {
+  args: { disabled: true },
+  play: async ({ canvasElement }) => {
+    const trigger = within(canvasElement).getByRole('button', { name: /send/i })
+    await expect(trigger).toBeDisabled()
+    await expect(trigger).toHaveAttribute('title', 'Disabled in the demo')
+    await expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  },
+}

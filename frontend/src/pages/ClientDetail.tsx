@@ -28,6 +28,8 @@ import { useClientTabs } from '@/components/layout/client-tabs'
 import { useFileDrop, isRaterFile } from '@/hooks/use-file-drop'
 import { useLogShortcut } from '@/hooks/use-log-shortcut'
 import { useAuth } from '@/auth/AuthContext'
+import { useAppConfig } from '@/config/AppConfigContext'
+import { useToast } from '@/components/ui/toast'
 import { ApiError } from '@/api/client'
 import { clientDisplayName, getClient } from '@/api/clients'
 import { getPolicy, type Vehicle } from '@/api/policies'
@@ -40,6 +42,8 @@ function ClientDetail() {
   const { openTab, removeTab } = useClientTabs()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { config } = useAppConfig()
+  const toast = useToast()
   const queryClient = useQueryClient()
 
   const {
@@ -149,6 +153,10 @@ function ClientDetail() {
     setAttachmentsHint(false)
     if (isRaterFile(file)) {
       openImportDialog(file)
+    } else if (config.demoMode) {
+      // A rater file above still imports - that parses locally and only POSTs
+      // JSON - but a plain file would be an upload, which the demo refuses.
+      toast.info('Uploading files is disabled in the demo.')
     } else if (selectedPolicyId !== undefined) {
       setSubtab('attachments')
       openAttachmentDialog(file)
@@ -314,6 +322,7 @@ function ClientDetail() {
                               client={client}
                               policy={query.data}
                               isAdmin={user?.role === 'admin'}
+                              disabled={config.demoMode}
                             />
                             <EditPolicyDialog
                               client={client}
@@ -347,6 +356,7 @@ function ClientDetail() {
                       policyId={policy.id}
                       onAddAttachment={() => openAttachmentDialog()}
                       currentUserId={user?.id}
+                      uploadDisabled={config.demoMode}
                     />
                   }
                 />

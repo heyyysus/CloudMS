@@ -29,6 +29,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { SubmitButton } from '@/components/ui/submit-button'
 import { useToast } from '@/components/ui/toast'
 import { renderPreview } from '@/lib/correspondence-merge-fields'
+import { isDemoDisabledError } from '@/lib/demo'
 
 // Addresses are compared case-insensitively throughout: the server lowercases
 // them before deduping to/cc, so the dialog has to agree or it would offer an
@@ -66,6 +67,9 @@ interface SendCorrespondenceDialogProps {
   // component renders in isolation (stories) without an AuthProvider - the
   // same convention InvoiceReceiptDialog uses.
   isAdmin?: boolean
+  // Demo deployments cannot send mail; the trigger is greyed out rather than
+  // hidden so the demo still shows the product has correspondence.
+  disabled?: boolean
   getTemplatesFn?: typeof getCorrespondenceTemplates
   getMergeValuesFn?: typeof getPolicyMergeValues
   sendFn?: typeof sendPolicyCorrespondence
@@ -80,6 +84,7 @@ export function SendCorrespondenceDialog({
   client,
   policy,
   isAdmin = false,
+  disabled = false,
   getTemplatesFn = getCorrespondenceTemplates,
   getMergeValuesFn = getPolicyMergeValues,
   sendFn = sendPolicyCorrespondence,
@@ -157,7 +162,8 @@ export function SendCorrespondenceDialog({
       const count = result.to.length + result.cc.length
       toast.success(`Email sent to ${count} recipient${count === 1 ? '' : 's'}`)
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error) =>
+      toast.error(isDemoDisabledError(error) ? 'This action is disabled in the demo.' : error.message),
   })
 
   return (
@@ -169,7 +175,12 @@ export function SendCorrespondenceDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={disabled}
+          title={disabled ? 'Disabled in the demo' : undefined}
+        >
           <MailIcon /> Send
         </Button>
       </DialogTrigger>

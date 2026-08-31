@@ -1,0 +1,44 @@
+name: cloudms-demo
+
+services:
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./nginx/demo:/etc/nginx/conf.d
+      - ./frontend/dist:/usr/share/nginx/html:ro
+    depends_on:
+      - app
+    restart: always
+
+  app:
+    image: ghcr.io/heyyysus/cloudms-app:latest
+    env_file:
+      - .env.demo
+    environment:
+      # Set here too, not only in .env.demo, so demo mode can't be lost by an
+      # incomplete env file.
+      - DEMO_MODE=true
+      - DATABASE_URL=postgresql://postgres:password@db:5432/myapp_demo
+    depends_on:
+      - db
+    restart: always
+
+  db:
+    image: postgres:18.4
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: myapp_demo
+    volumes:
+      # Its own volume - never postgres_data, which is production's.
+      - postgres_data_demo:/var/lib/postgresql
+    restart: always
+    # Production already holds 5433 on the host.
+    ports:
+      - "127.0.0.1:5434:5432"
+
+volumes:
+  postgres_data_demo:

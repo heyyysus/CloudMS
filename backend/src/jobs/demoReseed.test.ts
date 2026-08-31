@@ -49,17 +49,23 @@ function deferred() {
 }
 
 describe("startDemoReseedScheduler", () => {
+  // The DEMO_MODE cases unset NODE_ENV=test so the demoMode() guard is what's
+  // actually exercised - under NODE_ENV=test they'd pass regardless. Safe:
+  // with demo mode off no timer is ever created.
   it("does not start when DEMO_MODE is unset", () => {
+    process.env.NODE_ENV = "development"
     delete process.env.DEMO_MODE
     expect(startDemoReseedScheduler()).toBeUndefined()
   })
 
   it("does not start when DEMO_MODE is false", () => {
+    process.env.NODE_ENV = "development"
     process.env.DEMO_MODE = "false"
     expect(startDemoReseedScheduler()).toBeUndefined()
   })
 
   it("fails closed on a near-miss value", () => {
+    process.env.NODE_ENV = "development"
     process.env.DEMO_MODE = "TRUE"
     expect(startDemoReseedScheduler()).toBeUndefined()
   })

@@ -84,15 +84,23 @@ jobs:
           commit, do not post comments yourself, and do not spawn subagents or use the /code-review skill —
           do the review in this session and put the full review in your final message.
 
-          Check, in order of importance:
-          1. Correctness bugs and regressions (backend Express/Drizzle routes, frontend React/TanStack).
-          2. Security: auth/session checks on routes, input validation, injection, data exposure, secrets.
-          3. Scope: does the change match the issue and plan.md — nothing missing, nothing extra?
-          4. CLAUDE.md conventions (ignore the concurrent-agents section) and PROJECT.md direction.
-          5. Tests: present, meaningful, using TestContext fixtures for backend.
+          This is a scope-and-slop review, not a line-by-line audit. Check:
+          1. Scope: every hunk must map to the issue/plan.md, and the issue must be fully addressed.
+             Flag anything extra (drive-by refactors, speculative abstractions, unused props/exports,
+             dead code) and anything asked for that is missing.
+          2. Slop: overbuilt or nonsensical implementations, code that contradicts CLAUDE.md
+             conventions (ignore the concurrent-agents section) or PROJECT.md direction, copy-paste
+             noise, comments that restate code.
+          3. Tests: a quick pass — do the added/changed tests actually exercise the changed behavior?
+             Flag changed behavior with no covering test, and tests that assert nothing meaningful.
+             Backend tests must use TestContext fixtures.
+          4. Flag an outright correctness or security problem if you notice one, but do not hunt.
 
-          Output a Markdown review: "## PR review (\`$MODE\`)", then findings as bullets with
-          \`path:line\` references, most severe first; say "No findings" if clean. End with exactly one line:
+          Report format — keep it tight. "## PR review (\`$MODE\`)", then at most 150 words:
+          one bullet per finding, \`path:line\` then one sentence naming the problem (and the fix in a
+          clause if obvious). No summary of what the PR does, no restating the diff, no praise, no
+          severity labels, no hedging. If clean, the entire body is one line: "No findings — scope,
+          tests, and conventions check out." End with exactly one line:
           PIPELINE-VERDICT: clean | advisory | blocking-security
           (blocking-security only for an exploitable security problem that must not be merged as-is.)
 

@@ -2,6 +2,7 @@ import { randomBytes } from "crypto"
 import { Request, Response, Router } from "express"
 import { z } from "zod"
 import { demoSessionTtlMs } from "../config"
+import { demoSignInLimit } from "../middleware/demoSignInLimit"
 import { createSession, createUser } from "../repositories"
 import { cookieOptions, publicUser } from "./routes"
 import { SESSION_COOKIE } from "./middleware"
@@ -11,7 +12,7 @@ const demoSignInBody = z.object({ name: z.string().trim().min(1).max(150) })
 
 export const demoAuthRouter = Router()
 
-demoAuthRouter.post("/auth/demo", async (req: Request, res: Response) => {
+demoAuthRouter.post("/auth/demo", demoSignInLimit, async (req: Request, res: Response) => {
   const parsed = demoSignInBody.safeParse(req.body)
   if (!parsed.success) {
     res.status(400).json({ error: "name is required" })

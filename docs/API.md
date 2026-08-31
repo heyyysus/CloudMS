@@ -55,17 +55,25 @@ mechanics. What a frontend integration needs to know:
   /auth/demo` with `{ name }` is also available: it mints a fresh admin
   account and the same kind of session cookie, with no Google token. On a
   real instance this route doesn't exist — it 404s. See [Config](#config)
-  below.
+  below. It is rate-limited to `DEMO_SIGNIN_LIMIT_PER_HOUR` (default 5)
+  sign-ins per IP per rolling hour; over the limit it answers `429 { error:
+  ... }`. This is an in-memory, per-container speed bump keyed on a
+  spoofable header, not an access control — see
+  [`docs/demo-mode.md`](./demo-mode.md).
 
 ## Config
 
 | Method | Path | Role | Notes |
 |---|---|---|---|
-| GET | `/config` | none (unauthenticated) | `{ demoMode: boolean }` |
+| GET | `/config` | none (unauthenticated) | `{ demoMode: boolean, demoResetMinutes?: number }` |
 
 Public even on a real production instance, so a frontend can decide whether
-to offer demo sign-in before any user is authenticated. It carries nothing
-else.
+to offer demo sign-in before any user is authenticated. On a real instance the
+body is exactly `{ demoMode: false }`. On a demo instance it also carries
+`demoResetMinutes` (from `DEMO_RESET_MINUTES`, default 60) unless that value is
+`0`, in which case the field is omitted and the frontend falls back to generic
+"resets periodically" copy. See [`docs/demo-mode.md`](./demo-mode.md) for what
+resets a demo host and how.
 
 ## No pagination
 

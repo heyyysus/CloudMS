@@ -24,6 +24,22 @@ export function demoMaxRowsPerTable(): number {
   return num("DEMO_MAX_ROWS_PER_TABLE", 5000)
 }
 
+// How often the demo host is reset (see docs/demo-mode.md - today this is a
+// manually-run `npm run db:seed`, not an in-process timer). Reported on
+// GET /config so the frontend banner can show a real number. 0 means "no
+// reset is scheduled"; the caller omits the field in that case rather than
+// rendering "every 0 minutes".
+export function demoResetMinutes(): number {
+  return num("DEMO_RESET_MINUTES", 60)
+}
+
+// Sign-ins per IP per rolling hour allowed through POST /auth/demo. A speed
+// bump against a script minting accounts in a loop, not a security control -
+// see middleware/demoSignInLimit.ts.
+export function demoSignInLimitPerHour(): number {
+  return num("DEMO_SIGNIN_LIMIT_PER_HOUR", 5)
+}
+
 // The credentials a demo instance may not hold. Kept as a list so the startup
 // guard names every offender at once rather than failing one at a time.
 export const FORBIDDEN_DEMO_ENV = [

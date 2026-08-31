@@ -14,10 +14,12 @@ node_modules/
 .env.development
 .env.staging
 .env.production
+.env.demo
 .env*.local
 *.pem
 *.key
 !.env.example
+!.env.demo.example
 
 # Cloudflare origin certs (never commit)
 nginx/certs/

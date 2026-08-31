@@ -43,6 +43,19 @@ export function remindersEnabled(): boolean {
   return process.env.REMINDERS_ENABLED !== "false"
 }
 
+export interface DemoReseedConfig {
+  intervalMs: number
+}
+
+const DEMO_RESEED_DEFAULT_MINUTES = 15
+
+export function demoReseedConfig(): DemoReseedConfig {
+  const minutes = num("DEMO_RESEED_INTERVAL_MINUTES", DEMO_RESEED_DEFAULT_MINUTES)
+  // num() already falls back on NaN, but not on a non-positive value - "0"
+  // would otherwise produce a zero-delay interval that reseeds in a hot loop.
+  return { intervalMs: (minutes > 0 ? minutes : DEMO_RESEED_DEFAULT_MINUTES) * 60_000 }
+}
+
 // The identity that renders into {{agentName}}/{{agentEmail}} on an automated
 // send. Distinct from the automation *user*, which supplies authorship: a
 // client should read the agency's name, not "CloudMS Automation".

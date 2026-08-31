@@ -6,6 +6,14 @@ faker.seed(42)
 
 export { faker }
 
+// Re-applies the fixed seed. Faker's generator is a stream that only resets
+// on an explicit reseed, so a second seed() call in the same process (the
+// demo reseed job) would otherwise continue the stream and produce different
+// data each cycle instead of the same reproducible dataset every time.
+export function resetRng(): void {
+  faker.seed(42)
+}
+
 export function chunk<T>(items: T[], size: number): T[][] {
   const chunks: T[][] = []
   for (let i = 0; i < items.length; i += size) {

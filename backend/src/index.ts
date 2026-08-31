@@ -1,5 +1,5 @@
 import app from "./app"
-import { demoMode } from "./config"
+import { demoMode, forbiddenDemoEnvPresent } from "./config"
 import { startReminderScheduler } from "./jobs/scheduler"
 import { logger } from "./logger"
 
@@ -14,6 +14,13 @@ if (!process.env.GOOGLE_CLIENT_ID) {
 // so this is a real warning, not a dev-only notice.
 if (demoMode()) {
   logger.warn("demo mode: /auth/demo is open and mints admin accounts")
+  // A demo instance may not hold outbound credentials at all, so refuse to
+  // start rather than run with them present and unused.
+  const present = forbiddenDemoEnvPresent()
+  if (present.length > 0) {
+    logger.fatal(`DEMO_MODE is set but ${present.join(", ")} is configured — refusing to start`)
+    process.exit(1)
+  }
 }
 
 const PORT = process.env.PORT || 8000

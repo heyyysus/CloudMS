@@ -1,6 +1,7 @@
 import request from "supertest"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
+import { DemoDisabledError } from "../config"
 import { attachmentKeyPrefix, createPolicyAttachment } from "../repositories"
 import { getPresignedDownloadUrl, headObject } from "../storage/r2"
 import { makeSessionCookie, TestContext } from "./testHelpers"
@@ -21,9 +22,11 @@ vi.mock("../storage/r2", async (importOriginal) => {
 })
 
 const ctx = new TestContext()
+const ORIGINAL_ENV = { ...process.env }
 afterEach(() => {
   vi.mocked(getPresignedDownloadUrl).mockReset().mockResolvedValue("https://example.com/signed")
   vi.mocked(headObject).mockReset()
+  process.env = { ...ORIGINAL_ENV }
   return ctx.cleanup()
 })
 
@@ -105,6 +108,57 @@ describe("GET /policy-attachments/:id/link", () => {
       `policy-attachments/${policy.id}/declarations-page.pdf`,
       { downloadFileName: "declarations-page.pdf" }
     )
+  })
+
+  // getPresignedDownloadUrl is mocked above, so this exercises the route's
+  // own DemoDisabledError -> 403 mapping (handleStorageError) rather than the
+  // real check in r2.ts's getClient() - that seam is covered by the presign
+  // test below, which calls through to the unmocked function.
+  it("returns 403 in demo mode", async () => {
+    process.env.DEMO_MODE = "true"
+    vi.mocked(getPresignedDownloadUrl).mockRejectedValueOnce(
+      new DemoDisabledError("File storage is disabled in demo mode")
+    )
+    const user = await ctx.user("attach-link-demo")
+    const cookie = await makeSessionCookie(user.id)
+    const policy = await ctx.policy()
+    const attachment = await createPolicyAttachment({
+      policyId: policy.id,
+      fileName: "test.pdf",
+      storageKey: `policy-attachments/${policy.id}/test.pdf`,
+      mimeType: "application/pdf",
+      sizeBytes: 100,
+      createdBy: user.id,
+    })
+
+    const res = await request(app)
+      .get(`/policy-attachments/${attachment.id}/link`)
+      .set("Cookie", cookie)
+    expect(res.status).toBe(403)
+    expect(res.body.error).toBe("Disabled in demo mode")
+  })
+})
+
+describe("POST /policy-attachments/presign", () => {
+  // getPresignedUploadUrl is not overridden by the vi.mock above, so this
+  // exercises the real seam in storage/r2.ts's getClient() end to end - the
+  // mocked R2 calls above cover the route wiring, this covers the check
+  // itself fires before any credential is touched.
+  it("returns 403 in demo mode, without touching R2 credentials", async () => {
+    process.env.DEMO_MODE = "true"
+    const user = await ctx.user("attach-presign-demo")
+    const cookie = await makeSessionCookie(user.id)
+    const policy = await ctx.policy()
+
+    const res = await request(app).post("/policy-attachments/presign").set("Cookie", cookie).send({
+      policyId: policy.id,
+      fileName: "test.pdf",
+      contentType: "application/pdf",
+      sizeBytes: 100,
+    })
+
+    expect(res.status).toBe(403)
+    expect(res.body.error).toBe("Disabled in demo mode")
   })
 })
 

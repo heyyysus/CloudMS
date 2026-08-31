@@ -3,7 +3,7 @@ import express, { Application, NextFunction, Request, Response } from "express"
 import pinoHttp from "pino-http"
 import { authRouter } from "./auth/routes"
 import { demoAuthRouter } from "./auth/demoRoutes"
-import { demoMode } from "./config"
+import { DemoDisabledError, demoMode } from "./config"
 import { logger } from "./logger"
 import { carriersRouter } from "./routes/carriers"
 import { clientsRouter } from "./routes/clients"
@@ -92,6 +92,11 @@ interface HttpError extends Error {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: PgError & HttpError, req: Request, res: Response, next: NextFunction) => {
+  if (err instanceof DemoDisabledError) {
+    res.status(403).json({ error: "Disabled in demo mode" })
+    return
+  }
+
   const status = err.status ?? err.statusCode
   if (typeof status === "number" && status >= 400 && status < 500) {
     res

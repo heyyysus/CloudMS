@@ -145,4 +145,4 @@ Frontend changes deploy separately: `.github/workflows/frontend.yml` triggers on
 
 ### Demo instance
 
-A separate, self-resetting instance for showing the app off, standalone from production (its own compose file, database, and volume). See [`docs/demo-deployment.md`](docs/demo-deployment.md).
+A separate, self-resetting instance for showing the app off, deployed to its own host with its own hostname, TLS cert, and database — `docker-compose.demo.yml`, not the production compose file. See [`docs/demo-deployment.md`](docs/demo-deployment.md).

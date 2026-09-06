@@ -23,6 +23,7 @@ import { isoDaysFromToday, makeSessionCookie, TestContext } from "../routes/test
 import { AUTOMATION_USER_EMAIL, resetAutomationUserCache } from "./automationUser"
 import { dispatchReminders } from "./dispatcher"
 import { PLANNER_LOCK_KEY, planDueReminders, planReminders } from "./planner"
+import { startReminderScheduler } from "./scheduler"
 
 const ORIGINAL_ENV = { ...process.env }
 
@@ -60,6 +61,15 @@ async function dueSetup(offsetDays: number, options: { withEmail?: boolean } = {
   const rule = await ctx.reminderRule({ offsetDays })
   return { client, policy, rule }
 }
+
+describe("startReminderScheduler", () => {
+  it("does not start in demo mode, even with reminders enabled", () => {
+    process.env.DEMO_MODE = "true"
+    process.env.REMINDERS_ENABLED = "true"
+
+    expect(startReminderScheduler()).toBeUndefined()
+  })
+})
 
 describe("planReminders", () => {
   it("queues a reminder for an active policy whose target date is today", async () => {
@@ -847,5 +857,15 @@ describe("POST /reminders/tick", () => {
     expect(res.status).toBe(200)
     expect(res.body.plan).toBeDefined()
     expect(res.body.dispatch).toBeDefined()
+  })
+
+  it("returns 403 in demo mode, without running a plan/dispatch pass", async () => {
+    process.env.DEMO_MODE = "true"
+    const cookie = await cookieFor("tick-demo")
+
+    const res = await request(app).post("/reminders/tick").set("Cookie", cookie)
+
+    expect(res.status).toBe(403)
+    expect(res.body.error).toBe("Disabled in demo mode")
   })
 })

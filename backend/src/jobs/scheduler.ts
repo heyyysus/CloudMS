@@ -1,3 +1,4 @@
+import { demoMode } from "../config"
 import { logger } from "../logger"
 import { reminderConfig, remindersEnabled } from "./config"
 import { dispatchReminders, type DispatchResult } from "./dispatcher"
@@ -50,6 +51,10 @@ async function tick(): Promise<void> {
 // Started from src/index.ts only, never app.ts: the supertest suites import
 // app directly, and a timer there would leak into every test file.
 export function startReminderScheduler(): NodeJS.Timeout | undefined {
+  if (demoMode()) {
+    logger.info("Reminder scheduler disabled (DEMO_MODE)")
+    return undefined
+  }
   if (!remindersEnabled()) {
     logger.info("Reminder scheduler disabled (REMINDERS_ENABLED=false)")
     return undefined

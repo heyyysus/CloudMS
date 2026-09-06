@@ -200,6 +200,25 @@ describe("POST /clients/:clientId/send-email", () => {
 
     expect(res.status).toBe(502)
   })
+
+  it("returns 403 in demo mode, without hitting Resend", async () => {
+    configureMail()
+    process.env.DEMO_MODE = "true"
+    const user = await ctx.user("mail-demo", "admin")
+    const cookie = await makeSessionCookie(user.id)
+    const client = await ctx.client()
+    await addEmailToClient(client.id, "onfile@example.com")
+    const fetchMock = stubResend({ id: "msg_should_not_send" })
+
+    const res = await request(app)
+      .post(`/clients/${client.id}/send-email`)
+      .set("Cookie", cookie)
+      .send({ subject: "Hi", body: "Hello" })
+
+    expect(res.status).toBe(403)
+    expect(res.body.error).toBe("Disabled in demo mode")
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })
 
 // A correspondence template referencing one merge field from each group, so
@@ -516,5 +535,22 @@ describe("POST /policies/:policyId/send-correspondence", () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].status).toBe("failed")
     expect(await listPolicyLogsByPolicyId(policy.id)).toHaveLength(0)
+  })
+
+  it("returns 403 in demo mode, without hitting Resend", async () => {
+    configureMail()
+    process.env.DEMO_MODE = "true"
+    const { cookie, policy } = await makeSendFixture("send-demo")
+    const template = await makeTemplate()
+    const fetchMock = stubResend({ id: "msg_should_not_send" })
+
+    const res = await request(app)
+      .post(`/policies/${policy.id}/send-correspondence`)
+      .set("Cookie", cookie)
+      .send({ templateId: template.id, to: ["jane@example.com"] })
+
+    expect(res.status).toBe(403)
+    expect(res.body.error).toBe("Disabled in demo mode")
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

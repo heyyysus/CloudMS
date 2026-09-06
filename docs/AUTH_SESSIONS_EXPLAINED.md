@@ -27,7 +27,9 @@ and mints a session cookie exactly like `/auth/google` does — same
 `SESSION_TTL_MS` (7 days). Demo users are excluded from `GET /users`
 (`visibleToAdmin()` in `repositories/users.ts`) but are otherwise ordinary
 admin accounts — this is only safe because a demo deployment has its own,
-disposable database.
+disposable database. See [`docs/demo-mode.md`](./demo-mode.md) for the full
+picture: every `DEMO_*` env var, the outbound-credential boot guard, the
+sign-in rate limit, and how to deploy a demo instance.
 
 ---
 

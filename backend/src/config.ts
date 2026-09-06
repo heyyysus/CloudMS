@@ -2,6 +2,8 @@
 // module load - the convention jobs/config.ts, mailer.ts and storage/r2.ts
 // all follow, and what lets tests stub a value between cases.
 
+import { demoReseedConfig } from "./jobs/config"
+
 function num(name: string, fallback: number): number {
   const raw = process.env[name]
   if (!raw) return fallback
@@ -23,3 +25,41 @@ export function demoSessionTtlMs(): number {
 export function demoMaxRowsPerTable(): number {
   return num("DEMO_MAX_ROWS_PER_TABLE", 5000)
 }
+
+// How often the demo database is actually wiped and reseeded, reported on
+// GET /config so the frontend banner can show a real number. Derived from the
+// reseed job's own interval rather than a second env var, so the number a
+// visitor is shown can't drift from the cadence that runs (see
+// jobs/demoReseed.ts). Returns minutes; the caller omits the field when the
+// job isn't running rather than rendering "every 0 minutes".
+export function demoResetMinutes(): number {
+  if (!demoMode()) return 0
+  return demoReseedConfig().intervalMs / 60_000
+}
+
+// Sign-ins per IP per rolling hour allowed through POST /auth/demo. A speed
+// bump against a script minting accounts in a loop, not a security control -
+// see middleware/demoSignInLimit.ts.
+export function demoSignInLimitPerHour(): number {
+  return num("DEMO_SIGNIN_LIMIT_PER_HOUR", 5)
+}
+
+// The credentials a demo instance may not hold. Kept as a list so the startup
+// guard names every offender at once rather than failing one at a time.
+export const FORBIDDEN_DEMO_ENV = [
+  "RESEND_API_KEY",
+  "MAIL_FROM",
+  "R2_ACCOUNT_ID",
+  "R2_ACCESS_KEY_ID",
+  "R2_SECRET_ACCESS_KEY",
+  "R2_BUCKET_NAME",
+] as const
+
+// Pure so it can be unit-tested without spawning a process. Returns the names
+// that are set; empty means safe to boot. An empty string counts as unset.
+export function forbiddenDemoEnvPresent(env: NodeJS.ProcessEnv = process.env): string[] {
+  return FORBIDDEN_DEMO_ENV.filter((name) => !!env[name])
+}
+
+// Thrown from the mail/storage seams. app.ts maps it to 403.
+export class DemoDisabledError extends Error {}

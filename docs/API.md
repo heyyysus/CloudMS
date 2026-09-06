@@ -55,17 +55,26 @@ mechanics. What a frontend integration needs to know:
   /auth/demo` with `{ name }` is also available: it mints a fresh admin
   account and the same kind of session cookie, with no Google token. On a
   real instance this route doesn't exist — it 404s. See [Config](#config)
-  below.
+  below. It is rate-limited to `DEMO_SIGNIN_LIMIT_PER_HOUR` (default 5)
+  sign-ins per IP per rolling hour; over the limit it answers `429 { error:
+  ... }`. This is an in-memory, per-container speed bump keyed on a
+  spoofable header, not an access control — see
+  [`docs/demo-mode.md`](./demo-mode.md).
 
 ## Config
 
 | Method | Path | Role | Notes |
 |---|---|---|---|
-| GET | `/config` | none (unauthenticated) | `{ demoMode: boolean }` |
+| GET | `/config` | none (unauthenticated) | `{ demoMode: boolean, demoResetMinutes?: number }` |
 
 Public even on a real production instance, so a frontend can decide whether
-to offer demo sign-in before any user is authenticated. It carries nothing
-else.
+to offer demo sign-in before any user is authenticated. On a real instance the
+body is exactly `{ demoMode: false }`. On a demo instance it also carries
+`demoResetMinutes`, which is the reseed job's own interval
+(`DEMO_RESEED_INTERVAL_MINUTES`, default 15) rather than a separate knob — so
+the cadence a visitor is shown is the one that actually runs. It is always
+present in demo mode. See [`docs/demo-mode.md`](./demo-mode.md) for what
+resets a demo host and how.
 
 ## No pagination
 
@@ -770,6 +779,9 @@ Status codes specific to this route:
 - `502` — Resend was unreachable, timed out (10s), or answered with an error
   status (e.g. rate limited).
 - `503` — `RESEND_API_KEY` or `MAIL_FROM` isn't configured on the server.
+- `403` — `DEMO_MODE=true` on the server; body `{ error: "Disabled in demo
+  mode" }`. A demo instance holds no outbound mail credentials at all, so this
+  takes precedence over the `503` above.
 
 Example response (`POST /clients/42/send-email`, body
 `{ "subject": "Renewal", "body": "Your policy renews soon." }`):
@@ -845,7 +857,7 @@ Status codes specific to `POST /policies/:policyId/send-correspondence`:
 - `404` — no policy with that id, or no *correspondence* template with that id.
   The singleton `welcome` template is kind-scoped out of this lookup, so it can
   never be sent to a client.
-- `502` / `503` — as for `/clients/:clientId/send-email` above.
+- `502` / `503` / `403` — as for `/clients/:clientId/send-email` above.
 
 A successful send writes one `email_log` row per address (`to` and `cc` alike)
 and appends one entry to the policy's log:
@@ -904,6 +916,9 @@ Status codes specific to these routes:
 pass always gets one rather than "another container was already planning". It
 is also the seam for driving the scheduler from outside the process — an
 external cron calling this endpoint — with no code change.
+
+With `DEMO_MODE=true`, the scheduler never starts and `POST /reminders/tick`
+answers `403 { error: "Disabled in demo mode" }` instead of running a pass.
 
 ## Policy activities
 

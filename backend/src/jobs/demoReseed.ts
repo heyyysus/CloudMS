@@ -71,8 +71,7 @@ export function startDemoReseedScheduler(): NodeJS.Timeout | undefined {
     .select({ count: sql<number>`count(*)` })
     .from(clients)
     .then(([{ count }]) => {
-      // pg returns count(*) as a string - compare numerically.
-      if (Number(count) === 0) void runDemoReseed()
+      if (count === 0) void runDemoReseed()
     })
     .catch((err) => logger.error(err, "Demo reseed boot check failed"))
 

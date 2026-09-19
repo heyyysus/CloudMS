@@ -51,12 +51,16 @@ async function main() {
       $$;
     `)
     await tx.execute(sql`GRANT USAGE ON SCHEMA public TO app`)
-    await tx.execute(sql`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app`)
+    await tx.execute(
+      sql`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app`
+    )
     await tx.execute(sql`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app`)
     await tx.execute(
-      sql`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app`,
+      sql`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app`
     )
-    await tx.execute(sql`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO app`)
+    await tx.execute(
+      sql`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO app`
+    )
   })
   console.log("Ensured app role exists with up-to-date privileges")
 

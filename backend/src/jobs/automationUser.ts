@@ -19,7 +19,9 @@ export async function getAutomationUser(): Promise<User> {
     where: eq(users.email, AUTOMATION_USER_EMAIL),
   })
   if (!found) {
-    throw new Error(`Automation user ${AUTOMATION_USER_EMAIL} is missing - run npm run db:bootstrap`)
+    throw new Error(
+      `Automation user ${AUTOMATION_USER_EMAIL} is missing - run npm run db:bootstrap`
+    )
   }
   cached = found
   return found

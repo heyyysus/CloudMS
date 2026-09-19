@@ -1,0 +1,58 @@
+diff --git a/.github/workflows/agent-coder.yml b/.github/workflows/agent-coder.yml
+index 96c7d11..6ace2ef 100644
+--- a/.github/workflows/agent-coder.yml
++++ b/.github/workflows/agent-coder.yml
+@@ -42,7 +42,8 @@ jobs:
+     env:
+       ISSUE: ${{ github.event.issue.number }}
+       BRANCH: agent/issue-${{ github.event.issue.number }}
+-      DATABASE_URL: postgresql://postgres:password@localhost:5432/myapp
++      DATABASE_ADMIN_URL: postgresql://postgres:password@localhost:5432/myapp
++      DATABASE_URL: postgresql://app:password@localhost:5432/myapp
+       CODER_MAX_TURNS: 200
+     steps:
+       - uses: actions/checkout@v4
+@@ -87,10 +88,10 @@ jobs:
+             backend/package-lock.json
+             frontend/package-lock.json
+ 
+-      - name: Install and migrate
++      - name: Install and set up database
+         run: |
+           set -euo pipefail
+-          (cd backend && npm ci --legacy-peer-deps && npx ts-node src/db/migrate.ts)
++          (cd backend && npm ci --legacy-peer-deps && npm run db:push && npm run db:bootstrap)
+           (cd frontend && npm ci)
+ 
+       - name: Build prompt
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 6323455..4d9d121 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -52,7 +52,8 @@ jobs:
+           --health-timeout 5s
+           --health-retries 5
+     env:
+-      DATABASE_URL: postgresql://postgres:password@localhost:5432/myapp
++      DATABASE_ADMIN_URL: postgresql://postgres:password@localhost:5432/myapp
++      DATABASE_URL: postgresql://app:password@localhost:5432/myapp
+     steps:
+       - uses: actions/checkout@v4
+ 
+@@ -67,10 +68,12 @@ jobs:
+       - run: npm run typecheck
+       - run: npm run lint
+       - run: npm run format:check
+-      # Runs the same migrator + bootstrap (welcome email template, admin
+-      # user) as the production container's dist/db/migrate.js, so tests that
+-      # depend on baseline data (e.g. the welcome template) see it too.
+-      - run: npx ts-node src/db/migrate.ts
++      # Runs the same push + role grants + bootstrap (welcome email template,
++      # admin user) as the production container's CMD (dist/db/roles.js,
++      # dist/db/bootstrap.js), so tests that depend on baseline data (e.g. the
++      # welcome template) see it too, and run as the app role like production.
++      - run: npm run db:push
++      - run: npm run db:bootstrap
+       # Coverage is report-only (no thresholds in vitest.config.ts): it tracks
+       # the metric without gating the build.
+       - run: npm run test:coverage

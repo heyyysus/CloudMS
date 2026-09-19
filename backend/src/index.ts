@@ -1,6 +1,5 @@
 import app from "./app"
 import { demoMode } from "./config"
-import { startDemoReseedScheduler } from "./jobs/demoReseed"
 import { startReminderScheduler } from "./jobs/scheduler"
 import { logger } from "./logger"
 
@@ -25,5 +24,4 @@ app.listen(PORT, () => {
   // starts a timer. Safe to run on every container: the planner takes an
   // advisory lock and the dispatcher claims rows with SKIP LOCKED.
   startReminderScheduler()
-  startDemoReseedScheduler()
 })

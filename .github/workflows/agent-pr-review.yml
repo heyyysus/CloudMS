@@ -51,8 +51,11 @@ jobs:
           else
             base=$(git merge-base origin/main HEAD); mode="full PR"
           fi
+          # Diff to a file first, then truncate (see agent-docs.yml: a pipe into head
+          # kills git with SIGPIPE under pipefail once the diff exceeds the cap).
           git diff "$base"..HEAD -- . ':!**/package-lock.json' ':!**/dist/**' ':!frontend/src/components/ui/**' ':!pipeline' \
-            | head -n 6000 > "$RUNNER_TEMP/diff.patch"
+            > "$RUNNER_TEMP/diff.full.patch"
+          head -n 6000 "$RUNNER_TEMP/diff.full.patch" > "$RUNNER_TEMP/diff.patch"
           git diff "$base"..HEAD --stat > "$RUNNER_TEMP/diff.stat"
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           if [[ ! -s "$RUNNER_TEMP/diff.patch" ]]; then echo "empty=true" >> "$GITHUB_OUTPUT"; else echo "empty=false" >> "$GITHUB_OUTPUT"; fi

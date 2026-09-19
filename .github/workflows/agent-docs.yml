@@ -51,8 +51,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git diff origin/main...HEAD --stat -- . ':!pipeline' ':!**/package-lock.json' > "$RUNNER_TEMP/diff.stat"
+          # Diff to a file first, then truncate: piping straight into head makes git die
+          # of SIGPIPE (exit 141) under pipefail as soon as the diff exceeds the cap, which
+          # any change that deletes a generated file does.
           git diff origin/main...HEAD -- . ':!pipeline' ':!**/package-lock.json' ':!**/dist/**' \
-            | head -n 4000 > "$RUNNER_TEMP/diff.patch"
+            > "$RUNNER_TEMP/diff.full.patch"
+          head -n 4000 "$RUNNER_TEMP/diff.full.patch" > "$RUNNER_TEMP/diff.patch"
           { echo "DIFF_STAT<<__S__"; cat "$RUNNER_TEMP/diff.stat"; echo "__S__"; } >> "$GITHUB_ENV"
 
       - name: Build prompt

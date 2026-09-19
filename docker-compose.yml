@@ -20,7 +20,10 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://postgres:password@db:5432/myapp
+      # The app password here and APP_DB_PASSWORD (consumed by roles.ts) must
+      # be changed together; nothing derives one from the other.
+      - DATABASE_ADMIN_URL=postgresql://postgres:password@db:5432/myapp
+      - DATABASE_URL=postgresql://app:password@db:5432/myapp
     depends_on:
       - db
     restart: always

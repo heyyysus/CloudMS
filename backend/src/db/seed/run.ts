@@ -19,37 +19,14 @@ import { seedCarriers } from "./carriers"
 import { seedFinancials } from "./financials"
 import { seedHouseholds } from "./households"
 import { seedPolicies } from "./policies"
-import { resetRng } from "./rng"
 import { seedUsers } from "./users"
-import { wipe, type WipeOptions } from "./wipe"
+import { wipe } from "./wipe"
 
 const CLIENT_COUNT = 100
 const POLICY_COUNT = 300
 
-export type SeedOptions = WipeOptions
-
-export interface SeedCounts {
-  users: number
-  carriers: number
-  persons: number
-  clients: number
-  autoPolicies: number
-  vehicles: number
-  policyDrivers: number
-  policyLogs: number
-  invoices: number
-  invoiceItems: number
-  payments: number
-  receipts: number
-  trustLedger: number
-}
-
-export async function seed(options: SeedOptions = {}): Promise<SeedCounts> {
-  // Re-applied on every call, not just at module load, so a second seed() in
-  // the same process (the demo reseed job) regenerates the same reproducible
-  // dataset instead of continuing the faker stream into different data.
-  resetRng()
-  await wipe(options)
+export async function seed(): Promise<void> {
+  await wipe()
 
   const seededUsers = await seedUsers()
   const seededCarriers = await seedCarriers()
@@ -74,19 +51,20 @@ export async function seed(options: SeedOptions = {}): Promise<SeedCounts> {
       db.select({ count: sql<number>`count(*)` }).from(trustLedger),
     ])
 
-  return {
+  console.log("\n=== Row counts ===")
+  console.table({
     users: u.count,
     carriers: c.count,
     persons: p.count,
     clients: cl.count,
-    autoPolicies: ap.count,
+    auto_policies: ap.count,
     vehicles: v.count,
-    policyDrivers: pd.count,
-    policyLogs: pl.count,
+    policy_drivers: pd.count,
+    policy_logs: pl.count,
     invoices: inv.count,
-    invoiceItems: ii.count,
+    invoice_items: ii.count,
     payments: pay.count,
     receipts: rc.count,
-    trustLedger: tl.count,
-  }
+    trust_ledger: tl.count,
+  })
 }

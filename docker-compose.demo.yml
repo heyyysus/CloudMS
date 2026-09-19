@@ -5,15 +5,9 @@ services:
   nginx:
     image: nginx:alpine
     ports:
-      - "80:80"
-      - "443:443"
+      - "127.0.0.1:8080:80"
     volumes:
-      # The same config production uses - the demo runs on its own host, so
-      # there is no port conflict and no reason to keep a second copy of it.
-      # The cert mounted here is the demo hostname's own Cloudflare Origin CA
-      # cert, not production's (see docs/demo-deployment.md).
-      - ./nginx/conf.d:/etc/nginx/conf.d
-      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./nginx/demo:/etc/nginx/conf.d
       - ./frontend/dist:/usr/share/nginx/html:ro
     depends_on:
       - app
@@ -42,10 +36,9 @@ services:
       # Its own volume - never postgres_data, which is production's.
       - postgres_data_demo:/var/lib/postgresql
     restart: always
-    # Loopback only, same as production's. The demo has its own host, so it
-    # can use the same port without colliding with anything.
+    # Production already holds 5433 on the host.
     ports:
-      - "127.0.0.1:5433:5432"
+      - "127.0.0.1:5434:5432"
 
 volumes:
   postgres_data_demo:

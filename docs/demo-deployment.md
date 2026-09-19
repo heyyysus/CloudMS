@@ -50,26 +50,17 @@ leaking into the test process.
 
 ## Bringing it up
 
-**The demo runs on its own host.** It is a separate deployment, not a second
-stack squeezed onto the production box: its own machine, its own hostname,
-its own TLS cert, its own database. `docker-compose.demo.yml` at the repo
-root defines it — own Postgres volume (`postgres_data_demo`), own database
-(`myapp_demo`), own Compose project name (`cloudms-demo`). `scripts/start.sh`
-(the production deploy script) never references this file.
-
-On the demo host:
+The demo stack is a standalone `docker-compose.demo.yml` at the repo root —
+its own Postgres volume (`postgres_data_demo`), its own database
+(`myapp_demo`), and its own Docker Compose project name (`cloudms-demo`), so
+it can run alongside the production stack on the same host without touching
+it. `scripts/start.sh` (the production deploy script) never references this
+file.
 
 ```bash
-git clone https://github.com/heyyysus/CloudMS.git && cd CloudMS
 cp .env.demo.example .env.demo   # fill in the real values
-# Place the demo hostname's Cloudflare Origin CA cert + key here first:
-#   nginx/certs/cloudflare-origin.pem
-#   nginx/certs/cloudflare-origin.key
 docker compose -f docker-compose.demo.yml up -d
 ```
-
-You also need `frontend/dist/` built on that host (or rsynced to it) — nginx
-serves the SPA from there, exactly as production does.
 
 `.env.demo` deliberately has no `RESEND_API_KEY`, `MAIL_FROM`,
 `MAIL_REPLY_TO`, or `R2_*` keys — the demo sends no real email and stores no
@@ -81,24 +72,14 @@ without a Resend key, every scheduled send would fail and burn through
 `/auth/demo` — `src/index.ts` refuses to start without one regardless of demo
 mode.
 
-## HTTPS and ports
+## Ports
 
-The demo serves HTTPS itself, the same way production does, and reuses
-production's `nginx/conf.d/default.conf` verbatim — there is no separate demo
-nginx config to keep in sync. `nginx` publishes 80 (redirects to HTTPS) and
-443; `db` publishes `127.0.0.1:5433`, loopback only.
-
-What differs is the certificate: issue a **second** Cloudflare Origin CA cert
-for the demo hostname and place it at `nginx/certs/cloudflare-origin.pem` /
-`.key` on the demo host. Do not copy production's cert over — it is issued
-for the production hostname and would fail Cloudflare's `Full (strict)`
-validation. `docs/cloudflare-https.md` covers issuing one; the process is
-identical, just for the demo hostname.
-
-Because the demo has its own host, it holds 80/443/5433 uncontested. Running
-both stacks on one machine is not supported: they would collide on all three
-ports, and colocating a database that gets wiped every 15 minutes with the
-production one is exactly the accident this deployment is shaped to prevent.
+The demo's `nginx` publishes `127.0.0.1:8080`, and its `db` publishes
+`127.0.0.1:5434` — production already holds 80/443 and 5433 on a shared host.
+`nginx/demo/default.conf` listens on plain HTTP 80 inside the container
+(unlike production's config, it holds no Cloudflare origin cert), so put a
+Cloudflare Tunnel or the production nginx in front of it if the demo needs to
+be reachable over HTTPS.
 
 ## Not covered here
 

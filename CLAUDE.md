@@ -38,22 +38,30 @@ agent. A worktree gives you isolated *files*, not an isolated database.
 - **Never run `npm run db:seed`.** It wipes every table, including the fixtures
   another agent's test run is mid-way through using.
 - **Never `docker compose down`, `stop`, or `restart db`.**
-- `npx tsx src/db/migrate.ts` is additive and idempotent, so it is safe to run;
-  say in your summary that you ran it.
+- `npx tsx src/db/bootstrap.ts` (`npm run db:bootstrap`) is insert-if-absent
+  and idempotent, so it is safe to run against the shared database; say in
+  your summary that you ran it. `npm run db:push` is **not** safe against the
+  shared database — it applies whatever destructive DDL is needed to make the
+  schema match `schema.ts` on whatever database `DATABASE_ADMIN_URL` points
+  at, with no confirmation prompt. Only run it against your own database (see
+  below).
 - In tests, use `TestContext` from `src/routes/testHelpers.ts`. Its fixtures
   carry random unique suffixes precisely so parallel runs don't collide, and
   `ctx.cleanup()` deletes only rows that context created. Never truncate a
   table and never assert on a global row count — both break under concurrency.
-- For anything genuinely destructive (seeding, a reset, a schema experiment),
-  **make your own database** rather than using the shared one. An inline
-  `DATABASE_URL` overrides `backend/.env`, since `dotenv` does not clobber
-  variables already present in the environment:
+- For anything genuinely destructive (seeding, a reset, a schema experiment,
+  or running `db:push`), **make your own database** rather than using the
+  shared one. Inline `DATABASE_ADMIN_URL`/`DATABASE_URL` override
+  `backend/.env`, since `dotenv` does not clobber variables already present in
+  the environment:
 
   ```
   docker compose exec -T db createdb -U postgres myapp_<agent>
   cd backend
-  export DATABASE_URL=postgresql://postgres:password@localhost:5433/myapp_<agent>
-  npx tsx src/db/migrate.ts
+  export DATABASE_ADMIN_URL=postgresql://postgres:password@localhost:5433/myapp_<agent>
+  export DATABASE_URL=postgresql://app:password@localhost:5433/myapp_<agent>
+  npm run db:push
+  npm run db:bootstrap
   npx vitest run
   ```
 

@@ -128,6 +128,10 @@ jobs:
              frontend/: npm run lint && npm run build
              Use "npm run format" in backend/ to fix formatting. The repo's per-commit test hook is
              disabled on this runner, so running npm test here is your responsibility.
+          6. This runner's token cannot push changes under .github/workflows/. If the plan needs one,
+             make the change, save it with git diff -- .github/workflows > pipeline/$ISSUE/workflow-changes.patch,
+             revert the workflow files (git checkout -- .github/workflows), commit the patch, and say
+             in notes.md that a human must apply it before the PR is merged.
 
           Stop when the plan is implemented, checks pass, notes.md is complete and committed, and the
           branch is pushed. If you are running low on turns, commit and push what you have, and say in

@@ -7,14 +7,8 @@ import type { NewUser, User } from "../types"
 // The automation user is a permanently-disabled system row (see
 // jobs/automationUser.ts) that must never appear as something an admin can
 // edit or delete, so every listing excludes it alongside soft-deleted rows.
-// Demo users (POST /auth/demo) are excluded the same way - real admin
-// management has nothing to do with accounts a visitor minted for themselves.
 function visibleToAdmin() {
-  return and(
-    isNull(users.deletedAt),
-    ne(users.email, AUTOMATION_USER_EMAIL),
-    eq(users.isDemo, false)
-  )
+  return and(isNull(users.deletedAt), ne(users.email, AUTOMATION_USER_EMAIL))
 }
 
 export async function listUsers(): Promise<User[]> {

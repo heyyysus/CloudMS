@@ -13,11 +13,11 @@ import { SESSION_TTL_MS, generateSessionToken, hashToken } from "./tokens"
 
 const loginSchema = z.object({ idToken: z.string().min(1) })
 
-export function publicUser(user: User) {
+function publicUser(user: User) {
   return { id: user.id, email: user.email, name: user.name, role: user.role }
 }
 
-export const cookieOptions = {
+const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "lax",

@@ -1,7 +1,5 @@
 import { Request, Response, Router } from "express"
 import { requireAuth } from "../auth/middleware"
-import { vehicles } from "../db/schema"
-import { demoRowCeiling } from "../middleware/demoRowCeiling"
 import {
   createVehicle,
   deleteVehicle,
@@ -40,19 +38,14 @@ vehiclesRouter.get("/vehicles/:id", requireAuth, async (req: Request, res: Respo
   res.json(vehicle)
 })
 
-vehiclesRouter.post(
-  "/vehicles",
-  requireAuth,
-  demoRowCeiling(vehicles),
-  async (req: Request, res: Response) => {
-    const parsed = createVehicleBody.safeParse(req.body)
-    if (!parsed.success) {
-      res.status(400).json({ error: firstIssue(parsed.error) })
-      return
-    }
-    res.status(201).json(await createVehicle(parsed.data))
+vehiclesRouter.post("/vehicles", requireAuth, async (req: Request, res: Response) => {
+  const parsed = createVehicleBody.safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ error: firstIssue(parsed.error) })
+    return
   }
-)
+  res.status(201).json(await createVehicle(parsed.data))
+})
 
 vehiclesRouter.patch("/vehicles/:id", requireAuth, async (req: Request, res: Response) => {
   const id = parseId(req.params.id, res)

@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm"
 import { createAutoPolicyWithDetails } from "../../repositories/autoPolicies"
 import type { Carrier, PolicyStatus } from "../../types"
-import { db } from "../index"
+import { adminDb as db } from "../index"
 import { autoPolicies } from "../schema"
 import type { Household } from "./households"
 import { addDays, chunk, faker, toDateString } from "./rng"

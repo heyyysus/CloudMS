@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm"
-import { db } from "../index"
+import { adminDb as db } from "../index"
 import {
   autoPolicies,
   carriers,

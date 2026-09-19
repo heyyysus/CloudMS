@@ -1,5 +1,5 @@
 import type { Carrier } from "../../types"
-import { db } from "../index"
+import { adminDb as db } from "../index"
 import { carriers } from "../schema"
 import { faker } from "./rng"
 

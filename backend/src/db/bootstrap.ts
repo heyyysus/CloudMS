@@ -1,17 +1,15 @@
 import "dotenv/config"
 import { eq } from "drizzle-orm"
-import { migrate } from "drizzle-orm/node-postgres/migrator"
-import { db } from "./index"
+import { adminDb as db } from "./index"
 import { emailTemplates, users } from "./schema"
 import { AUTOMATION_USER_EMAIL } from "../jobs/automationUser"
 
-// Runs at container start (see Dockerfile CMD), before the server boots.
-// Unlike db:seed this is safe against live data: migrations are append-only
-// and the admin bootstrap / template seed are both insert-if-absent.
+// Runs at container start (see Dockerfile CMD), after db:push and roles.ts,
+// before the server boots. Unlike db:seed this is safe against live data:
+// the admin bootstrap / template seed are both insert-if-absent. Runs on
+// adminDb since the app role has no reason to write these baseline rows
+// itself.
 async function main() {
-  await migrate(db, { migrationsFolder: "drizzle" })
-  console.log("Migrations applied")
-
   const adminEmail = process.env.ADMIN_EMAIL
   if (adminEmail) {
     await db

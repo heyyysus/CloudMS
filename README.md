@@ -142,3 +142,7 @@ Merges to `main` that pass CI (typecheck, lint, format check, tests, build) trig
 To roll back, edit the `app` image on the host to a known-good SHA tag (`ghcr.io/heyyysus/cloudms-app:<sha>`) and run `docker compose up -d app`.
 
 Frontend changes deploy separately: `.github/workflows/frontend.yml` triggers on pushes to `main` under `frontend/**`, builds the Vite app in CI (using the `VITE_GOOGLE_CLIENT_ID` secret), rsyncs `frontend/dist/` to `${DEPLOY_PATH}/frontend/dist` on the deploy host, and restarts the `nginx` container so it picks up the new static files — no image to rebuild, since the frontend isn't containerized. The same workflow runs lint + build (no deploy) on PRs touching `frontend/**`.
+
+### One deployment, many agencies
+
+This stack is the whole product: every agency that signs up will be an organization inside it, sharing the one API, the one Postgres, and the one nginx. There is no per-agency instance, host, or compose file to bring up, and none is planned. The organization model, its rollout order, and the in-deployment demo org are laid out in [`docs/multitenancy.md`](docs/multitenancy.md).

@@ -14,6 +14,10 @@ depth — this doc assumes that context and focuses on the resource routes.
   proxying to the backend, matching the existing `/auth/*` routes.
 - **Auth**: every route below requires a valid `session` cookie
   (`requireAuth` — see `auth/middleware.ts`). There is no anonymous access.
+- **Tenancy**: every resource is currently agency-wide; the schema has no
+  organization yet. Once it does, the session's organization scopes every
+  route below and never appears in a URL, header, or body — see
+  [`multitenancy.md`](./multitenancy.md).
 - **Roles**: `staff` and `admin`. Admins pass every `requireRole` check
   (admin-bypass), so the tables below only call out where a route is
   restricted beyond plain authentication.

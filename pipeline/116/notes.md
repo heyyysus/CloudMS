@@ -1,6 +1,6 @@
 ---
 issue: 116
-status: in-progress
+status: implemented
 ---
 # Implementation notes — issue #116
 
@@ -94,3 +94,34 @@ status: in-progress
   unchanged by anything in this implementation.
 
 ## Checks run
+
+All on this runner's own isolated Postgres (`DATABASE_ADMIN_URL`/`DATABASE_URL` in
+`backend/.env`, gitignored, not committed):
+
+- `npx drizzle-kit push --help` on the installed 0.31.10 to confirm `--force` (not
+  `--strict`) is the non-interactive flag.
+- `npm run db:push` twice in a row against the same database: both times non-interactive,
+  no prompts, second run reports no unexpected diff. Confirms idempotence of both the
+  push and `roles.ts`'s grant step (also covered by `roles.test.ts`'s third case).
+- `PGPASSWORD=... psql -U app ...`: connects, `usesuper = f`, and a bare `CREATE TABLE`
+  is rejected with "permission denied for schema public" — the same thing
+  `roles.test.ts` asserts through the app.
+- `npm run db:bootstrap` twice: insert-if-absent rows confirmed present, no errors.
+- `npm run typecheck`, `npm run lint`, `npm run format:check` (ran `npm run format`
+  once first to fix 3 files), `npm run build`: all clean.
+- `npm test`: 390/390 passing, connected as the `app` role. **Important**: this runner's
+  shell environment has `DATABASE_URL` preset to the postgres owner connection (from the
+  harness that set up this task). `dotenv` does not override an already-set env var, so
+  `backend/.env`'s app-role `DATABASE_URL` is silently ignored unless the shell's
+  `DATABASE_URL` is unset first (`unset DATABASE_URL && npm test`) so dotenv can populate
+  it from `.env`. Without the `unset`, `db` silently connects as the superuser instead of
+  `app` and `roles.test.ts`'s "denied DDL" case fails (DDL succeeds instead). This is a
+  property of this CI runner's setup, not of the application code, but worth flagging for
+  whoever reviews or reruns these commands here.
+- **Not run**: `npm run db:seed` — the coder prompt explicitly says not to run it, even
+  though plan.md's manual verification step 3 asks for it. Seed code review (all seven
+  `seed/*.ts` imports switched to `adminDb`) stands in for it; someone with a disposable
+  database should still run it once before merge.
+- **Not run**: the Docker build/run verification from plan.md's Tests section (no Docker
+  daemon on this runner). Dockerfile/CMD changes are reviewed by inspection only.
+- Did not run frontend checks — no frontend files touched.

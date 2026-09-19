@@ -30,6 +30,12 @@ outputs:
   result:
     description: Claude's final text result
     value: ${{ steps.parse.outputs.result }}
+  stop_reason:
+    description: >-
+      The SDK result subtype: "success", "error_max_turns", etc. Empty when there is no
+      execution file. Stages that must know whether Claude finished should check this rather
+      than the step conclusion, which is always success because of continue-on-error.
+    value: ${{ steps.parse.outputs.stop_reason }}
   conclusion:
     value: ${{ steps.claude.outputs.conclusion }}
 
@@ -60,6 +66,7 @@ runs:
         set -euo pipefail
         if [[ -z "${EXEC_FILE:-}" || ! -f "$EXEC_FILE" ]]; then
           echo "result=" >> "$GITHUB_OUTPUT"
+          echo "stop_reason=" >> "$GITHUB_OUTPUT"
           echo "### $STAGE ($MODEL): no execution file" >> "$GITHUB_STEP_SUMMARY"
           exit 0
         fi
@@ -71,6 +78,7 @@ runs:
         out_tok=$(jq -r '.usage.output_tokens // 0' <<< "$res")
         cost=$(jq -r '.total_cost_usd // "n/a"' <<< "$res")
         turns=$(jq -r '.num_turns // "n/a"' <<< "$res")
+        echo "stop_reason=$(jq -r '.subtype // ""' <<< "$res")" >> "$GITHUB_OUTPUT"
         {
           echo "### $STAGE ($MODEL)"
           echo "| turns | input | cache read | cache write | output | cost (USD) |"

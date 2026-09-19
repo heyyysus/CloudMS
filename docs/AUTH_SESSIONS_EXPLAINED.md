@@ -296,7 +296,7 @@ Login is invite-only (`findUserByEmail` in `auth/routes.ts` — no matching
 - run the seed (`npm run db:seed` in `backend/`, which creates
   `jesus.velarde07@gmail.com` as admin), or
 - set `ADMIN_EMAIL=<your-google-account-email>` in `.env` and run
-  `npm run db:migrate` (the migrate script bootstraps that email as an
+  `npm run db:bootstrap` (the bootstrap script inserts that email as an
   admin user via `onConflictDoNothing`).
 
 ### 2. Start the backend

@@ -71,7 +71,9 @@ are decisions still to be made.
 - **Row-level security as a backstop, later:** a non-superuser database role,
   `SET LOCAL app.org_id` at the start of each request transaction, and an RLS
   policy on every tenant table. This is defense in depth against a missed
-  `where`, not the primary mechanism.
+  `where`, not the primary mechanism. The non-superuser `app` role already
+  exists (the API, the scheduler and the test suite all connect as it) —
+  only `SET LOCAL app.org_id` and the policies themselves remain.
 - `TestContext` creates its own organization per context and its cleanup
   deletes that organization, cascading. That is a better isolation story for
   concurrent test runs than the current unique-suffix scheme.

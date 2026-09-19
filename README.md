@@ -24,18 +24,22 @@ See [PROJECT.md](./PROJECT.md) for what this project is and where it's headed. T
    cp .env.example .env
    ```
 
-   `.env` only needs `DATABASE_URL`, which already points at the Compose Postgres instance:
+   `.env` needs `DATABASE_ADMIN_URL` and `DATABASE_URL`, which already point at the Compose Postgres instance:
 
    ```
-   DATABASE_URL=postgresql://postgres:password@localhost:5433/myapp
+   DATABASE_ADMIN_URL=postgresql://postgres:password@localhost:5433/myapp
+   DATABASE_URL=postgresql://app:password@localhost:5433/myapp
    ```
 
-3. Install dependencies and run migrations:
+   `DATABASE_ADMIN_URL` is the owner connection, used by `db:push`, `db:seed` and `db:bootstrap`. `DATABASE_URL` is the non-superuser `app` role that the API, the scheduler and the test suite run as; `db:push` creates it, so it won't exist until after step 3.
+
+3. Install dependencies and push the schema:
 
    ```bash
    npm install
-   npm run db:migrate
-   npm run db:seed   # optional: seeds an example carrier, client, and policy
+   npm run db:push       # applies schema.ts and creates/grants the app role, non-interactively
+   npm run db:bootstrap  # inserts baseline rows (admin user, automation user, email templates)
+   npm run db:seed       # optional: seeds an example carrier, client, and policy
    ```
 
 4. Start the dev server (watches `src/` and restarts on change):
@@ -60,8 +64,9 @@ See [PROJECT.md](./PROJECT.md) for what this project is and where it's headed. T
 | `npm test` | Run the Vitest suite |
 | `npm run build` | Compile to `dist/` |
 | `npm run start` | Run the compiled build (`dist/index.js`) |
-| `npm run db:generate` | Generate a new Drizzle migration from schema changes |
-| `npm run db:studio` | Open Drizzle Studio against the configured `DATABASE_URL` |
+| `npm run db:push` | Apply `schema.ts` to the database non-interactively and create/grant the `app` role |
+| `npm run db:bootstrap` | Insert baseline rows (admin user, automation user, email templates) |
+| `npm run db:studio` | Open Drizzle Studio against the configured `DATABASE_ADMIN_URL` |
 | `npm run logs` | Print the last 100 lines of the app container's logs (`docker compose logs --tail 100 app`) |
 
 ## Option B: Run the full stack in Docker
@@ -93,7 +98,7 @@ Run the same checks CI runs so a push doesn't fail in Actions. From `backend/`:
 npm run typecheck
 npm run lint
 npm run format:check   # or `npm run format` to auto-fix
-npm run db:migrate     # if the change adds/changes a migration
+npm run db:push        # if the change touches schema.ts
 npm test
 npm run build
 ```

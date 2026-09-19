@@ -62,10 +62,10 @@ Deviations).
   committable.
 - `docker-compose.demo.yml` (new, root) — standalone, `name: cloudms-demo`,
   own `myapp_demo` database, own `postgres_data_demo` volume, `DEMO_MODE=true`
-  set directly in `environment:` (not only in the env file). Deployed to its
-  own host, so it publishes 80/443 and `127.0.0.1:5433` like production and
-  mounts production's `nginx/conf.d` + `nginx/certs` (with the demo
-  hostname's own Origin CA cert). See Deviations.
+  set directly in `environment:` (not only in the env file), host ports 5434
+  (db) and 8080 (nginx) so it can coexist with production's 5433/80/443.
+- `nginx/demo/default.conf` (new) — plain `listen 80` (no Cloudflare origin
+  cert), same `/api/v1/` proxy and SPA fallback as production's config.
 - `docs/demo-deployment.md` (new) — what demo mode is, the reseed job, what
   survives a reseed and what doesn't, bring-up instructions, the
   never-point-at-production warning, and what's explicitly out of scope
@@ -138,17 +138,6 @@ against it, per CLAUDE.md ("additive and idempotent, safe to run").
   `src/config.ts`" since the foundation issue wasn't merged when the plan was
   reviewed. It landed in `backend/src/config.ts` — imported from there
   exactly as the plan anticipated, no other change needed.
-- **The demo is its own host, not a second stack on the production box.** The
-  plan's step 8 took the same-host path (plain-HTTP `nginx/demo/default.conf`
-  on `127.0.0.1:8080`, fronted by a tunnel or the production nginx) and
-  flagged "one host or two?" as an open question for the reviewer. The
-  repo owner answered it: two hosts. So, per the plan's own stated
-  alternative for that branch ("drop this and reuse `nginx/conf.d` with its
-  own cert"), `nginx/demo/default.conf` was deleted and the demo stack now
-  mounts production's `nginx/conf.d` and `nginx/certs`, publishing 80/443 and
-  `127.0.0.1:5433`. The demo host needs its own Cloudflare Origin CA cert for
-  its own hostname; `docs/demo-deployment.md` says so and points at
-  `docs/cloudflare-https.md`.
 - Everything else matches the plan as approved (Approach steps 1–10). No
   scope changes.
 
@@ -161,12 +150,6 @@ against it, per CLAUDE.md ("additive and idempotent, safe to run").
 - `postgres_data_demo` growth (each reseed writes ~100 clients/~300 policies
   and deletes the previous set) is unaddressed, as the plan notes — worth
   watching on a small host, not a blocker.
-- The demo needs a host, a hostname, and a Cloudflare Origin CA cert of its
-  own before it can be brought up — there is nothing left in the repo to
-  decide, but that provisioning is a prerequisite, not something this PR does.
-- A reviewer noted and fixed a real bug in the first pass of this branch: the
-  boot-empty check compared `count(*)` with `=== 0`, but node-postgres returns
-  it as a string, so a fresh demo container would have sat empty for a full
-  interval instead of seeding immediately. Fixed in 51945c7 (`Number(count)`),
-  along with the `DEMO_MODE` guard tests, which previously passed on the
-  `NODE_ENV=test` short-circuit rather than on `demoMode()` itself.
+- One-host nginx design (step 8) is what's implemented; if the demo ends up
+  on a separate host, `nginx/demo/default.conf` can gain its own TLS listener
+  instead of relying on a tunnel/front proxy.

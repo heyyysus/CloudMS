@@ -24,7 +24,6 @@ import {
   type PolicyAttachment,
 } from '@/api/policyAttachments'
 import { useToast } from '@/components/ui/toast'
-import { isDemoDisabledError } from '@/lib/demo'
 
 // Mirrors the server defaults (POLICY_ATTACHMENT_MAX_SIZE_MB /
 // ATTACHMENT_MIME_TYPES) for immediate feedback - the server is the source
@@ -211,8 +210,7 @@ export function AddAttachmentDialog({
       onOpenChange(false)
       toast.success('New attachment uploaded')
     },
-    onError: (error) =>
-      toast.error(isDemoDisabledError(error) ? 'This action is disabled in the demo.' : error.message),
+    onError: (error) => toast.error(error.message),
   })
 
   return (

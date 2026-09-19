@@ -7,8 +7,6 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { AppSidebar } from './app-sidebar'
 import { UserMenu } from './user-menu'
 import { useAuth } from '@/auth/AuthContext'
-import { useAppConfig } from '@/config/AppConfigContext'
-import { DemoBanner } from './demo-banner'
 import { ClientTabsProvider, useClientTabs } from './client-tabs'
 import { useSearchShortcut } from '@/hooks/use-search-shortcut'
 import { useSubmitShortcut } from '@/hooks/use-submit-shortcut'
@@ -28,7 +26,6 @@ export function AppLayout() {
 
 function AppLayoutInner() {
   const { user } = useAuth()
-  const { config } = useAppConfig()
   const { tabs, openTab, closeTab } = useClientTabs()
   const navigate = useNavigate()
   const [searchOpen, setSearchOpen] = useState(false)
@@ -58,7 +55,6 @@ function AppLayoutInner() {
       <SidebarProvider>
         <AppSidebar openTabs={tabs} onCloseTab={closeTab} isAdmin={user?.role === 'admin'} />
         <SidebarInset>
-          <DemoBanner demoMode={config.demoMode} resetMinutes={config.demoResetMinutes} />
           <header className="flex h-14 items-center gap-2 border-b px-4">
             <SidebarTrigger />
             <Separator orientation="vertical" className="h-4" />

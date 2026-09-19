@@ -125,3 +125,11 @@ All on this runner's own isolated Postgres (`DATABASE_ADMIN_URL`/`DATABASE_URL` 
 - **Not run**: the Docker build/run verification from plan.md's Tests section (no Docker
   daemon on this runner). Dockerfile/CMD changes are reviewed by inspection only.
 - Did not run frontend checks — no frontend files touched.
+
+## Docs
+
+No doc changes needed beyond what the implementation stage already made:
+README.md, `docs/AUTH_SESSIONS_EXPLAINED.md:299`, and `docs/multitenancy.md`
+already reflect `db:push`/`db:bootstrap`/`DATABASE_ADMIN_URL` accurately.
+`docs/API.md` and `docs/frontend-ui-design.md` are unaffected (no route or UI
+changes in this diff).

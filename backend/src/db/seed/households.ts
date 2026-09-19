@@ -1,5 +1,5 @@
 import type { Client, Gender, NewPerson } from "../../types"
-import { db } from "../index"
+import { adminDb as db } from "../index"
 import { clientEmails, clientPhones, clients, drivers, persons } from "../schema"
 import { chunk, faker, toDateString } from "./rng"
 

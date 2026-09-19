@@ -1,4 +1,4 @@
-import { db } from "../index"
+import { adminDb as db } from "../index"
 import {
   autoPolicies,
   carriers,

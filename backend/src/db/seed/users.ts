@@ -1,5 +1,5 @@
 import type { User } from "../../types"
-import { db } from "../index"
+import { adminDb as db } from "../index"
 import { users } from "../schema"
 import { faker } from "./rng"
 

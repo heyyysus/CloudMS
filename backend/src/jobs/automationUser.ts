@@ -3,7 +3,7 @@ import { db } from "../db"
 import { users } from "../db/schema"
 import type { User } from "../types"
 
-// Bootstrapped by src/db/migrate.ts. Deliberately a .local address: it must
+// Bootstrapped by src/db/bootstrap.ts. Deliberately a .local address: it must
 // never be deliverable, and it is only ever used as a lookup key.
 export const AUTOMATION_USER_EMAIL = "automation@cloudms.local"
 
@@ -19,7 +19,7 @@ export async function getAutomationUser(): Promise<User> {
     where: eq(users.email, AUTOMATION_USER_EMAIL),
   })
   if (!found) {
-    throw new Error(`Automation user ${AUTOMATION_USER_EMAIL} is missing - run src/db/migrate.ts`)
+    throw new Error(`Automation user ${AUTOMATION_USER_EMAIL} is missing - run npm run db:bootstrap`)
   }
   cached = found
   return found

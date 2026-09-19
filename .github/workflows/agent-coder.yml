@@ -42,7 +42,8 @@ jobs:
     env:
       ISSUE: ${{ github.event.issue.number }}
       BRANCH: agent/issue-${{ github.event.issue.number }}
-      DATABASE_URL: postgresql://postgres:password@localhost:5432/myapp
+      DATABASE_ADMIN_URL: postgresql://postgres:password@localhost:5432/myapp
+      DATABASE_URL: postgresql://app:password@localhost:5432/myapp
       CODER_MAX_TURNS: 200
     steps:
       - uses: actions/checkout@v4
@@ -87,10 +88,10 @@ jobs:
             backend/package-lock.json
             frontend/package-lock.json
 
-      - name: Install and migrate
+      - name: Install and set up database
         run: |
           set -euo pipefail
-          (cd backend && npm ci --legacy-peer-deps && npx ts-node src/db/migrate.ts)
+          (cd backend && npm ci --legacy-peer-deps && npm run db:push && npm run db:bootstrap)
           (cd frontend && npm ci)
 
       - name: Build prompt

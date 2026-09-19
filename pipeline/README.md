@@ -43,13 +43,17 @@ reviewed commit so only new pushes are re-reviewed).
   remove `needs-human` and add `pipeline:plan-approved` to run the coder.
 - **Stage failed**: fix the cause, remove `needs-human`, re-add the `pipeline:*` label
   for the stage you want to run. Every stage is triggered purely by its label.
+- **Coder hit its turn cap**: whatever it had done is on `agent/issue-<n>`, uncommitted
+  leftovers included, as a trailing `wip:` commit. Remove `needs-human` and re-add
+  `pipeline:plan-approved`; the next run is told to continue from the branch.
 - **Abort**: remove `agent`.
 
 ## Costs
 
-Each stage has `--max-turns` and a job `timeout-minutes`. Every run writes a token /
-cost table to the job summary (Actions → run → Summary). Opus is used only by the
-planner unless you add `agent:deep-review`. `/code-review ultra` is never automated.
+Each stage has `--max-turns` and a job `timeout-minutes` (the coder gets 200 turns and
+90 minutes; every tool call is a turn). Every run writes a token / cost table to the job
+summary (Actions → run → Summary). Opus is used only by the planner unless you add
+`agent:deep-review`. `/code-review ultra` is never automated.
 
 ## Setup (once)
 

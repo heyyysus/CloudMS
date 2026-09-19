@@ -1,7 +1,12 @@
 name: agent-coder
 
 # Sonnet implements the approved plan on agent/issue-<n>. Postgres is provided because the
-# repo's PreToolUse hook runs the backend test suite on every commit touching backend/.
+# coder runs the backend test suite itself (the repo's per-commit PreToolUse hook is skipped
+# on CI runners so it cannot burn the turn budget).
+#
+# Work is never lost to the turn cap: the verify step commits whatever the coder left
+# uncommitted as a `wip:` commit and pushes it, so re-adding `pipeline:plan-approved` resumes
+# from the branch instead of starting over.
 
 on:
   issues:
@@ -19,7 +24,7 @@ jobs:
   code:
     if: github.event.label.name == 'pipeline:plan-approved'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     services:
       postgres:
         image: postgres:18.4
@@ -38,6 +43,7 @@ jobs:
       ISSUE: ${{ github.event.issue.number }}
       BRANCH: agent/issue-${{ github.event.issue.number }}
       DATABASE_URL: postgresql://postgres:password@localhost:5432/myapp
+      CODER_MAX_TURNS: 200
     steps:
       - uses: actions/checkout@v4
         with:
@@ -90,6 +96,7 @@ jobs:
       - name: Build prompt
         env:
           TITLE: ${{ github.event.issue.title }}
+          MAX_TURNS: ${{ env.CODER_MAX_TURNS }}
         run: |
           {
             echo "PROMPT<<__PROMPT__"
@@ -100,21 +107,31 @@ jobs:
           section of CLAUDE.md (shared working tree, worktrees, shared DB container, ports) does not apply
           here; every other rule in CLAUDE.md does. Do not run npm run db:seed. Never push to main.
 
-          1. Read pipeline/$ISSUE/plan.md and pipeline/$ISSUE/review.md, then CLAUDE.md.
-          2. Implement exactly what plan.md scopes. If you must deviate, do the minimum and record why in
+          You have a hard cap of $MAX_TURNS turns (every tool call is a turn) and anything not committed
+          when it hits is lost. So: commit early and often, and never let more than a few files sit
+          uncommitted.
+
+          1. Read pipeline/$ISSUE/plan.md and pipeline/$ISSUE/review.md, then CLAUDE.md. Then run
+             git log --oneline origin/main..HEAD and git diff --stat origin/main: the branch may already
+             carry partial work from an earlier attempt (commits after the plan/review, possibly a
+             "wip:" commit). If it does, continue from it; do not redo what is already there.
+          2. Make your first commit now: pipeline/$ISSUE/notes.md as a skeleton (sections: implemented,
+             decisions, deviations, for the docs stage / reviewer, checks run). Fill it in as you go.
+          3. Implement exactly what plan.md scopes. If you must deviate, do the minimum and record why in
              notes.md. Do not expand scope. Reuse existing patterns; backend tests use TestContext from
              backend/src/routes/testHelpers.ts.
-          3. Before committing, run the checks CI runs, for each area you touched:
+          4. Commit after each logical step (one file or one coherent group) as soon as it typechecks.
+             Small, descriptive commits; no Co-Authored-By trailer. Do not wait for the full check list
+             before committing. Push after every commit or two: git push origin $BRANCH
+          5. Before your final commit, run the checks CI runs for each area you touched and fix failures:
              backend/:  npm run typecheck && npm run lint && npm run format:check && npm test && npm run build
              frontend/: npm run lint && npm run build
-             Fix failures. Use "npm run format" in backend/ to fix formatting.
-          4. Write pipeline/$ISSUE/notes.md: what you implemented, key decisions, deviations
-             from the plan, anything the docs stage or PR reviewer should know, and which checks you ran.
-          5. Commit with git (small, descriptive commits; no Co-Authored-By trailer). A PreToolUse hook
-             runs the backend test suite when a commit touches backend/; if it blocks the commit, fix the
-             tests — do not bypass the hook. Then push: git push origin $BRANCH
+             Use "npm run format" in backend/ to fix formatting. The repo's per-commit test hook is
+             disabled on this runner, so running npm test here is your responsibility.
 
-          Stop when the plan is implemented, checks pass, notes.md is committed, and the branch is pushed.
+          Stop when the plan is implemented, checks pass, notes.md is complete and committed, and the
+          branch is pushed. If you are running low on turns, commit and push what you have, and say in
+          notes.md exactly what is left.
           EOF
             echo "__PROMPT__"
           } >> "$GITHUB_ENV"
@@ -124,7 +141,7 @@ jobs:
         with:
           stage: coder
           model: sonnet
-          max_turns: 80
+          max_turns: ${{ env.CODER_MAX_TURNS }}
           allowed_tools: "Read,Edit,Write,Grep,Glob,Bash"
           prompt: ${{ env.PROMPT }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -133,16 +150,23 @@ jobs:
       - name: Verify work landed
         env:
           BASE: ${{ steps.sync.outputs.base }}
+          STOP_REASON: ${{ steps.claude.outputs.stop_reason }}
         run: |
           set -euo pipefail
-          git push origin "$BRANCH" || true
+          # Never lose work: whatever the coder left uncommitted goes on the branch as a WIP
+          # commit, so a re-run (or a human) continues from it instead of starting over.
           if [[ -n "$(git status --porcelain)" ]]; then
-            echo "Uncommitted changes left behind:"; git status --short; exit 1
+            echo "Uncommitted changes left behind; committing them as WIP:"; git status --short
+            git add -A
+            git commit -q -m "wip: coder stopped before finishing (stop reason: ${STOP_REASON:-unknown})"
           fi
+          git push origin "$BRANCH"
           n=$(git rev-list --count "$BASE..HEAD")
+          echo "$n commit(s) on $BRANCH since sync; coder stop reason: ${STOP_REASON:-unknown}"
+          [[ "$STOP_REASON" == "success" ]] || { echo "Coder did not finish cleanly"; exit 1; }
+          if git log -1 --format=%s | grep -q '^wip:'; then echo "Last commit is a WIP commit"; exit 1; fi
           [[ "$n" -gt 0 ]] || { echo "No commits were made"; exit 1; }
           test -s "pipeline/$ISSUE/notes.md" || { echo "notes.md missing"; exit 1; }
-          echo "$n commit(s) on $BRANCH"
 
       - name: Advance state
         env:
@@ -156,4 +180,4 @@ jobs:
           GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
         run: |
           gh issue edit "$ISSUE" --remove-label "pipeline:in-progress" --remove-label "pipeline:plan-approved" --add-label "needs-human" || true
-          gh issue comment "$ISSUE" --body "Coder failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}. Any partial work is on \`$BRANCH\`." || true
+          gh issue comment "$ISSUE" --body "Coder failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}. Partial work, if any, is committed on \`$BRANCH\` (look for a \`wip:\` commit). To resume from it, remove \`needs-human\` and re-add \`pipeline:plan-approved\`." || true

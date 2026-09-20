@@ -43,6 +43,30 @@ describe("GET /clients/:id", () => {
       (await request(app).get(`/clients/${MISSING_ROW_ID}`).set("Cookie", cookie)).status
     ).toBe(404)
   })
+
+  it("does not see a client from another org", async () => {
+    const user = await ctx.user("clients-wrongorg", "admin")
+    const cookie = await ctx.cookie(user.id)
+    const other = await ctx.org()
+    const client = await ctx.client({ orgId: other.id })
+
+    const list = await request(app).get("/clients").set("Cookie", cookie)
+    expect(list.body.some((c: { id: string }) => c.id === client.id)).toBe(false)
+    expect((await request(app).get(`/clients/${client.id}`).set("Cookie", cookie)).status).toBe(
+      404
+    )
+    expect(
+      (
+        await request(app)
+          .patch(`/clients/${client.id}`)
+          .set("Cookie", cookie)
+          .send({ mailingAddress1: "X" })
+      ).status
+    ).toBe(404)
+    expect(
+      (await request(app).delete(`/clients/${client.id}`).set("Cookie", cookie)).status
+    ).toBe(404)
+  })
 })
 
 describe("POST /clients", () => {
@@ -131,6 +155,23 @@ describe("PATCH /clients/:id", () => {
       .send({ phones: [] })
     expect(res.status).toBe(200)
     expect(res.body.phones).toEqual([])
+  })
+
+  it("rejects a PATCH repointing namedInsuredId at another org's person", async () => {
+    const user = await ctx.user("clients-crossorg")
+    const cookie = await ctx.cookie(user.id)
+    const client = await ctx.client()
+    const other = await ctx.org()
+    const theirPerson = await ctx.person({ orgId: other.id })
+
+    const res = await request(app)
+      .patch(`/clients/${client.id}`)
+      .set("Cookie", cookie)
+      .send({ namedInsuredId: theirPerson.id })
+    expect(res.status).toBe(409)
+
+    const after = await request(app).get(`/clients/${client.id}`).set("Cookie", cookie)
+    expect(after.body.namedInsured.id).toBe(client.namedInsuredId)
   })
 })
 

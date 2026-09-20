@@ -1,35 +1,67 @@
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { db } from "../db"
-import { drivers } from "../db/schema"
+import { drivers, persons } from "../db/schema"
 import type { Driver, NewDriver } from "../types"
+import { CrossOrgReferenceError } from "./errors"
 
-export async function listDrivers(): Promise<Driver[]> {
-  return db.select().from(drivers)
+export async function listDrivers(orgId: string): Promise<Driver[]> {
+  return db.select().from(drivers).where(eq(drivers.orgId, orgId))
 }
 
-export async function findDriverById(id: string): Promise<Driver | undefined> {
-  const [row] = await db.select().from(drivers).where(eq(drivers.id, id))
+export async function findDriverById(orgId: string, id: string): Promise<Driver | undefined> {
+  const [row] = await db
+    .select()
+    .from(drivers)
+    .where(and(eq(drivers.id, id), eq(drivers.orgId, orgId)))
   return row
 }
 
-export async function createDriver(input: NewDriver): Promise<Driver> {
-  const [row] = await db.insert(drivers).values(input).returning()
-  return row
+export async function createDriver(
+  orgId: string,
+  input: Omit<NewDriver, "orgId">
+): Promise<Driver> {
+  return db.transaction(async (tx) => {
+    const [person] = await tx
+      .select()
+      .from(persons)
+      .where(and(eq(persons.id, input.personId), eq(persons.orgId, orgId)))
+    if (!person) throw new CrossOrgReferenceError()
+
+    const [row] = await tx
+      .insert(drivers)
+      .values({ ...input, orgId })
+      .returning()
+    return row
+  })
 }
 
 export async function updateDriver(
+  orgId: string,
   id: string,
-  input: Partial<NewDriver>
+  input: Partial<Omit<NewDriver, "orgId">>
 ): Promise<Driver | undefined> {
-  const [row] = await db
-    .update(drivers)
-    .set({ ...input, updatedAt: new Date() })
-    .where(eq(drivers.id, id))
-    .returning()
-  return row
+  return db.transaction(async (tx) => {
+    if (input.personId !== undefined) {
+      const [person] = await tx
+        .select()
+        .from(persons)
+        .where(and(eq(persons.id, input.personId), eq(persons.orgId, orgId)))
+      if (!person) throw new CrossOrgReferenceError()
+    }
+
+    const [row] = await tx
+      .update(drivers)
+      .set({ ...input, updatedAt: new Date() })
+      .where(and(eq(drivers.id, id), eq(drivers.orgId, orgId)))
+      .returning()
+    return row
+  })
 }
 
-export async function deleteDriver(id: string): Promise<boolean> {
-  const deleted = await db.delete(drivers).where(eq(drivers.id, id)).returning({ id: drivers.id })
+export async function deleteDriver(orgId: string, id: string): Promise<boolean> {
+  const deleted = await db
+    .delete(drivers)
+    .where(and(eq(drivers.id, id), eq(drivers.orgId, orgId)))
+    .returning({ id: drivers.id })
   return deleted.length > 0
 }

@@ -3,8 +3,16 @@ import { db } from "../db"
 import { emailTemplates } from "../db/schema"
 import type { EmailTemplate } from "../types"
 
+// key is no longer globally unique (email_templates now scopes it per org),
+// so this orders by orgId to stay deterministic on a seeded multi-org
+// database. Sub-issue 4 replaces this with an explicit orgId argument.
 export async function findEmailTemplateByKey(key: string): Promise<EmailTemplate | undefined> {
-  const [row] = await db.select().from(emailTemplates).where(eq(emailTemplates.key, key))
+  const [row] = await db
+    .select()
+    .from(emailTemplates)
+    .where(eq(emailTemplates.key, key))
+    .orderBy(emailTemplates.orgId)
+    .limit(1)
   return row
 }
 
@@ -80,7 +88,7 @@ export async function upsertEmailTemplate(input: {
     .insert(emailTemplates)
     .values(input)
     .onConflictDoUpdate({
-      target: emailTemplates.key,
+      target: [emailTemplates.orgId, emailTemplates.key],
       set: {
         subject: input.subject,
         body: input.body,

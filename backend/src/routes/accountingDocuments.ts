@@ -95,7 +95,11 @@ export async function recordReceiptDocument(
     const pdf = await buildAccountingDocumentPdf({
       kind: "receipt",
       invoice,
-      receipt: { id: receipt.id, receiptNumber: receipt.receiptNumber, paymentId: receipt.paymentId },
+      receipt: {
+        id: receipt.id,
+        receiptNumber: receipt.receiptNumber,
+        paymentId: receipt.paymentId,
+      },
       generatedAt: new Date(),
       ...header,
     })

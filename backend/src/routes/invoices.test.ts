@@ -130,9 +130,7 @@ describe("POST /invoices", () => {
       })
     expect(res.status).toBe(409)
 
-    const list = await request(app)
-      .get(`/invoices?policyId=${policy.id}`)
-      .set("Cookie", cookie)
+    const list = await request(app).get(`/invoices?policyId=${policy.id}`).set("Cookie", cookie)
     expect(list.body).toEqual([])
   })
 

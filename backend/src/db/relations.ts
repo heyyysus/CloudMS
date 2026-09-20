@@ -9,6 +9,8 @@ import {
   emailTemplates,
   invoiceItems,
   invoices,
+  orgMemberships,
+  organizations,
   payments,
   persons,
   policyAttachments,
@@ -23,6 +25,16 @@ import {
   users,
   vehicles,
 } from "./schema"
+
+export const organizationsRelations = relations(organizations, ({ many }) => ({
+  memberships: many(orgMemberships),
+  sessions: many(sessions),
+}))
+
+export const orgMembershipsRelations = relations(orgMemberships, ({ one }) => ({
+  user: one(users, { fields: [orgMemberships.userId], references: [users.id] }),
+  org: one(organizations, { fields: [orgMemberships.orgId], references: [organizations.id] }),
+}))
 
 export const personsRelations = relations(persons, ({ one, many }) => ({
   driver: one(drivers),
@@ -153,10 +165,12 @@ export const usersRelations = relations(users, ({ many }) => ({
   policyLogs: many(policyLogs),
   policyAttachments: many(policyAttachments),
   policyLogAttachments: many(policyLogAttachments),
+  memberships: many(orgMemberships),
 }))
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
   user: one(users, { fields: [sessions.userId], references: [users.id] }),
+  org: one(organizations, { fields: [sessions.orgId], references: [organizations.id] }),
 }))
 
 export const reminderRulesRelations = relations(reminderRules, ({ one, many }) => ({

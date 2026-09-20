@@ -17,6 +17,8 @@ import type {
   invoices,
   invoiceStatusEnum,
   maritalStatusEnum,
+  orgMemberships,
+  organizations,
   paymentMethodEnum,
   payments,
   persons,
@@ -55,6 +57,8 @@ export type TrustLedgerDirection = (typeof trustLedgerDirectionEnum.enumValues)[
 export type EmailLogStatus = (typeof emailLogStatusEnum.enumValues)[number]
 export type AttachmentSourceType = (typeof attachmentSourceTypeEnum.enumValues)[number]
 
+export type Organization = typeof organizations.$inferSelect
+export type OrgMembership = typeof orgMemberships.$inferSelect
 export type Person = typeof persons.$inferSelect
 export type Driver = typeof drivers.$inferSelect
 export type Client = typeof clients.$inferSelect
@@ -77,6 +81,8 @@ export type EmailLogEntry = typeof emailLog.$inferSelect
 export type ReminderRule = typeof reminderRules.$inferSelect
 export type ScheduledEmail = typeof scheduledEmails.$inferSelect
 
+export type NewOrganization = typeof organizations.$inferInsert
+export type NewOrgMembership = typeof orgMemberships.$inferInsert
 export type NewPerson = typeof persons.$inferInsert
 export type NewDriver = typeof drivers.$inferInsert
 export type NewClient = typeof clients.$inferInsert

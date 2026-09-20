@@ -30,8 +30,13 @@ async function backdateLog(logId: string, date: Date): Promise<void> {
   await db.update(policyLogs).set({ createdAt: date }).where(eq(policyLogs.id, logId))
 }
 
-async function addNote(policy: SeededPolicy, staff: User[], date: Date): Promise<void> {
-  const log = await createPolicyLog({
+async function addNote(
+  orgId: string,
+  policy: SeededPolicy,
+  staff: User[],
+  date: Date
+): Promise<void> {
+  const log = await createPolicyLog(orgId, {
     policyId: policy.id,
     authorId: randomStaffId(staff),
     body: faker.helpers.arrayElement(NOTE_TEMPLATES),
@@ -48,13 +53,14 @@ function agencyFeeAmount(): string {
 }
 
 async function createInvoiceAt(
+  orgId: string,
   policy: SeededPolicy,
   staff: User[],
   date: Date,
   sweepType: "new_business_sweep" | "installment_payment_sweep",
   feeType: "new_business_fee" | "installment_payment_fee"
 ): Promise<{ id: string; total: string } | null> {
-  const result = await createInvoiceWithDetails({
+  const result = await createInvoiceWithDetails(orgId, {
     policyId: policy.id,
     createdBy: randomStaffId(staff),
     items: [
@@ -78,12 +84,13 @@ async function createInvoiceAt(
 }
 
 async function recordPaymentAt(
+  orgId: string,
   invoiceId: string,
   staff: User[],
   date: Date,
   amount: string
 ): Promise<boolean> {
-  const result = await recordPayment({
+  const result = await recordPayment(orgId, {
     invoiceId,
     method: faker.helpers.arrayElement(PAYMENT_METHODS),
     amount,
@@ -121,6 +128,7 @@ async function recordPaymentAt(
 }
 
 async function payDownInvoice(
+  orgId: string,
   invoiceId: string,
   total: string,
   staff: User[],
@@ -151,13 +159,23 @@ async function payDownInvoice(
       ? faker.number.int({ min: 100, max: 2000 })
       : 0
 
-    const ok = await recordPaymentAt(invoiceId, staff, cursor, centsToAmount(appliedC + overpayC))
+    const ok = await recordPaymentAt(
+      orgId,
+      invoiceId,
+      staff,
+      cursor,
+      centsToAmount(appliedC + overpayC)
+    )
     if (!ok) break
     remainingC -= appliedC
   }
 }
 
-export async function seedFinancials(policies: SeededPolicy[], staff: User[]): Promise<void> {
+export async function seedFinancials(
+  orgId: string,
+  policies: SeededPolicy[],
+  staff: User[]
+): Promise<void> {
   const now = new Date()
 
   for (const batch of chunk(policies, 8)) {
@@ -166,6 +184,7 @@ export async function seedFinancials(policies: SeededPolicy[], staff: User[]): P
         const effectiveDate = new Date(policy.effectiveDate)
         if (effectiveDate > now) {
           await addNote(
+            orgId,
             policy,
             staff,
             addDays(effectiveDate, -faker.number.int({ min: 3, max: 14 }))
@@ -173,11 +192,17 @@ export async function seedFinancials(policies: SeededPolicy[], staff: User[]): P
           return
         }
 
-        await addNote(policy, staff, addDays(effectiveDate, faker.number.int({ min: 0, max: 2 })))
+        await addNote(
+          orgId,
+          policy,
+          staff,
+          addDays(effectiveDate, faker.number.int({ min: 0, max: 2 }))
+        )
 
         let cursor = addDays(effectiveDate, faker.number.int({ min: 1, max: 5 }))
         if (cursor > now) cursor = now
         const invoice = await createInvoiceAt(
+          orgId,
           policy,
           staff,
           cursor,
@@ -185,7 +210,7 @@ export async function seedFinancials(policies: SeededPolicy[], staff: User[]): P
           "new_business_fee"
         )
         if (invoice) {
-          await payDownInvoice(invoice.id, invoice.total, staff, cursor, now)
+          await payDownInvoice(orgId, invoice.id, invoice.total, staff, cursor, now)
         }
 
         const expirationDate = new Date(policy.expirationDate)
@@ -195,6 +220,7 @@ export async function seedFinancials(policies: SeededPolicy[], staff: User[]): P
         )
         if (midTerm < now && midTerm > cursor && faker.datatype.boolean({ probability: 0.3 })) {
           const installment = await createInvoiceAt(
+            orgId,
             policy,
             staff,
             midTerm,
@@ -202,13 +228,13 @@ export async function seedFinancials(policies: SeededPolicy[], staff: User[]): P
             "installment_payment_fee"
           )
           if (installment) {
-            await payDownInvoice(installment.id, installment.total, staff, midTerm, now)
+            await payDownInvoice(orgId, installment.id, installment.total, staff, midTerm, now)
           }
         }
 
         if (faker.datatype.boolean({ probability: 0.4 })) {
           const noteDate = addDays(cursor, faker.number.int({ min: 5, max: 60 }))
-          await addNote(policy, staff, noteDate > now ? now : noteDate)
+          await addNote(orgId, policy, staff, noteDate > now ? now : noteDate)
         }
       })
     )

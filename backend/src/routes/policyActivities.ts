@@ -1,6 +1,10 @@
 import { Request, Response, Router } from "express"
 import { requireAuth } from "../auth/middleware"
-import { listScheduledEmails, type ScheduledEmailWithContext } from "../repositories"
+import {
+  findAutoPolicyById,
+  listScheduledEmails,
+  type ScheduledEmailWithContext,
+} from "../repositories"
 import { parseId } from "./helpers"
 
 export const policyActivitiesRouter = Router()
@@ -48,12 +52,23 @@ function toActivity(row: ScheduledEmailWithContext): PolicyActivity {
 
 // Returns completed activities alongside upcoming ones, so the tab shows the
 // reminder history rather than emptying out the moment everything has sent.
+//
+// listScheduledEmails itself is not org-scoped until #121 (scheduled_emails
+// rows are still planned with org_id null), so the cross-tenant read is closed
+// here instead: resolve the policy through the already-org-scoped
+// findAutoPolicyById and 404 before ever looking at its scheduled emails.
 policyActivitiesRouter.get(
   "/policies/:policyId/activities",
   requireAuth,
   async (req: Request, res: Response) => {
     const policyId = parseId(req.params.policyId, res)
     if (policyId === undefined) return
+
+    const policy = await findAutoPolicyById(req.orgId!, policyId)
+    if (!policy) {
+      res.status(404).json({ error: "Policy not found" })
+      return
+    }
 
     const scheduled = await listScheduledEmails({ policyId })
     res.json({ activities: scheduled.map(toActivity) })

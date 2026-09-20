@@ -12,7 +12,7 @@ policyLogsRouter.get("/policy-logs", requireAuth, async (req: Request, res: Resp
     res.status(400).json({ error: "Invalid policyId" })
     return
   }
-  res.json(await listPolicyLogsByPolicyId(policyId.data))
+  res.json(await listPolicyLogsByPolicyId(req.orgId!, policyId.data))
 })
 
 // Logs are append-only: no GET /policy-logs/:id, no PATCH, no DELETE.
@@ -29,7 +29,7 @@ policyLogsRouter.post("/policy-logs", requireAuth, async (req: Request, res: Res
     return
   }
 
-  const log = await createPolicyLog({
+  const log = await createPolicyLog(req.orgId!, {
     policyId: parsed.data.policyId,
     authorId: req.user!.id,
     body: parsed.data.body,

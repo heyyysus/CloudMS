@@ -183,7 +183,7 @@ mailRouter.post(
       // of the log already sees it. The mail is gone by now, so a log failure
       // is logged rather than turned into a 500 on a send that succeeded.
       try {
-        await createPolicyLog({
+        await createPolicyLog(req.orgId!, {
           policyId,
           authorId: req.user!.id,
           body: correspondenceSentLogBody({

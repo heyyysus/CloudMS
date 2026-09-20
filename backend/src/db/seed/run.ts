@@ -63,7 +63,7 @@ export async function seed(): Promise<void> {
   const seededCarriers = await seedCarriers(defaultOrg.id, CARRIER_COUNT, usedNaics)
   const households = await seedHouseholds(CLIENT_COUNT, defaultOrg.id)
   const policies = await seedPolicies(defaultOrg.id, households, seededCarriers, POLICY_COUNT)
-  await seedFinancials(policies, seededUsers)
+  await seedFinancials(defaultOrg.id, policies, seededUsers)
   await seedWelcomeTemplate(defaultOrg.id)
 
   await seedUsers(secondOrg.id, usedEmails, {

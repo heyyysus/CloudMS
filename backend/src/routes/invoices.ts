@@ -23,7 +23,7 @@ invoicesRouter.get("/invoices", requireAuth, async (req: Request, res: Response)
       res.status(400).json({ error: "Invalid clientId" })
       return
     }
-    res.json(await listInvoicesByClientId(clientId.data))
+    res.json(await listInvoicesByClientId(req.orgId!, clientId.data))
     return
   }
   if (typeof req.query.policyId === "string") {
@@ -32,7 +32,7 @@ invoicesRouter.get("/invoices", requireAuth, async (req: Request, res: Response)
       res.status(400).json({ error: "Invalid policyId" })
       return
     }
-    res.json(await listInvoicesByPolicyId(policyId.data))
+    res.json(await listInvoicesByPolicyId(req.orgId!, policyId.data))
     return
   }
   res.status(400).json({ error: "Provide a clientId or policyId" })
@@ -42,7 +42,7 @@ invoicesRouter.get("/invoices/:id", requireAuth, async (req: Request, res: Respo
   const id = parseId(req.params.id, res)
   if (id === undefined) return
 
-  const invoice = await getInvoiceWithDetails(id)
+  const invoice = await getInvoiceWithDetails(req.orgId!, id)
   if (!invoice) {
     res.status(404).json({ error: "Invoice not found" })
     return
@@ -58,7 +58,7 @@ invoicesRouter.post("/invoices", requireAuth, async (req: Request, res: Response
   }
 
   try {
-    const created = await createInvoiceWithDetails({
+    const created = await createInvoiceWithDetails(req.orgId!, {
       policyId: parsed.data.policyId,
       note: parsed.data.note ?? null,
       items: parsed.data.items,
@@ -99,7 +99,7 @@ invoicesRouter.post(
       return
     }
 
-    const result = await voidInvoice(id, req.user!.id, parsed.data.reason ?? null)
+    const result = await voidInvoice(req.orgId!, id, req.user!.id, parsed.data.reason ?? null)
     switch (result.status) {
       case "not_found":
         res.status(404).json({ error: "Invoice not found" })
@@ -114,7 +114,7 @@ invoicesRouter.post(
         // Voiding requires no active payments, so any receipt documents on this
         // invoice were already hidden when their payments were voided.
         await voidAccountingDocument(req, "invoice", id)
-        res.json(await getInvoiceWithDetails(id))
+        res.json(await getInvoiceWithDetails(req.orgId!, id))
         return
     }
   }

@@ -251,8 +251,8 @@ export class TestContext {
   // policy_logs cascade-deletes with its policy, so no separate tracking
   // array is needed here - as long as the policy is tracked, cleanup() below
   // removes its logs before it removes the author's user row.
-  async log(policyId: string, authorId: string, body = "Test log") {
-    const l = await createPolicyLog({ policyId, authorId, body })
+  async log(policyId: string, authorId: string, body = "Test log", orgId?: string) {
+    const l = await createPolicyLog(orgId ?? (await this.defaultOrg()), { policyId, authorId, body })
     if (!l) throw new Error(`Could not create log for policy ${policyId}`)
     return l
   }

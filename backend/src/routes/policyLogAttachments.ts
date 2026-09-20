@@ -31,7 +31,7 @@ policyLogAttachmentsRouter.get(
     // Same visibility rule as GET /policy-attachments: a document for a voided
     // invoice or payment drops out of its log for staff, stays for admins.
     res.json(
-      await listPolicyLogAttachmentsByPolicyId(policyId.data, {
+      await listPolicyLogAttachmentsByPolicyId(req.orgId!, policyId.data, {
         includeVoided: req.membership!.role === "admin",
       })
     )
@@ -48,7 +48,7 @@ policyLogAttachmentsRouter.post(
       return
     }
 
-    const result = await linkAttachmentsToLog({
+    const result = await linkAttachmentsToLog(req.orgId!, {
       logId: parsed.data.logId,
       attachmentIds: parsed.data.attachmentIds,
       linkedBy: req.user!.id,
@@ -78,7 +78,7 @@ policyLogAttachmentsRouter.delete(
     const id = parseId(req.params.id, res)
     if (id === undefined) return
 
-    if (!(await unlinkPolicyLogAttachment(id))) {
+    if (!(await unlinkPolicyLogAttachment(req.orgId!, id))) {
       res.status(404).json({ error: "Link not found" })
       return
     }

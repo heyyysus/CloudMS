@@ -19,7 +19,7 @@ receiptsRouter.get("/receipts", requireAuth, async (req: Request, res: Response)
       res.status(400).json({ error: "Invalid clientId" })
       return
     }
-    res.json(await listReceiptsByClientId(clientId.data))
+    res.json(await listReceiptsByClientId(req.orgId!, clientId.data))
     return
   }
   if (typeof req.query.policyId === "string") {
@@ -28,7 +28,7 @@ receiptsRouter.get("/receipts", requireAuth, async (req: Request, res: Response)
       res.status(400).json({ error: "Invalid policyId" })
       return
     }
-    res.json(await listReceiptsByPolicyId(policyId.data))
+    res.json(await listReceiptsByPolicyId(req.orgId!, policyId.data))
     return
   }
   res.status(400).json({ error: "Provide a clientId or policyId" })
@@ -38,7 +38,7 @@ receiptsRouter.get("/receipts/:id", requireAuth, async (req: Request, res: Respo
   const id = parseId(req.params.id, res)
   if (id === undefined) return
 
-  const receipt = await getReceiptWithDetails(id)
+  const receipt = await getReceiptWithDetails(req.orgId!, id)
   if (!receipt) {
     res.status(404).json({ error: "Receipt not found" })
     return

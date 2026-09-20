@@ -18,7 +18,7 @@ trustLedgerRouter.get("/trust-ledger", requireAuth, async (req: Request, res: Re
       res.status(400).json({ error: "Invalid clientId" })
       return
     }
-    res.json(await listTrustLedgerByClientId(clientId.data))
+    res.json(await listTrustLedgerByClientId(req.orgId!, clientId.data))
     return
   }
   if (typeof req.query.policyId === "string") {
@@ -27,7 +27,7 @@ trustLedgerRouter.get("/trust-ledger", requireAuth, async (req: Request, res: Re
       res.status(400).json({ error: "Invalid policyId" })
       return
     }
-    res.json(await listTrustLedgerByPolicyId(policyId.data))
+    res.json(await listTrustLedgerByPolicyId(req.orgId!, policyId.data))
     return
   }
   res.status(400).json({ error: "Provide a clientId or policyId" })
@@ -41,7 +41,10 @@ trustLedgerRouter.get("/trust-balance", requireAuth, async (req: Request, res: R
       res.status(400).json({ error: "Invalid clientId" })
       return
     }
-    res.json({ clientId: clientId.data, balance: await getTrustBalanceByClientId(clientId.data) })
+    res.json({
+      clientId: clientId.data,
+      balance: await getTrustBalanceByClientId(req.orgId!, clientId.data),
+    })
     return
   }
   if (typeof req.query.policyId === "string") {
@@ -50,7 +53,10 @@ trustLedgerRouter.get("/trust-balance", requireAuth, async (req: Request, res: R
       res.status(400).json({ error: "Invalid policyId" })
       return
     }
-    res.json({ policyId: policyId.data, balance: await getTrustBalanceByPolicyId(policyId.data) })
+    res.json({
+      policyId: policyId.data,
+      balance: await getTrustBalanceByPolicyId(req.orgId!, policyId.data),
+    })
     return
   }
   res.status(400).json({ error: "Provide a clientId or policyId" })

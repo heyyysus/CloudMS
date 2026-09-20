@@ -148,7 +148,7 @@ async function sendOne(row: ClaimedRow): Promise<void> {
   // Best-effort, matching routes/mail.ts: the mail is already gone, so a
   // logging failure must not undo a successful send.
   try {
-    await createPolicyLog({
+    await createPolicyLog(orgId, {
       policyId: row.policy_id,
       authorId: automation.id,
       body: correspondenceSentLogBody({

@@ -21,7 +21,7 @@ paymentsRouter.get("/payments", requireAuth, async (req: Request, res: Response)
       res.status(400).json({ error: "Invalid clientId" })
       return
     }
-    res.json(await listPaymentsByClientId(clientId.data))
+    res.json(await listPaymentsByClientId(req.orgId!, clientId.data))
     return
   }
   if (typeof req.query.policyId === "string") {
@@ -30,7 +30,7 @@ paymentsRouter.get("/payments", requireAuth, async (req: Request, res: Response)
       res.status(400).json({ error: "Invalid policyId" })
       return
     }
-    res.json(await listPaymentsByPolicyId(policyId.data))
+    res.json(await listPaymentsByPolicyId(req.orgId!, policyId.data))
     return
   }
   res.status(400).json({ error: "Provide a clientId or policyId" })
@@ -40,7 +40,7 @@ paymentsRouter.get("/payments/:id", requireAuth, async (req: Request, res: Respo
   const id = parseId(req.params.id, res)
   if (id === undefined) return
 
-  const payment = await getPaymentWithDetails(id)
+  const payment = await getPaymentWithDetails(req.orgId!, id)
   if (!payment) {
     res.status(404).json({ error: "Payment not found" })
     return
@@ -56,7 +56,7 @@ paymentsRouter.post("/payments", requireAuth, async (req: Request, res: Response
     return
   }
 
-  const result = await recordPayment({
+  const result = await recordPayment(req.orgId!, {
     invoiceId: parsed.data.invoiceId,
     method: parsed.data.method,
     amount: parsed.data.amount,
@@ -77,7 +77,7 @@ paymentsRouter.post("/payments", requireAuth, async (req: Request, res: Response
       // caller's next read of the policy's attachments. logId ties it to the
       // "Payment of $X ..." log this write appended.
       await recordReceiptDocument(req, result.receiptId, result.logId)
-      res.status(201).json(await getReceiptWithDetails(result.receiptId))
+      res.status(201).json(await getReceiptWithDetails(req.orgId!, result.receiptId))
       return
   }
 })
@@ -100,7 +100,7 @@ paymentsRouter.post(
       return
     }
 
-    const result = await voidPayment(id, req.user!.id, parsed.data.reason ?? null)
+    const result = await voidPayment(req.orgId!, id, req.user!.id, parsed.data.reason ?? null)
     switch (result.status) {
       case "not_found":
         res.status(404).json({ error: "Payment not found" })
@@ -112,7 +112,7 @@ paymentsRouter.post(
         if (result.receiptId !== null) {
           await voidAccountingDocument(req, "receipt", result.receiptId)
         }
-        res.json(await getPaymentWithDetails(id))
+        res.json(await getPaymentWithDetails(req.orgId!, id))
         return
     }
   }

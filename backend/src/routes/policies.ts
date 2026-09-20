@@ -55,7 +55,7 @@ async function recordPolicyChangeFormUnsafe(
   // write failed, in which case the attachment is simply filed unlinked.
   let changeLogId: string | undefined
   try {
-    const log = await createPolicyLog({
+    const log = await createPolicyLog(req.orgId!, {
       policyId: after.id,
       authorId: req.user!.id,
       body: `Policy updated:\n${formatChangeSummaryText(changes)}`.slice(0, 5000),
@@ -83,7 +83,7 @@ async function recordPolicyChangeFormUnsafe(
       },
       changes
     )
-    await storeGeneratedPolicyAttachment({
+    await storeGeneratedPolicyAttachment(req.orgId!, {
       policyId: after.id,
       pdf,
       fileName: "Policy Change Form.pdf",

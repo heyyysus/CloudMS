@@ -46,6 +46,18 @@ export const policyStatusEnum = pgEnum("policy_status", [
 
 export const userRoleEnum = pgEnum("user_role", ["admin", "staff"])
 
+// A tenant. Declared before `users` so every table below can reference
+// `organizations.id` without a forward-reference workaround.
+export const organizations = pgTable("organizations", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 150 }).notNull(),
+  slug: varchar("slug", { length: 64 }).notNull().unique(),
+  nextInvoiceNumber: integer("next_invoice_number").notNull().default(1),
+  nextReceiptNumber: integer("next_receipt_number").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+})
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
@@ -63,6 +75,30 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 })
 
+// Which organizations a user belongs to, and their role in each. `role`
+// mirrors `users.role` until sub-issue 3 retires the latter; nothing reads
+// this table's role yet.
+export const orgMemberships = pgTable(
+  "org_memberships",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    orgId: integer("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    role: userRoleEnum("role").notNull().default("staff"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    unique("org_memberships_user_id_org_id_unique").on(table.userId, table.orgId),
+    index("org_memberships_org_id_idx").on(table.orgId),
+  ]
+)
+
 export const sessions = pgTable(
   "sessions",
   {
@@ -70,6 +106,9 @@ export const sessions = pgTable(
     userId: integer("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    // Nullable: nothing reads or writes this until sub-issue 3 attaches the
+    // organization to the session at sign-in.
+    orgId: integer("org_id").references(() => organizations.id),
     tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
     expiresAt: timestamp("expires_at").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -82,18 +121,31 @@ export const sessions = pgTable(
 // (scoped to a client, their policy, and the sending agent).
 export const emailTemplateKindEnum = pgEnum("email_template_kind", ["welcome", "correspondence"])
 
-export const emailTemplates = pgTable("email_templates", {
-  id: serial("id").primaryKey(),
-  key: varchar("key", { length: 64 }).notNull().unique(),
-  // Admin-facing label for correspondence templates; null for the welcome row.
-  name: varchar("name", { length: 120 }),
-  kind: emailTemplateKindEnum("kind").notNull().default("correspondence"),
-  subject: varchar("subject", { length: 200 }).notNull(),
-  body: text("body").notNull(),
-  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-})
+export const emailTemplates = pgTable(
+  "email_templates",
+  {
+    id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
+    key: varchar("key", { length: 64 }).notNull(),
+    // Admin-facing label for correspondence templates; null for the welcome row.
+    name: varchar("name", { length: 120 }),
+    kind: emailTemplateKindEnum("kind").notNull().default("correspondence"),
+    subject: varchar("subject", { length: 200 }).notNull(),
+    body: text("body").notNull(),
+    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    unique("email_templates_org_id_key_unique").on(table.orgId, table.key),
+    index("email_templates_org_id_idx").on(table.orgId),
+  ]
+)
 
 export const emailLogStatusEnum = pgEnum("email_log_status", ["sent", "failed"])
 
@@ -101,6 +153,12 @@ export const emailLog = pgTable(
   "email_log",
   {
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
     recipient: varchar("recipient", { length: 255 }).notNull(),
     // Plain varchar, not an FK to email_templates.key - the log must survive
     // template renames/deletes.
@@ -114,7 +172,10 @@ export const emailLog = pgTable(
     triggeredBy: integer("triggered_by").references(() => users.id, { onDelete: "set null" }),
     sentAt: timestamp("sent_at").defaultNow().notNull(),
   },
-  (table) => [index("email_log_recipient_idx").on(table.recipient)]
+  (table) => [
+    index("email_log_recipient_idx").on(table.recipient),
+    index("email_log_org_id_idx").on(table.orgId),
+  ]
 )
 
 // A standing instruction to send a correspondence template off a date on the
@@ -126,6 +187,12 @@ export const reminderRules = pgTable(
   "reminder_rules",
   {
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
     name: varchar("name", { length: 120 }).notNull(),
     trigger: reminderTriggerEnum("trigger").notNull(),
     // Days before the trigger date. A negative value sends after it (-7 is a
@@ -142,7 +209,10 @@ export const reminderRules = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [unique("reminder_rules_trigger_offset_unique").on(table.trigger, table.offsetDays)]
+  (table) => [
+    unique("reminder_rules_trigger_offset_unique").on(table.trigger, table.offsetDays),
+    index("reminder_rules_org_id_idx").on(table.orgId),
+  ]
 )
 
 export const scheduledEmailStatusEnum = pgEnum("scheduled_email_status", [
@@ -161,6 +231,12 @@ export const scheduledEmails = pgTable(
   "scheduled_emails",
   {
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
     ruleId: integer("rule_id")
       .notNull()
       .references(() => reminderRules.id, { onDelete: "cascade" }),
@@ -194,6 +270,7 @@ export const scheduledEmails = pgTable(
     ),
     index("scheduled_emails_due_idx").on(table.status, table.scheduledFor),
     index("scheduled_emails_policy_id_idx").on(table.policyId),
+    index("scheduled_emails_org_id_idx").on(table.orgId),
   ]
 )
 
@@ -201,6 +278,12 @@ export const persons = pgTable(
   "persons",
   {
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
     firstName: varchar("first_name", { length: 100 }).notNull(),
     lastName: varchar("last_name", { length: 100 }).notNull(),
     dateOfBirth: date("date_of_birth").notNull(),
@@ -217,26 +300,43 @@ export const persons = pgTable(
       "gin",
       sql`(${table.firstName} || ' ' || ${table.lastName}) gin_trgm_ops`
     ),
+    index("persons_org_id_idx").on(table.orgId),
   ]
 )
 
-export const drivers = pgTable("drivers", {
-  id: serial("id").primaryKey(),
-  personId: integer("person_id")
-    .notNull()
-    .unique()
-    .references(() => persons.id, { onDelete: "cascade" }),
-  dlNumber: varchar("dl_number", { length: 50 }),
-  rating: driverRatingEnum("rating").notNull().default("rated"),
-  sr22: boolean("sr22").notNull().default(false),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-})
+export const drivers = pgTable(
+  "drivers",
+  {
+    id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
+    personId: integer("person_id")
+      .notNull()
+      .unique()
+      .references(() => persons.id, { onDelete: "cascade" }),
+    dlNumber: varchar("dl_number", { length: 50 }),
+    rating: driverRatingEnum("rating").notNull().default("rated"),
+    sr22: boolean("sr22").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("drivers_org_id_idx").on(table.orgId)]
+)
 
 export const clients = pgTable(
   "clients",
   {
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
     namedInsuredId: integer("named_insured_id")
       .notNull()
       .references(() => persons.id),
@@ -263,6 +363,7 @@ export const clients = pgTable(
       "gin",
       sql`(coalesce(${table.physicalAddress1}, '') || ' ' || coalesce(${table.physicalAddress2}, '') || ' ' || coalesce(${table.physicalCity}, '') || ' ' || coalesce(${table.physicalState}, '') || ' ' || coalesce(${table.physicalZip}, '')) gin_trgm_ops`
     ),
+    index("clients_org_id_idx").on(table.orgId),
   ]
 )
 
@@ -270,6 +371,12 @@ export const clientPhones = pgTable(
   "client_phones",
   {
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
     clientId: integer("client_id")
       .notNull()
       .references(() => clients.id, { onDelete: "cascade" }),
@@ -279,6 +386,7 @@ export const clientPhones = pgTable(
   (table) => [
     index("client_phones_client_id_idx").on(table.clientId),
     index("client_phones_phone_number_trgm_idx").using("gin", table.phoneNumber.op("gin_trgm_ops")),
+    index("client_phones_org_id_idx").on(table.orgId),
   ]
 )
 
@@ -286,6 +394,12 @@ export const clientEmails = pgTable(
   "client_emails",
   {
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
     clientId: integer("client_id")
       .notNull()
       .references(() => clients.id, { onDelete: "cascade" }),
@@ -295,30 +409,47 @@ export const clientEmails = pgTable(
   (table) => [
     index("client_emails_client_id_idx").on(table.clientId),
     index("client_emails_email_trgm_idx").using("gin", table.email.op("gin_trgm_ops")),
+    index("client_emails_org_id_idx").on(table.orgId),
   ]
 )
 
 // Carriers are never deleted once a policy references them (every FK is ON
 // DELETE no action), so retiring one is `isActive = false`: it drops out of
 // the carrier picker for new policies but stays readable on existing records.
-export const carriers = pgTable("carriers", {
-  id: serial("id").primaryKey(),
-  name: varchar("name", { length: 150 }).notNull(),
-  naic: varchar("naic", { length: 10 }).notNull().unique(),
-  isActive: boolean("is_active").notNull().default(true),
-  phone: varchar("phone", { length: 30 }),
-  email: varchar("email", { length: 255 }),
-  website: varchar("website", { length: 255 }),
-  producerCode: varchar("producer_code", { length: 50 }),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-})
+export const carriers = pgTable(
+  "carriers",
+  {
+    id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
+    name: varchar("name", { length: 150 }).notNull(),
+    naic: varchar("naic", { length: 10 }).notNull().unique(),
+    isActive: boolean("is_active").notNull().default(true),
+    phone: varchar("phone", { length: 30 }),
+    email: varchar("email", { length: 255 }),
+    website: varchar("website", { length: 255 }),
+    producerCode: varchar("producer_code", { length: 50 }),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [index("carriers_org_id_idx").on(table.orgId)]
+)
 
 export const autoPolicies = pgTable(
   "auto_policies",
   {
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
     clientId: integer("client_id")
       .notNull()
       .references(() => clients.id),
@@ -347,6 +478,7 @@ export const autoPolicies = pgTable(
       "gin",
       sql`(coalesce(${table.policyAddress1}, '') || ' ' || coalesce(${table.policyAddress2}, '') || ' ' || coalesce(${table.policyCity}, '') || ' ' || coalesce(${table.policyState}, '') || ' ' || coalesce(${table.policyZip}, '')) gin_trgm_ops`
     ),
+    index("auto_policies_org_client_idx").on(table.orgId, table.clientId),
   ]
 )
 
@@ -354,6 +486,12 @@ export const vehicles = pgTable(
   "vehicles",
   {
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
     policyId: integer("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
@@ -378,6 +516,7 @@ export const vehicles = pgTable(
   (table) => [
     index("vehicles_policy_id_idx").on(table.policyId),
     unique("vehicles_policy_id_vin_unique").on(table.policyId, table.vin),
+    index("vehicles_org_id_idx").on(table.orgId),
   ]
 )
 
@@ -385,6 +524,12 @@ export const policyDrivers = pgTable(
   "policy_drivers",
   {
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
     policyId: integer("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
@@ -393,7 +538,10 @@ export const policyDrivers = pgTable(
       .references(() => drivers.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [unique().on(table.policyId, table.driverId)]
+  (table) => [
+    unique().on(table.policyId, table.driverId),
+    index("policy_drivers_org_id_idx").on(table.orgId),
+  ]
 )
 
 // Append-only notes attached to a policy. logNumber is a per-policy counter
@@ -405,6 +553,12 @@ export const policyLogs = pgTable(
   "policy_logs",
   {
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
     policyId: integer("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
@@ -418,6 +572,7 @@ export const policyLogs = pgTable(
   (table) => [
     index("policy_logs_policy_id_idx").on(table.policyId),
     unique("policy_logs_policy_id_log_number_unique").on(table.policyId, table.logNumber),
+    index("policy_logs_org_id_idx").on(table.orgId),
   ]
 )
 
@@ -440,6 +595,12 @@ export const policyAttachments = pgTable(
   "policy_attachments",
   {
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
     policyId: integer("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
@@ -463,6 +624,7 @@ export const policyAttachments = pgTable(
   (table) => [
     index("policy_attachments_policy_id_idx").on(table.policyId),
     index("policy_attachments_source_idx").on(table.sourceType, table.sourceId),
+    index("policy_attachments_org_id_idx").on(table.orgId),
   ]
 )
 
@@ -476,6 +638,12 @@ export const policyLogAttachments = pgTable(
   "policy_log_attachments",
   {
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
     logId: integer("log_id")
       .notNull()
       .references(() => policyLogs.id, { onDelete: "cascade" }),
@@ -496,6 +664,7 @@ export const policyLogAttachments = pgTable(
       table.logId,
       table.attachmentId
     ),
+    index("policy_log_attachments_org_id_idx").on(table.orgId),
   ]
 )
 
@@ -551,6 +720,16 @@ export const invoices = pgTable(
   {
     // id doubles as the agency-wide sequential invoice number.
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
+    // Temporary: auto-allocated globally so existing create paths keep working.
+    // Sub-issue 5 allocates from organizations.next_invoice_number inside the
+    // creating transaction and drops the identity.
+    invoiceNumber: integer("invoice_number").notNull().generatedByDefaultAsIdentity(),
     policyId: integer("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
@@ -575,6 +754,8 @@ export const invoices = pgTable(
   (table) => [
     index("invoices_policy_id_idx").on(table.policyId),
     index("invoices_client_id_idx").on(table.clientId),
+    index("invoices_org_id_idx").on(table.orgId),
+    unique("invoices_org_id_invoice_number_unique").on(table.orgId, table.invoiceNumber),
   ]
 )
 
@@ -582,6 +763,12 @@ export const invoiceItems = pgTable(
   "invoice_items",
   {
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
     invoiceId: integer("invoice_id")
       .notNull()
       .references(() => invoices.id, { onDelete: "cascade" }),
@@ -594,13 +781,22 @@ export const invoiceItems = pgTable(
     amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [index("invoice_items_invoice_id_idx").on(table.invoiceId)]
+  (table) => [
+    index("invoice_items_invoice_id_idx").on(table.invoiceId),
+    index("invoice_items_org_id_idx").on(table.orgId),
+  ]
 )
 
 export const payments = pgTable(
   "payments",
   {
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
     invoiceId: integer("invoice_id")
       .notNull()
       .references(() => invoices.id, { onDelete: "cascade" }),
@@ -630,6 +826,7 @@ export const payments = pgTable(
     index("payments_invoice_id_idx").on(table.invoiceId),
     index("payments_policy_id_idx").on(table.policyId),
     index("payments_client_id_idx").on(table.clientId),
+    index("payments_org_id_idx").on(table.orgId),
   ]
 )
 
@@ -638,6 +835,16 @@ export const receipts = pgTable(
   {
     // id doubles as the agency-wide sequential receipt number.
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
+    // Temporary: auto-allocated globally so existing create paths keep working.
+    // Sub-issue 5 allocates from organizations.next_receipt_number inside the
+    // creating transaction and drops the identity.
+    receiptNumber: integer("receipt_number").notNull().generatedByDefaultAsIdentity(),
     // One receipt per payment.
     paymentId: integer("payment_id")
       .notNull()
@@ -670,6 +877,8 @@ export const receipts = pgTable(
     index("receipts_invoice_id_idx").on(table.invoiceId),
     index("receipts_policy_id_idx").on(table.policyId),
     index("receipts_client_id_idx").on(table.clientId),
+    index("receipts_org_id_idx").on(table.orgId),
+    unique("receipts_org_id_receipt_number_unique").on(table.orgId, table.receiptNumber),
   ]
 )
 
@@ -677,6 +886,12 @@ export const trustLedger = pgTable(
   "trust_ledger",
   {
     id: serial("id").primaryKey(),
+    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
+    // sub-issue 6 once every insert passes one explicitly.
+    orgId: integer("org_id")
+      .notNull()
+      .default(1)
+      .references(() => organizations.id),
     policyId: integer("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
@@ -702,5 +917,6 @@ export const trustLedger = pgTable(
     index("trust_ledger_policy_id_idx").on(table.policyId),
     index("trust_ledger_client_id_idx").on(table.clientId),
     index("trust_ledger_invoice_id_idx").on(table.invoiceId),
+    index("trust_ledger_org_id_idx").on(table.orgId),
   ]
 )

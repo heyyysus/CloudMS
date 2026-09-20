@@ -49,6 +49,30 @@ describe("GET /persons/:id", () => {
 
     expect((await request(app).get("/persons/abc").set("Cookie", cookie)).status).toBe(404)
   })
+
+  it("does not see a person from another org", async () => {
+    const user = await ctx.user("persons-wrongorg", "admin")
+    const cookie = await ctx.cookie(user.id)
+    const other = await ctx.org()
+    const person = await ctx.person({ orgId: other.id })
+
+    const list = await request(app).get("/persons").set("Cookie", cookie)
+    expect(list.body.some((p: { id: string }) => p.id === person.id)).toBe(false)
+    expect((await request(app).get(`/persons/${person.id}`).set("Cookie", cookie)).status).toBe(
+      404
+    )
+    expect(
+      (
+        await request(app)
+          .patch(`/persons/${person.id}`)
+          .set("Cookie", cookie)
+          .send({ lastName: "X" })
+      ).status
+    ).toBe(404)
+    expect(
+      (await request(app).delete(`/persons/${person.id}`).set("Cookie", cookie)).status
+    ).toBe(404)
+  })
 })
 
 describe("POST /persons", () => {

@@ -111,3 +111,12 @@ run against it, bootstrap re-run once to confirm idempotency):
 Frontend: pending the delegated agent's report; will fill in `lint`/`build`
 (and `test`, since Chromium + Playwright's headless shell are available on
 this runner) results once it returns.
+
+## Docs
+
+`docs/API.md` and `docs/multitenancy.md` were already updated during
+implementation (Row ids convention/section, renumbered rollout order) and
+read as accurate against the final diff. No further doc changes needed:
+README.md's `db:push` description still holds (it's the same command with an
+extra idempotent, invisible extensions step) and neither
+AUTH_SESSIONS_EXPLAINED.md nor frontend-ui-design.md reference id format.

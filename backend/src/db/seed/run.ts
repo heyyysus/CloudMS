@@ -1,4 +1,4 @@
-import { inArray, sql } from "drizzle-orm"
+import { sql } from "drizzle-orm"
 import { adminDb as db } from "../index"
 import {
   autoPolicies,
@@ -47,18 +47,6 @@ async function seedWelcomeTemplate(orgId: string): Promise<void> {
   })
 }
 
-// createAutoPolicyWithDetails (used by seedPolicies) takes no orgId in this
-// sub-issue, so the second org's policies land in org 1 via the column
-// default and need moving afterwards. Temporary until sub-issue 4 threads
-// orgId through the policy repositories directly.
-async function reassignPoliciesToOrg(orgId: string, policyIds: string[]): Promise<void> {
-  if (policyIds.length === 0) return
-  await db.update(autoPolicies).set({ orgId }).where(inArray(autoPolicies.id, policyIds))
-  await db.update(vehicles).set({ orgId }).where(inArray(vehicles.policyId, policyIds))
-  await db.update(policyDrivers).set({ orgId }).where(inArray(policyDrivers.policyId, policyIds))
-  await db.update(policyLogs).set({ orgId }).where(inArray(policyLogs.policyId, policyIds))
-}
-
 export async function seed(): Promise<void> {
   await wipe()
 
@@ -74,7 +62,7 @@ export async function seed(): Promise<void> {
   })
   const seededCarriers = await seedCarriers(defaultOrg.id, CARRIER_COUNT, usedNaics)
   const households = await seedHouseholds(CLIENT_COUNT, defaultOrg.id)
-  const policies = await seedPolicies(households, seededCarriers, POLICY_COUNT)
+  const policies = await seedPolicies(defaultOrg.id, households, seededCarriers, POLICY_COUNT)
   await seedFinancials(policies, seededUsers)
   await seedWelcomeTemplate(defaultOrg.id)
 
@@ -88,15 +76,12 @@ export async function seed(): Promise<void> {
   // policy, so fewer policies than households means only a subset of
   // households gets one - the rest are clients with no policy yet, same as a
   // real prospect.
-  const secondOrgPolicies = await seedPolicies(
+  await seedPolicies(
+    secondOrg.id,
     secondOrgHouseholds.slice(0, SECOND_ORG_POLICY_COUNT),
     secondOrgCarriers,
     SECOND_ORG_POLICY_COUNT,
     "POL2"
-  )
-  await reassignPoliciesToOrg(
-    secondOrg.id,
-    secondOrgPolicies.map((p) => p.id)
   )
   await seedWelcomeTemplate(secondOrg.id)
 

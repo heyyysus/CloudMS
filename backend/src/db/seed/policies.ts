@@ -109,12 +109,12 @@ function buildVehicle(garagingZip: string) {
 }
 
 export async function seedPolicies(
+  orgId: string,
   households: Household[],
   carriers: Carrier[],
   totalPolicies: number,
-  // auto_policies.policy_number is still globally unique in this sub-issue,
-  // so a second org's call needs a distinct prefix to avoid colliding with
-  // the first org's POL-000001... numbers.
+  // Purely cosmetic now that auto_policies.policy_number is unique per org -
+  // kept so the two orgs' seeded policy numbers stay visually distinct.
   policyNumberPrefix = "POL"
 ): Promise<SeededPolicy[]> {
   const counts = pickPolicyCounts(households.length, totalPolicies)
@@ -142,7 +142,7 @@ export async function seedPolicies(
           Math.min(household.driverPersonIds.length, faker.number.int({ min: 1, max: 3 }))
         )
 
-        const detail = await createAutoPolicyWithDetails({
+        const detail = await createAutoPolicyWithDetails(orgId, {
           clientId: household.client.id,
           carrierId: carrier.id,
           policyNumber: `${policyNumberPrefix}-${String(n).padStart(6, "0")}`,

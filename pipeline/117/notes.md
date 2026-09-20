@@ -119,3 +119,16 @@ already pointed at it - no shared DB touched):
 - `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run
   build`: all clean.
 - No frontend changes, so no frontend lint/build run.
+
+## Docs
+
+No doc changes needed: this sub-issue only adds schema/seed/repository
+plumbing (`organizations`/`org_memberships` tables, `org_id` columns,
+`repositories/organizations.ts` and `orgMemberships.ts`) with nothing wired
+into routes, auth, or the frontend yet, so no route/endpoint/response shape,
+auth/session behaviour, UI convention, or setup/env-var/script changed.
+`docs/multitenancy.md` was already updated by the implementation stage (part
+of the diff, not this stage). Note for a later sub-issue's docs stage:
+`docs/API.md`'s "Tenancy" bullet still says "the schema has no organization
+yet," which is now literally false (the tables exist, just unused by
+routes) — worth a wording pass once routes actually start scoping by org.

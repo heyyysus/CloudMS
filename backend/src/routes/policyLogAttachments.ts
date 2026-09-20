@@ -32,7 +32,7 @@ policyLogAttachmentsRouter.get(
     // invoice or payment drops out of its log for staff, stays for admins.
     res.json(
       await listPolicyLogAttachmentsByPolicyId(policyId.data, {
-        includeVoided: req.user!.role === "admin",
+        includeVoided: req.membership!.role === "admin",
       })
     )
   }

@@ -6,7 +6,7 @@
 import { findEmailTemplateByKey } from "./repositories/emailTemplates"
 import { createEmailLogEntry } from "./repositories/emailLog"
 import { MailNotConfiguredError, MailSendError, plainTextToHtml, sendEmail } from "./mailer"
-import type { User } from "./types"
+import type { User, UserRole } from "./types"
 
 export const WELCOME_TEMPLATE_KEY = "welcome"
 
@@ -74,7 +74,8 @@ export interface SendWelcomeEmailResult {
 // broken-install condition and is left to propagate as a 500.
 export async function sendWelcomeEmail(
   user: User,
-  invitedBy: User
+  invitedBy: User,
+  role: UserRole
 ): Promise<SendWelcomeEmailResult> {
   const template = await findEmailTemplateByKey(WELCOME_TEMPLATE_KEY)
   if (!template) {
@@ -84,7 +85,7 @@ export async function sendWelcomeEmail(
   const fields: Record<string, string> = {
     name: user.name ?? user.email,
     email: user.email,
-    role: user.role,
+    role,
     appUrl: process.env.APP_URL ?? "",
     inviterName: invitedBy.name ?? invitedBy.email,
   }

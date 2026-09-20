@@ -27,7 +27,7 @@ async function main() {
   if (adminEmail) {
     await db
       .insert(users)
-      .values({ email: adminEmail.toLowerCase(), role: "admin" })
+      .values({ email: adminEmail.toLowerCase() })
       .onConflictDoNothing({ target: users.email })
     console.log(`Ensured admin user exists for ${adminEmail}`)
   }
@@ -41,7 +41,6 @@ async function main() {
     .values({
       email: AUTOMATION_USER_EMAIL,
       name: "CloudMS Automation",
-      role: "staff",
       isActive: false,
     })
     .onConflictDoNothing({ target: users.email })

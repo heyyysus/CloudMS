@@ -4,7 +4,7 @@ import { EditUserDialog } from './edit-user-dialog'
 import type { AdminUser } from '@/api/users'
 
 const user: AdminUser = {
-  id: 2,
+  id: '2',
   email: 'staffer@example.com',
   name: 'Blake Staffer',
   role: 'staff',

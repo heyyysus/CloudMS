@@ -19,7 +19,7 @@ const client: ClientAddressFields = {
 
 const carriers: Carrier[] = [
   {
-    id: 7,
+    id: '7',
     name: 'Acme Insurance',
     naic: '12345',
     isActive: true,
@@ -32,7 +32,7 @@ const carriers: Carrier[] = [
     updatedAt: '2026-07-14T17:48:07.653Z',
   },
   {
-    id: 8,
+    id: '8',
     name: 'Umbrella Corp',
     naic: '54321',
     isActive: true,
@@ -48,8 +48,8 @@ const carriers: Carrier[] = [
 
 const existingVehicles: Vehicle[] = [
   {
-    id: 501,
-    policyId: 900,
+    id: '501',
+    policyId: '900',
     vin: '1HGCM82633A004352',
     make: 'Honda',
     model: 'Accord',
@@ -72,9 +72,9 @@ const existingVehicles: Vehicle[] = [
 
 const existingDrivers: ExistingDriverOption[] = [
   {
-    personId: 229,
+    personId: '229',
     person: {
-      id: 229,
+      id: '229',
       firstName: 'Jane',
       lastName: 'Doe',
       dateOfBirth: '1987-07-22',
@@ -86,9 +86,9 @@ const existingDrivers: ExistingDriverOption[] = [
     },
   },
   {
-    personId: 230,
+    personId: '230',
     person: {
-      id: 230,
+      id: '230',
       firstName: 'John',
       lastName: 'Doe',
       dateOfBirth: '1985-03-11',
@@ -107,7 +107,7 @@ const meta = {
   component: AddPolicyForm,
   tags: ['autodocs'],
   args: {
-    clientId: 155,
+    clientId: '155',
     client,
     carriers,
     existingVehicles,
@@ -219,8 +219,8 @@ export const SubmitFansOutCoverages: Story = {
 
     await expect(args.onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
-        clientId: 155,
-        carrierId: 7,
+        clientId: '155',
+        carrierId: '7',
         policyNumber: 'POL-123',
         vehicles: [
           expect.objectContaining({
@@ -232,8 +232,8 @@ export const SubmitFansOutCoverages: Story = {
           }),
         ],
         drivers: [
-          expect.objectContaining({ kind: 'existing', personId: 229, dlNumber: 'D999' }),
-          { kind: 'existing', personId: 230 },
+          expect.objectContaining({ kind: 'existing', personId: '229', dlNumber: 'D999' }),
+          { kind: 'existing', personId: '230' },
         ],
       })
     )
@@ -260,7 +260,7 @@ export const SubmitOmitsBlankDl: Story = {
       expect.objectContaining({
         // Exact object (not objectContaining): asserts dlNumber is absent,
         // not just falsy.
-        drivers: [{ kind: 'existing', personId: 229, rating: 'rated', sr22: false }],
+        drivers: [{ kind: 'existing', personId: '229', rating: 'rated', sr22: false }],
       })
     )
   },

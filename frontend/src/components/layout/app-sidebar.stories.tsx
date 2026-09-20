@@ -38,8 +38,8 @@ export const Default: Story = {}
 export const WithOpenClients: Story = {
   args: {
     openTabs: [
-      { id: 155, label: 'Jane Doe' },
-      { id: 201, label: 'John Smith' },
+      { id: '155', label: 'Jane Doe' },
+      { id: '201', label: 'John Smith' },
     ],
     onCloseTab: fn(),
   },

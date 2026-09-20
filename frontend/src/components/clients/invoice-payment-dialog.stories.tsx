@@ -10,8 +10,8 @@ import type { Invoice } from '@/api/invoices'
 import type { ReceiptDetail } from '@/api/payments'
 
 const client: ClientDetail = {
-  id: 155,
-  namedInsuredId: 229,
+  id: '155',
+  namedInsuredId: '229',
   secondNamedInsuredId: null,
   mailingAddress1: null,
   mailingAddress2: null,
@@ -26,7 +26,7 @@ const client: ClientDetail = {
   createdAt: '2026-07-14T17:48:07.653Z',
   updatedAt: '2026-07-14T17:48:07.653Z',
   namedInsured: {
-    id: 229,
+    id: '229',
     firstName: 'Jane',
     lastName: 'Doe',
     dateOfBirth: '1987-07-22',
@@ -41,9 +41,9 @@ const client: ClientDetail = {
   emails: [],
   policies: [
     {
-      id: 900,
-      clientId: 155,
-      carrierId: 7,
+      id: '900',
+      clientId: '155',
+      carrierId: '7',
       policyNumber: 'POL-123',
       policyAddress1: null,
       policyAddress2: null,
@@ -61,10 +61,10 @@ const client: ClientDetail = {
 
 // The policy currently being viewed - passed in directly, never picked in
 // the dialog itself.
-const policy = { id: 900, policyNumber: 'POL-123' }
+const policy = { id: '900', policyNumber: 'POL-123' }
 
 const carrier: Carrier = {
-  id: 7,
+  id: '7',
   name: 'Acme Insurance',
   naic: '12345',
   isActive: true,
@@ -78,10 +78,10 @@ const carrier: Carrier = {
 }
 
 const createdInvoice: Invoice = {
-  id: 42,
-  policyId: 900,
-  clientId: 155,
-  createdBy: 1,
+  id: '42',
+  policyId: '900',
+  clientId: '155',
+  createdBy: '1',
   status: 'open',
   total: '150.00',
   amountPaid: '0.00',
@@ -93,8 +93,8 @@ const createdInvoice: Invoice = {
   updatedAt: '2026-07-14T17:48:07.653Z',
   items: [
     {
-      id: 1,
-      invoiceId: 42,
+      id: '1',
+      invoiceId: '42',
       category: 'agency',
       type: 'endorsement_fee',
       carrierId: null,
@@ -109,10 +109,10 @@ const createdInvoice: Invoice = {
 // Carries a carrier on its sweep item - server-defaulted, never picked - to
 // verify the read-only "Pay" summary still shows it.
 const openInvoice: Invoice = {
-  id: 10,
-  policyId: 900,
-  clientId: 155,
-  createdBy: 1,
+  id: '10',
+  policyId: '900',
+  clientId: '155',
+  createdBy: '1',
   status: 'open',
   total: '100.00',
   amountPaid: '40.00',
@@ -124,19 +124,19 @@ const openInvoice: Invoice = {
   updatedAt: '2026-07-14T17:48:07.653Z',
   items: [
     {
-      id: 2,
-      invoiceId: 10,
+      id: '2',
+      invoiceId: '10',
       category: 'sweep',
       type: 'new_business_sweep',
-      carrierId: 7,
+      carrierId: '7',
       description: null,
       amount: '80.00',
       createdAt: '2026-07-14T17:48:07.653Z',
       carrier,
     },
     {
-      id: 3,
-      invoiceId: 10,
+      id: '3',
+      invoiceId: '10',
       category: 'agency',
       type: 'new_business_fee',
       carrierId: null,
@@ -150,20 +150,20 @@ const openInvoice: Invoice = {
 
 function receiptFor(overrides: Partial<ReceiptDetail> & { amountApplied: string; changeGiven: string }): ReceiptDetail {
   return {
-    id: 500,
-    paymentId: 900,
-    invoiceId: 10,
-    policyId: 900,
-    clientId: 155,
+    id: '500',
+    paymentId: '900',
+    invoiceId: '10',
+    policyId: '900',
+    clientId: '155',
     amountDueAfter: '0.00',
     invoiceClosed: true,
     note: null,
     createdAt: '2026-07-14T17:48:07.653Z',
     payment: {
-      id: 900,
-      invoiceId: 10,
-      policyId: 900,
-      clientId: 155,
+      id: '900',
+      invoiceId: '10',
+      policyId: '900',
+      clientId: '155',
       method: 'cash',
       amount: overrides.amountApplied,
       amountApplied: overrides.amountApplied,
@@ -250,7 +250,7 @@ export const NoOpenInvoicesBuildsNewInvoice: Story = {
 
     await expect(args.createInvoiceFn).toHaveBeenCalledWith(
       expect.objectContaining({
-        policyId: 900,
+        policyId: '900',
         items: [
           expect.objectContaining({
             category: 'agency',
@@ -290,7 +290,7 @@ export const OpenInvoiceChooseThenPay: Story = {
     await userEvent.click(screen.getByRole('button', { name: /record payment/i }))
 
     await expect(args.recordPaymentFn).toHaveBeenCalledWith({
-      invoiceId: 10,
+      invoiceId: '10',
       method: 'cash',
       amount: '60.00',
       note: 'Paid at front desk',
@@ -305,7 +305,7 @@ export const OpenInvoiceChooseThenPay: Story = {
 
 export const PreTargetedInvoiceSkipsChoiceAndShowsChange: Story = {
   args: {
-    initialInvoiceId: 10,
+    initialInvoiceId: '10',
     getInvoicesFn: fn(async () => [openInvoice]),
     recordPaymentFn: fn(async () => receiptFor({ amountApplied: '60.00', changeGiven: '40.00' })),
   },

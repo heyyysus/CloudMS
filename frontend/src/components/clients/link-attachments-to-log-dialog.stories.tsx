@@ -9,8 +9,8 @@ import type { PolicyAttachment } from '@/api/policyAttachments'
 import type { PolicyLog } from '@/api/policyLogs'
 
 const declarations: PolicyAttachment = {
-  id: 1,
-  policyId: 900,
+  id: '1',
+  policyId: '900',
   fileName: 'declarations-page.pdf',
   description: 'Declarations page from carrier',
   mimeType: 'application/pdf',
@@ -19,12 +19,12 @@ const declarations: PolicyAttachment = {
   sourceType: 'upload',
   sourceId: null,
   createdAt: '2026-03-02T14:31:00',
-  uploadedBy: { id: 1, name: 'Jane Staff', email: 'jane@example.com' },
+  uploadedBy: { id: '1', name: 'Jane Staff', email: 'jane@example.com' },
 }
 
 const idCard: PolicyAttachment = {
   ...declarations,
-  id: 2,
+  id: '2',
   fileName: 'id-card.png',
   description: null,
   mimeType: 'image/png',
@@ -32,20 +32,20 @@ const idCard: PolicyAttachment = {
 
 const logs: PolicyLog[] = [
   {
-    id: 2,
-    policyId: 900,
+    id: '2',
+    policyId: '900',
     logNumber: 2,
     body: 'Insured called in to inquire about the renewal offer.',
     createdAt: '2026-03-02T14:31:00',
-    author: { id: 1, name: 'Jane Staff', email: 'jane@example.com' },
+    author: { id: '1', name: 'Jane Staff', email: 'jane@example.com' },
   },
   {
-    id: 1,
-    policyId: 900,
+    id: '1',
+    policyId: '900',
     logNumber: 1,
     body: 'Called the client to confirm garaging address.',
     createdAt: '2026-07-14T17:48:07',
-    author: { id: 2, name: 'Tom Reyes', email: 'tom@example.com' },
+    author: { id: '2', name: 'Tom Reyes', email: 'tom@example.com' },
   },
 ]
 
@@ -58,8 +58,8 @@ const meta = {
   component: LinkAttachmentsToLogDialog,
   tags: ['autodocs'],
   args: {
-    policyId: 900,
-    currentUserId: 1,
+    policyId: '900',
+    currentUserId: '1',
     open: true,
     attachments: [declarations, idCard],
     onOpenChange: fn(),
@@ -120,8 +120,8 @@ export const LinksTheSelection: Story = {
     await userEvent.click(screen.getByRole('button', { name: 'Link' }))
 
     await expect(args.linkAttachmentsToLogFn).toHaveBeenCalledWith({
-      logId: 1,
-      attachmentIds: [1, 2],
+      logId: '1',
+      attachmentIds: ['1', '2'],
     })
     await expect(args.onLinked).toHaveBeenCalled()
     await expect(args.onOpenChange).toHaveBeenCalledWith(false)

@@ -14,7 +14,7 @@ const MERGE_FIELDS = [
 ]
 
 const initial: CorrespondenceTemplate = {
-  id: 3,
+  id: '3',
   key: 'correspondence-renewal-reminder-ab12cd34',
   name: 'Renewal Reminder',
   subject: 'Policy {{policyNumber}} renews soon',

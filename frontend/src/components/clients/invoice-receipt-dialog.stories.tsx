@@ -11,7 +11,7 @@ import type { InvoiceDetail } from '@/api/invoices'
 const TS = '2026-07-14T17:48:07.653Z'
 
 const namedInsured: Person = {
-  id: 229,
+  id: '229',
   firstName: 'John',
   lastName: 'Doe',
   dateOfBirth: '1987-07-22',
@@ -23,9 +23,9 @@ const namedInsured: Person = {
 }
 
 const policy: AutoPolicy = {
-  id: 900,
-  clientId: 223,
-  carrierId: 7,
+  id: '900',
+  clientId: '223',
+  carrierId: '7',
   policyNumber: '2052',
   policyAddress1: null,
   policyAddress2: null,
@@ -40,8 +40,8 @@ const policy: AutoPolicy = {
 }
 
 const client: ClientDetail = {
-  id: 223,
-  namedInsuredId: 229,
+  id: '223',
+  namedInsuredId: '229',
   secondNamedInsuredId: null,
   mailingAddress1: null,
   mailingAddress2: null,
@@ -63,7 +63,7 @@ const client: ClientDetail = {
 }
 
 const carrier: Carrier = {
-  id: 7,
+  id: '7',
   name: 'Progressive',
   naic: '12345',
   isActive: true,
@@ -77,10 +77,10 @@ const carrier: Carrier = {
 }
 
 const closedInvoice: InvoiceDetail = {
-  id: 41,
-  policyId: 900,
-  clientId: 223,
-  createdBy: 1,
+  id: '41',
+  policyId: '900',
+  clientId: '223',
+  createdBy: '1',
   status: 'closed',
   total: '600.00',
   amountPaid: '600.00',
@@ -92,19 +92,19 @@ const closedInvoice: InvoiceDetail = {
   updatedAt: TS,
   items: [
     {
-      id: 1,
-      invoiceId: 41,
+      id: '1',
+      invoiceId: '41',
       category: 'sweep',
       type: 'new_business_sweep',
-      carrierId: 7,
+      carrierId: '7',
       description: null,
       amount: '400.00',
       createdAt: TS,
       carrier,
     },
     {
-      id: 2,
-      invoiceId: 41,
+      id: '2',
+      invoiceId: '41',
       category: 'agency',
       type: 'new_business_fee',
       carrierId: null,
@@ -116,10 +116,10 @@ const closedInvoice: InvoiceDetail = {
   ],
   payments: [
     {
-      id: 5,
-      invoiceId: 41,
-      policyId: 900,
-      clientId: 223,
+      id: '5',
+      invoiceId: '41',
+      policyId: '900',
+      clientId: '223',
       method: 'credit_card',
       amount: '600.00',
       amountApplied: '600.00',
@@ -133,11 +133,11 @@ const closedInvoice: InvoiceDetail = {
   ],
   receipts: [
     {
-      id: 88,
-      paymentId: 5,
-      invoiceId: 41,
-      policyId: 900,
-      clientId: 223,
+      id: '88',
+      paymentId: '5',
+      invoiceId: '41',
+      policyId: '900',
+      clientId: '223',
       amountApplied: '600.00',
       changeGiven: '0.00',
       amountDueAfter: '0.00',
@@ -149,17 +149,17 @@ const closedInvoice: InvoiceDetail = {
       createdAt: TS,
     },
   ],
-  createdByUser: { id: 1, name: 'Jane Staff', email: 'jane@example.com' },
+  createdByUser: { id: '1', name: 'Jane Staff', email: 'jane@example.com' },
 }
 
 const closedInvoiceWithChange: InvoiceDetail = {
   ...closedInvoice,
-  id: 43,
+  id: '43',
   payments: [
     {
       ...closedInvoice.payments[0],
-      id: 6,
-      invoiceId: 43,
+      id: '6',
+      invoiceId: '43',
       amount: '650.00',
       amountApplied: '600.00',
       changeGiven: '50.00',
@@ -168,9 +168,9 @@ const closedInvoiceWithChange: InvoiceDetail = {
   receipts: [
     {
       ...closedInvoice.receipts[0],
-      id: 89,
-      paymentId: 6,
-      invoiceId: 43,
+      id: '89',
+      paymentId: '6',
+      invoiceId: '43',
       changeGiven: '50.00',
     },
   ],
@@ -178,7 +178,7 @@ const closedInvoiceWithChange: InvoiceDetail = {
 
 const openInvoice: InvoiceDetail = {
   ...closedInvoice,
-  id: 42,
+  id: '42',
   status: 'open',
   amountPaid: '0.00',
   note: null,
@@ -188,10 +188,10 @@ const openInvoice: InvoiceDetail = {
 
 const voidedInvoice: InvoiceDetail = {
   ...openInvoice,
-  id: 44,
+  id: '44',
   status: 'void',
   voidedAt: TS,
-  voidedBy: 1,
+  voidedBy: '1',
   voidReason: 'Duplicate invoice',
 }
 
@@ -199,7 +199,7 @@ const voidedInvoice: InvoiceDetail = {
 // to void until that payment is voided first.
 const paidOpenInvoice: InvoiceDetail = {
   ...closedInvoice,
-  id: 45,
+  id: '45',
   status: 'open',
   amountPaid: '600.00',
 }
@@ -220,7 +220,7 @@ const meta = {
   component: StatefulInvoiceReceiptDialog,
   tags: ['autodocs'],
   args: {
-    invoiceId: 41,
+    invoiceId: '41',
     client,
     policies: [policy],
     open: true,
@@ -242,7 +242,7 @@ type Story = StoryObj<typeof meta>
 
 export const ClosedInvoiceReceipt: Story = {
   args: {
-    invoiceId: 41,
+    invoiceId: '41',
     getInvoiceFn: fn(async () => closedInvoice),
   },
   play: async ({ args }) => {
@@ -277,7 +277,7 @@ export const ClosedInvoiceReceipt: Story = {
 
 export const ClosedInvoiceReceiptWithChange: Story = {
   args: {
-    invoiceId: 43,
+    invoiceId: '43',
     getInvoiceFn: fn(async () => closedInvoiceWithChange),
   },
   play: async () => {
@@ -288,7 +288,7 @@ export const ClosedInvoiceReceiptWithChange: Story = {
 
 export const OpenInvoiceReceipt: Story = {
   args: {
-    invoiceId: 42,
+    invoiceId: '42',
     getInvoiceFn: fn(async () => openInvoice),
   },
   play: async () => {
@@ -303,7 +303,7 @@ export const OpenInvoiceReceipt: Story = {
 
 export const LoadError: Story = {
   args: {
-    invoiceId: 41,
+    invoiceId: '41',
     getInvoiceFn: fn(async () => {
       throw new ApiError(500, 'Something went wrong')
     }),
@@ -317,7 +317,7 @@ export const LoadError: Story = {
 
 export const AdminSeesVoidAction: Story = {
   args: {
-    invoiceId: 42,
+    invoiceId: '42',
     isAdmin: true,
     getInvoiceFn: fn(async () => openInvoice),
   },
@@ -330,7 +330,7 @@ export const AdminSeesVoidAction: Story = {
 export const NonAdminHasNoVoidAction: Story = {
   args: {
     // Invoice 41 carries an active payment, so this covers both void controls.
-    invoiceId: 41,
+    invoiceId: '41',
     isAdmin: false,
     getInvoiceFn: fn(async () => closedInvoice),
   },
@@ -345,12 +345,12 @@ export const NonAdminHasNoVoidAction: Story = {
 
 export const VoidsASinglePayment: Story = {
   args: {
-    invoiceId: 41,
+    invoiceId: '41',
     isAdmin: true,
     getInvoiceFn: fn(async () => closedInvoice),
     voidPaymentFn: fn(async () => closedInvoice.payments[0]),
     // Spied so the assertion below can prove the invoice was left alone.
-    voidInvoiceFn: fn(async () => ({ ...voidedInvoice, id: 41 })),
+    voidInvoiceFn: fn(async () => ({ ...voidedInvoice, id: '41' })),
   },
   play: async ({ args }) => {
     await expect(await screen.findByText('Invoice #41')).toBeInTheDocument()
@@ -363,7 +363,7 @@ export const VoidsASinglePayment: Story = {
     await userEvent.click(screen.getByRole('button', { name: /void payment/i }))
 
     await waitFor(() =>
-      expect(args.voidPaymentFn).toHaveBeenCalledWith(5, { reason: 'keyed twice' })
+      expect(args.voidPaymentFn).toHaveBeenCalledWith('5', { reason: 'keyed twice' })
     )
     // The invoice itself is untouched by this action.
     await expect(args.voidInvoiceFn).not.toHaveBeenCalled()
@@ -374,11 +374,11 @@ export const VoidsASinglePayment: Story = {
 
 export const CascadesPaymentsThenInvoice: Story = {
   args: {
-    invoiceId: 41,
+    invoiceId: '41',
     isAdmin: true,
     getInvoiceFn: fn(async () => closedInvoice),
     voidPaymentFn: fn(async () => closedInvoice.payments[0]),
-    voidInvoiceFn: fn(async () => ({ ...voidedInvoice, id: 41 })),
+    voidInvoiceFn: fn(async () => ({ ...voidedInvoice, id: '41' })),
   },
   play: async ({ args }) => {
     await expect(await screen.findByText('Invoice #41')).toBeInTheDocument()
@@ -392,8 +392,8 @@ export const CascadesPaymentsThenInvoice: Story = {
     await userEvent.click(screen.getByRole('button', { name: /void 1 payment\(s\) \+ invoice/i }))
 
     // Payment first, then the invoice - the server refuses the other order.
-    await waitFor(() => expect(args.voidPaymentFn).toHaveBeenCalledWith(5, { reason: null }))
-    await waitFor(() => expect(args.voidInvoiceFn).toHaveBeenCalledWith(41, { reason: null }))
+    await waitFor(() => expect(args.voidPaymentFn).toHaveBeenCalledWith('5', { reason: null }))
+    await waitFor(() => expect(args.voidInvoiceFn).toHaveBeenCalledWith('41', { reason: null }))
     await expect(await screen.findByText('Void')).toBeInTheDocument()
     await expect(await screen.findByText(/invoice and 1 payment\(s\) voided/i)).toBeInTheDocument()
   },
@@ -401,7 +401,7 @@ export const CascadesPaymentsThenInvoice: Story = {
 
 export const CascadeReportsPartialProgress: Story = {
   args: {
-    invoiceId: 41,
+    invoiceId: '41',
     isAdmin: true,
     getInvoiceFn: fn(async () => closedInvoice),
     voidPaymentFn: fn(async () => closedInvoice.payments[0]),
@@ -426,7 +426,7 @@ export const CascadeReportsPartialProgress: Story = {
 
 export const VoidedInvoiceHidesAction: Story = {
   args: {
-    invoiceId: 44,
+    invoiceId: '44',
     isAdmin: true,
     getInvoiceFn: fn(async () => voidedInvoice),
   },
@@ -443,10 +443,10 @@ export const VoidedInvoiceHidesAction: Story = {
 
 export const ConfirmsThenVoids: Story = {
   args: {
-    invoiceId: 42,
+    invoiceId: '42',
     isAdmin: true,
     getInvoiceFn: fn(async () => openInvoice),
-    voidInvoiceFn: fn(async () => ({ ...voidedInvoice, id: 42 })),
+    voidInvoiceFn: fn(async () => ({ ...voidedInvoice, id: '42' })),
   },
   play: async ({ args }) => {
     await expect(await screen.findByText('Invoice #42')).toBeInTheDocument()
@@ -463,7 +463,7 @@ export const ConfirmsThenVoids: Story = {
     await userEvent.click(screen.getByRole('button', { name: /void invoice/i }))
 
     await waitFor(() =>
-      expect(args.voidInvoiceFn).toHaveBeenCalledWith(42, { reason: 'Duplicate invoice' })
+      expect(args.voidInvoiceFn).toHaveBeenCalledWith('42', { reason: 'Duplicate invoice' })
     )
     // setQueryData flips the open dialog over to the voided detail.
     await expect(await screen.findByText('Void')).toBeInTheDocument()
@@ -477,7 +477,7 @@ export const ConfirmsThenVoids: Story = {
 
 export const PaymentVoidRefused: Story = {
   args: {
-    invoiceId: 45,
+    invoiceId: '45',
     isAdmin: true,
     getInvoiceFn: fn(async () => paidOpenInvoice),
     voidPaymentFn: fn(async () => {
@@ -490,7 +490,7 @@ export const PaymentVoidRefused: Story = {
     await userEvent.click(screen.getByRole('button', { name: 'Void' }))
     // Submitted with no reason typed, so the body carries an explicit null.
     await userEvent.click(screen.getByRole('button', { name: /void payment/i }))
-    await waitFor(() => expect(args.voidPaymentFn).toHaveBeenCalledWith(5, { reason: null }))
+    await waitFor(() => expect(args.voidPaymentFn).toHaveBeenCalledWith('5', { reason: null }))
 
     // No payments were voided, so the message is the server's, unprefixed.
     const alert = await screen.findByRole('alert')

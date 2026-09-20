@@ -12,7 +12,7 @@ function createTestQueryClient() {
 
 const scheduled: ScheduledEmail[] = [
   {
-    id: 42,
+    id: '42',
     status: 'pending',
     scheduledFor: '2099-01-31T15:00:00.000Z',
     sentAt: null,
@@ -22,13 +22,13 @@ const scheduled: ScheduledEmail[] = [
     subject: null,
     ruleName: '30-day renewal reminder',
     templateName: 'Renewal Notice',
-    policyId: 7,
+    policyId: '7',
     policyNumber: 'POL-1001',
-    clientId: 3,
+    clientId: '3',
     clientName: 'Jane Doe',
   },
   {
-    id: 43,
+    id: '43',
     status: 'pending',
     scheduledFor: '2099-02-14T15:00:00.000Z',
     sentAt: null,
@@ -38,9 +38,9 @@ const scheduled: ScheduledEmail[] = [
     subject: null,
     ruleName: '7-day final notice',
     templateName: 'Documents Needed',
-    policyId: 9,
+    policyId: '9',
     policyNumber: 'POL-1002',
-    clientId: 4,
+    clientId: '4',
     clientName: 'John Smith',
   },
 ]
@@ -108,6 +108,6 @@ export const CancelsAQueuedReminder: Story = {
 
     await userEvent.click(canvas.getAllByRole('button', { name: 'Cancel' })[0])
 
-    await expect(args.cancelScheduledEmailFn).toHaveBeenCalledWith(42)
+    await expect(args.cancelScheduledEmailFn).toHaveBeenCalledWith('42')
   },
 }

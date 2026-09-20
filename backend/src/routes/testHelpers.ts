@@ -10,8 +10,10 @@ import {
   clients,
   emailLog,
   emailTemplates,
+  organizations,
   persons,
   reminderRules,
+  sessions,
   users,
   vehicles,
 } from "../db/schema"
@@ -23,6 +25,7 @@ import {
   createClient,
   createCorrespondenceTemplate,
   createDriver,
+  createMembership,
   createPerson,
   createPolicyLog,
   createReminderRule,
@@ -36,6 +39,7 @@ import type {
   NewClient,
   NewPerson,
   NewVehicle,
+  Organization,
   ReminderRule,
   User,
   UserRole,
@@ -73,14 +77,18 @@ export function isoDaysFromToday(days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-export async function makeTestUser(prefix: string, role: UserRole = "staff"): Promise<User> {
-  return createUser({ email: `${unique(prefix)}@example.com`, role })
+export async function makeTestUser(prefix: string): Promise<User> {
+  return createUser({ email: `${unique(prefix)}@example.com` })
 }
 
-export async function makeSessionCookie(userId: number): Promise<string> {
+// orgId is required here (unlike TestContext.cookie(), which defaults to the
+// context's org) since this module-level helper has no context to default
+// from.
+export async function makeSessionCookie(userId: number, orgId: number): Promise<string> {
   const token = generateSessionToken()
   await createSession({
     userId,
+    orgId,
     tokenHash: hashToken(token),
     expiresAt: new Date(Date.now() + 60 * 60 * 1000),
   })
@@ -99,11 +107,42 @@ export class TestContext {
   private vehicleIds: number[] = []
   private templateIds: number[] = []
   private ruleIds: number[] = []
+  private orgIds: number[] = []
+  // Set the first time org()/user() mints one, so repeated ctx.user() calls
+  // with no explicit orgId land in the same org rather than each getting
+  // their own - most tests need an actor and a target in one org together.
+  private defaultOrgId?: number
 
-  async user(prefix: string, role: UserRole = "staff") {
-    const u = await makeTestUser(prefix, role)
+  // Always inserts a fresh organization - the way to get a second, distinct
+  // org for a cross-org test. The very first call also becomes the context's
+  // default org (see defaultOrg()).
+  async org(): Promise<Organization> {
+    const [o] = await db
+      .insert(organizations)
+      .values({ name: unique("Test Org "), slug: unique("test-org-").slice(0, 64) })
+      .returning()
+    this.orgIds.push(o.id)
+    this.defaultOrgId ??= o.id
+    return o
+  }
+
+  private async defaultOrg(): Promise<number> {
+    if (this.defaultOrgId !== undefined) return this.defaultOrgId
+    return (await this.org()).id
+  }
+
+  async user(prefix: string, role: UserRole = "staff", orgId?: number) {
+    const u = await makeTestUser(prefix)
     this.userIds.push(u.id)
+    await createMembership({ userId: u.id, orgId: orgId ?? (await this.defaultOrg()), role })
     return u
+  }
+
+  // The mechanical replacement for a bare makeSessionCookie(userId) call:
+  // defaults to the context's org instead of requiring every call site to
+  // pass one.
+  async cookie(userId: number, orgId?: number): Promise<string> {
+    return makeSessionCookie(userId, orgId ?? (await this.defaultOrg()))
   }
 
   async person(overrides: Partial<NewPerson> = {}) {
@@ -262,6 +301,13 @@ export class TestContext {
   }
 
   async cleanup() {
+    // Sessions first: sessions.org_id has no ON DELETE clause (schema.ts), so
+    // a session for a tracked user must be gone before organizations below is
+    // deleted. Deleting users would cascade these away too (sessions.user_id
+    // does cascade), but doing it explicitly here decouples the ordering from
+    // that FK rather than relying on it.
+    if (this.userIds.length) await db.delete(sessions).where(inArray(sessions.userId, this.userIds))
+
     // Rules first: scheduled_emails cascades from them, and email_templates
     // is referenced with no cascade so it can only go once its rules have.
     if (this.ruleIds.length)
@@ -282,5 +328,10 @@ export class TestContext {
       await db.delete(emailLog).where(inArray(emailLog.triggeredBy, this.userIds))
       await db.delete(users).where(inArray(users.id, this.userIds))
     }
+    // Organizations last: org_memberships cascades from both users and
+    // organizations, so it needs neither side deleted first, but everything
+    // above (sessions, users) that references an org must already be gone.
+    if (this.orgIds.length)
+      await db.delete(organizations).where(inArray(organizations.id, this.orgIds))
   }
 }

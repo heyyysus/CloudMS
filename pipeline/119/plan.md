@@ -156,18 +156,21 @@ their modules)
    one either. Update-by-id keeps returning `undefined` for a row in another org, which the routes
    already turn into the existing 404.
 
-3. **Parent checks on insert.** Add `repositories/errors.ts`:
+3. **Parent checks on every write that sets a parent FK.** Add `repositories/errors.ts`:
 
    ```ts
-   // A create whose parent row exists but belongs to another organization. Handled
+   // A write whose parent row exists but belongs to another organization. Handled
    // exactly like the foreign-key violation a nonexistent parent id raises, so a
    // cross-org id is indistinguishable from a bad one.
    export class CrossOrgReferenceError extends Error {}
    ```
 
-   Inside each creating repository, look the parent up with `and(eq(id), eq(orgId))` *in the same
-   transaction as the insert* and throw `CrossOrgReferenceError` when it's missing. Then make the
-   mapping identical to today's, per call site:
+   Inside each repository that writes a parent FK, look the parent up with
+   `and(eq(id), eq(orgId))` *in the same transaction as the write* and throw
+   `CrossOrgReferenceError` when it's missing. This covers inserts **and updates**: every
+   `update*Body` is a `.partial()` of the create body (`schemas.ts:69,79,170,176`) and `omitMeta`
+   strips only `id`/`createdAt`/`updatedAt`, so a `PATCH` still accepts every parent FK a `POST`
+   does. Then make the mapping identical to today's, per call site:
 
    - `app.ts:79` error handler — add a `CrossOrgReferenceError` branch next to the `23503` branch,
      returning the same `409 { error: "Referenced by or references other records" }`. This covers
@@ -181,8 +184,31 @@ their modules)
      lookup at line 89 so a person in another org takes that same path. Same for the
      `drivers.personId` reuse lookup at line 96 and both inserts.
 
-   Parents to check: vehicle → policy; policy → client and carrier; policy driver → policy and
-   driver; phone/email → client; client → `namedInsuredId` and `secondNamedInsuredId`.
+   Parents to check on insert: vehicle → policy; policy → client and carrier; policy driver →
+   policy and driver; phone/email → client; client → `namedInsuredId` and
+   `secondNamedInsuredId`.
+
+   The same pairs on the **update** side, checked whenever the key is present in the input (an
+   absent key leaves the FK alone and needs no lookup):
+
+   - `updateAutoPolicy` / `updateAutoPolicyWithDetails` (`autoPolicies.ts:159,177`) — `clientId`
+     and `carrierId`. `handlePolicyWriteError`'s `CrossOrgReferenceError` branch, added above,
+     already maps these, so the update paths need no new route wiring.
+   - `updateClient` (`clients.ts:33`) — `namedInsuredId` and `secondNamedInsuredId`, same check
+     as `createClient`'s.
+   - `updateVehicle` (`vehicles.ts:24`) — `policyId`, same check as `createVehicle`'s, routed
+     through the `app.ts` global handler.
+
+   An org-scoped `WHERE` on the row being updated is *not* sufficient by itself: the row is ours,
+   the FK we are repointing it at is not, and Postgres is satisfied either way once both rows live
+   in the same table. Today a bad id raises 23503; after this issue it resolves cleanly. This is
+   the gap the first revision of this plan left open — and step 4 below depends on it being
+   closed.
+
+   `updateDriver` (`drivers.ts:20`) has the same blind `.set({ ...input })` with `personId` in
+   `Partial<NewDriver>`. No route exposes it today, so it is not reachable — but give it the
+   `orgId` treatment and the `personId` check along with the others, so it cannot become
+   reachable later without one.
 
 4. **Relational queries.** `getClientWithDetails` and `getPolicyWithDetails` filter the root row on
    `orgId`, and each nested *many* relation gets its own org condition, e.g.:
@@ -200,9 +226,15 @@ their modules)
 
    Leave the to-*one* parents (`namedInsured`, `secondNamedInsured`, `client`, `carrier`,
    `policyDrivers.driver.person`) unfiltered: a filtered-out to-one relation comes back `null` and
-   changes the non-null response shape the frontend consumes. Their org is guaranteed by the
-   insert-side parent checks in step 3 instead. Call this out in the PR body — it is the one place
-   the "constrain every join" rule is deliberately softened.
+   changes the non-null response shape the frontend consumes. Their org is guaranteed by step 3's
+   parent checks instead — which holds only because those checks now cover updates as well as
+   inserts. Had they stayed insert-only, `PATCH /policies/:id { clientId: <org B's client> }`
+   would write a cross-org link the database accepts, and this unfiltered `client` relation would
+   then hand back org B's name, address, phone and email on the next `GET` of a policy org A
+   legitimately owns — a cross-tenant PII read reachable by any authenticated staff member,
+   behind nothing but an enumerable integer id. Call this out in the PR body — it is the one
+   place the "constrain every join" rule is deliberately softened, and it is load-bearing on
+   step 3.
 
 5. **Search.** `searchClients(orgId, q, limit)` adds `eq(clients.orgId, orgId)` to the outer
    `where`, `eq(persons.orgId, orgId)` / `eq(clientPhones.orgId, orgId)` /
@@ -243,6 +275,33 @@ their modules)
      expect((await request(app).delete(`/vehicles/${vehicle.id}`).set("Cookie", cookie)).status).toBe(404)
    })
    ```
+
+   And — the case the first revision missed — one per route whose update body carries a parent
+   FK, PATCHing a row the caller **owns** with an FK pointed into the other org:
+
+   ```ts
+   it("rejects a PATCH repointing a FK at another org's row", async () => {
+     const user = await ctx.user("vehicles-crossorg")     // creates + fixes the default org
+     const cookie = await ctx.cookie(user.id)
+     const mine = await ctx.vehicle()                     // in the session's org
+     const other = await ctx.org()                        // second org
+     const theirPolicy = await ctx.policy({ orgId: other.id })
+
+     const res = await request(app)
+       .patch(`/vehicles/${mine.id}`)
+       .set("Cookie", cookie)
+       .send({ policyId: theirPolicy.id })
+
+     expect(res.status).toBe(409)                         // app.ts CrossOrgReferenceError branch
+     const after = await request(app).get(`/vehicles/${mine.id}`).set("Cookie", cookie)
+     expect(after.body.policyId).toBe(mine.policyId)      // still pointing at our own policy
+   })
+   ```
+
+   Same shape for `PATCH /policies/:id` with `clientId` / `carrierId` (expect `400`, via
+   `handlePolicyWriteError`) and `PATCH /clients/:id` with `namedInsuredId` (expect `409`, via the
+   global handler). Assert the row is **unchanged** afterwards, not just the status — a
+   status-only assertion also passes against a handler that rejected for an unrelated reason.
 
    **Ordering trap:** `ctx.org()` sets the context's default org on its *first* call
    (`testHelpers.ts:125`), so call `ctx.user()`/`ctx.cookie()` **before** minting the second org,
@@ -291,8 +350,10 @@ yes
   production rollout on a database that already has rows should be sequenced deliberately (the
   same caveat #117's PR body records).
 - **To-one relations in the `with:` trees are not org-filtered** (step 4). Justified by response
-  shape and upheld by the insert-side parent checks, but it is a genuine softening of the issue's
-  rule 3 and should be reviewed explicitly. RLS (sub-issue 7) is the backstop.
+  shape and upheld by step 3's parent checks on **both** inserts and updates, but it is a genuine
+  softening of the issue's rule 3 and should be reviewed explicitly. The dependency is strict: if
+  any write path that sets one of these FKs ever skips its org check, this is the relation that
+  serves the other org's row. RLS (sub-issue 7) is the backstop.
 - **`jobs/dispatcher.ts` runs without a request.** Taking the org from the claimed
   `scheduled_emails` row is correct, but the dispatcher/planner as a whole is sub-issue 6 — this
   issue only does the minimum to keep it compiling and correct.

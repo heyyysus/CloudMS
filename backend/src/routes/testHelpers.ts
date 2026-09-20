@@ -8,6 +8,7 @@ import {
   autoPolicies,
   carriers,
   clients,
+  drivers,
   emailLog,
   emailTemplates,
   organizations,
@@ -368,6 +369,12 @@ export class TestContext {
       // is never in templateIds. Sweep by org here too, or the FK from
       // email_templates.org_id blocks the delete below.
       await db.delete(emailTemplates).where(inArray(emailTemplates.orgId, this.orgIds))
+      // A nested "new" driver spec on a policy create/update (routes/policies.ts,
+      // autoPolicies.ts's linkPolicyDrivers) creates its person+driver rows
+      // server-side, so their ids never reach personIds above. Sweep both by
+      // org here too, or drivers.org_id/persons.org_id block the delete below.
+      await db.delete(drivers).where(inArray(drivers.orgId, this.orgIds))
+      await db.delete(persons).where(inArray(persons.orgId, this.orgIds))
       await db.delete(organizations).where(inArray(organizations.id, this.orgIds))
       this.orgIds = []
     }

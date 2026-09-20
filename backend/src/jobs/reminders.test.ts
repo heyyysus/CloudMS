@@ -43,7 +43,7 @@ afterEach(async () => {
   process.env = { ...ORIGINAL_ENV }
 })
 
-async function rowsFor(policyId: number) {
+async function rowsFor(policyId: string) {
   return db.select().from(scheduledEmails).where(eq(scheduledEmails.policyId, policyId))
 }
 
@@ -336,7 +336,7 @@ function sendTo(
   return call as [string, RequestInit]
 }
 
-async function rowFor(policyId: number) {
+async function rowFor(policyId: string) {
   const [row] = await db
     .select()
     .from(scheduledEmails)
@@ -559,7 +559,7 @@ describe("reminder rules", () => {
 
       const res = await request(app).get("/reminder-rules").set("Cookie", cookie)
 
-      const found = res.body.rules.find((r: { id: number }) => r.id === rule.id)
+      const found = res.body.rules.find((r: { id: string }) => r.id === rule.id)
       expect(found.template.name).toBe("Renewal Notice")
     })
   })
@@ -787,7 +787,7 @@ describe("scheduled emails", () => {
     const res = await request(app).get("/scheduled-emails?status=pending").set("Cookie", cookie)
 
     expect(res.status).toBe(200)
-    const found = res.body.scheduled.find((s: { policyId: number }) => s.policyId === policy.id)
+    const found = res.body.scheduled.find((s: { policyId: string }) => s.policyId === policy.id)
     expect(found.policyNumber).toBe(policy.policyNumber)
     expect(found.clientName).toBeTruthy()
   })

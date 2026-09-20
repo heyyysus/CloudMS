@@ -18,7 +18,7 @@ describe("GET /carriers", () => {
 
     const res = await request(app).get("/carriers").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.some((c: { id: number }) => c.id === carrier.id)).toBe(true)
+    expect(res.body.some((c: { id: string }) => c.id === carrier.id)).toBe(true)
   })
 })
 

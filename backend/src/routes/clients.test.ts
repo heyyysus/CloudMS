@@ -18,7 +18,7 @@ describe("GET /clients", () => {
 
     const res = await request(app).get("/clients").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.some((c: { id: number }) => c.id === client.id)).toBe(true)
+    expect(res.body.some((c: { id: string }) => c.id === client.id)).toBe(true)
   })
 })
 
@@ -177,7 +177,7 @@ describe("GET /clients?q=", () => {
 
     const res = await request(app).get("/clients?q=555-9876").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.some((c: { id: number }) => c.id === client.id)).toBe(true)
+    expect(res.body.some((c: { id: string }) => c.id === client.id)).toBe(true)
   })
 
   it("finds a client by cross-column full name", async () => {
@@ -188,7 +188,7 @@ describe("GET /clients?q=", () => {
 
     const res = await request(app).get("/clients?q=marisol alva").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.some((c: { id: number }) => c.id === client.id)).toBe(true)
+    expect(res.body.some((c: { id: string }) => c.id === client.id)).toBe(true)
   })
 
   it("returns 400 when q is too short", async () => {

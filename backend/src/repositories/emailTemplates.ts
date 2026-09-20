@@ -87,7 +87,7 @@ export async function upsertEmailTemplate(input: {
 }): Promise<EmailTemplate> {
   const [row] = await db
     .insert(emailTemplates)
-    .values(input)
+    .values({ ...input, kind: "welcome" })
     .onConflictDoUpdate({
       target: [emailTemplates.orgId, emailTemplates.key],
       set: {

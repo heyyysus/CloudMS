@@ -161,3 +161,15 @@ change, just this runner's baseline).
 No `.github/workflows/` changes were needed for this sub-issue.
 
 Branch is pushed: `agent/issue-118`.
+
+## Docs
+
+`docs/API.md`, `docs/AUTH_SESSIONS_EXPLAINED.md`, and `docs/multitenancy.md`
+were already updated by prior commits on this branch (`1496377`, `e60b127`,
+`2d43d89`); verified them against `auth/routes.ts`, `auth/middleware.ts`,
+`routes/users.ts`, and `routes/schemas.ts` and they accurately reflect the
+final code (`/auth/org`'s `setActiveOrgBody` validation, `ORG_REQUIRED`,
+`requireSession`/`requireAuth` split, and the membership-scoped Users routes
+including `DELETE`/`restore`). No further doc changes needed. `README.md`
+and `docs/frontend-ui-design.md` untouched: no new env vars/scripts, and the
+frontend has no changes in this sub-issue.

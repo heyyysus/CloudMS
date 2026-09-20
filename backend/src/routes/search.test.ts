@@ -77,4 +77,30 @@ describe("GET /search", () => {
       false
     )
   })
+
+  it("does not see a client or policy from another org", async () => {
+    const user = await ctx.user("search-wrongorg")
+    const cookie = await ctx.cookie(user.id)
+    const other = await ctx.org()
+    const person = await ctx.person({
+      orgId: other.id,
+      firstName: "Search",
+      lastName: "Wrongorg99",
+    })
+    const client = await ctx.client({ orgId: other.id, namedInsuredId: person.id })
+    const policy = await ctx.policy({
+      orgId: other.id,
+      clientId: client.id,
+      policyNumber: "WRONGORG99-POL",
+    })
+
+    const byName = await request(app).get("/search?q=Wrongorg99").set("Cookie", cookie)
+    expect(byName.status).toBe(200)
+    expect(byName.body.clients).toEqual([])
+    expect(byName.body.policies).toEqual([])
+
+    const byPolicy = await request(app).get("/search?q=WRONGORG99-POL").set("Cookie", cookie)
+    expect(byPolicy.body.clients).toEqual([])
+    expect(byPolicy.body.policies).toEqual([])
+  })
 })

@@ -129,6 +129,20 @@ describe("POST /carriers", () => {
     expect(res.status).toBe(409)
     expect(res.body.error).toBe("A carrier with this NAIC already exists")
   })
+
+  it("allows the same NAIC in a different org", async () => {
+    const user = await ctx.user("carriers-dup-otherorg", "admin")
+    const cookie = await ctx.cookie(user.id)
+    const other = await ctx.org()
+    const theirs = await ctx.carrier({ orgId: other.id })
+
+    const res = await request(app)
+      .post("/carriers")
+      .set("Cookie", cookie)
+      .send({ name: "Same NAIC Other Org", naic: theirs.naic })
+    expect(res.status).toBe(201)
+    ctx.track("carrier", res.body.id)
+  })
 })
 
 describe("PATCH /carriers/:id", () => {

@@ -1,9 +1,10 @@
 import request from "supertest"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
+import { ROW_ID_PATTERN } from "../db/ids"
 import { createPolicyAttachment, storeGeneratedPolicyAttachment } from "../repositories"
 import { putObject } from "../storage/r2"
-import { TestContext } from "./testHelpers"
+import { MISSING_ROW_ID, TestContext } from "./testHelpers"
 
 // The auto-link tests at the bottom create invoices and payments, which upload
 // generated PDFs. Mocked so tests don't need real R2 credentials.
@@ -174,7 +175,7 @@ describe("POST /policy-log-attachments", () => {
         await request(app)
           .post("/policy-log-attachments")
           .set("Cookie", cookie)
-          .send({ logId: 999999999, attachmentIds: [a.id] })
+          .send({ logId: MISSING_ROW_ID, attachmentIds: [a.id] })
       ).status
     ).toBe(404)
 
@@ -183,7 +184,7 @@ describe("POST /policy-log-attachments", () => {
         await request(app)
           .post("/policy-log-attachments")
           .set("Cookie", cookie)
-          .send({ logId: log.id, attachmentIds: [999999999] })
+          .send({ logId: log.id, attachmentIds: [MISSING_ROW_ID] })
       ).status
     ).toBe(404)
   })
@@ -232,7 +233,7 @@ describe("DELETE /policy-log-attachments/:id", () => {
     const user = await ctx.user("logatt-del-404")
     const cookie = await ctx.cookie(user.id)
     expect(
-      (await request(app).delete("/policy-log-attachments/999999999").set("Cookie", cookie)).status
+      (await request(app).delete(`/policy-log-attachments/${MISSING_ROW_ID}`).set("Cookie", cookie)).status
     ).toBe(404)
   })
 })
@@ -364,10 +365,10 @@ describe("auto-linked generated documents", () => {
       sourceType: "policy_change",
       sourceId: policy.id,
       createdBy: user.id,
-      linkToLogId: 999999999,
+      linkToLogId: MISSING_ROW_ID,
     })
 
-    expect(attachment.id).toBeGreaterThan(0)
+    expect(attachment.id).toMatch(ROW_ID_PATTERN)
     expect(await links(policy.id, cookie)).toEqual([])
   })
 })

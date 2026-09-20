@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
 import { attachmentKeyPrefix, createPolicyAttachment } from "../repositories"
 import { getPresignedDownloadUrl, headObject } from "../storage/r2"
-import { TestContext } from "./testHelpers"
+import { MISSING_ROW_ID, TestContext } from "./testHelpers"
 
 // getPresignedDownloadUrl and headObject are mocked so tests don't need real
 // R2 credentials; asserting on the download call's args is how these tests
@@ -37,7 +37,7 @@ describe("GET /policy-attachments/:id/link", () => {
     const cookie = await ctx.cookie(user.id)
 
     expect(
-      (await request(app).get("/policy-attachments/999999999/link").set("Cookie", cookie)).status
+      (await request(app).get(`/policy-attachments/${MISSING_ROW_ID}/link`).set("Cookie", cookie)).status
     ).toBe(404)
   })
 

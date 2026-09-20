@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
 import { CORRESPONDENCE_MERGE_FIELDS } from "../emails"
 import { deleteCorrespondenceTemplate } from "../repositories"
-import { TestContext } from "./testHelpers"
+import { MISSING_ROW_ID, TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 
@@ -129,7 +129,7 @@ describe("correspondence templates", () => {
     it("returns 404 for a missing id", async () => {
       const cookie = await adminCookie("corr-update-404")
       const res = await request(app)
-        .patch("/correspondence-templates/99999999")
+        .patch(`/correspondence-templates/${MISSING_ROW_ID}`)
         .set("Cookie", cookie)
         .send(VALID_BODY)
 
@@ -187,7 +187,7 @@ describe("correspondence templates", () => {
     it("returns 404 for a missing id", async () => {
       const cookie = await adminCookie("corr-delete-404")
       const res = await request(app)
-        .delete("/correspondence-templates/99999999")
+        .delete(`/correspondence-templates/${MISSING_ROW_ID}`)
         .set("Cookie", cookie)
       expect(res.status).toBe(404)
     })

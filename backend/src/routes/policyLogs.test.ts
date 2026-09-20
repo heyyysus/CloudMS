@@ -1,7 +1,7 @@
 import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
-import { TestContext } from "./testHelpers"
+import { MISSING_ROW_ID, TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 afterEach(() => ctx.cleanup())
@@ -140,7 +140,7 @@ describe("POST /policy-logs", () => {
         await request(app)
           .post("/policy-logs")
           .set("Cookie", cookie)
-          .send({ policyId: 999999999, body: "x" })
+          .send({ policyId: MISSING_ROW_ID, body: "x" })
       ).status
     ).toBe(404)
   })

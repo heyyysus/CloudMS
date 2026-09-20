@@ -70,6 +70,7 @@ emailTemplatesRouter.put(
       subject,
       body,
       updatedBy: req.user!.id,
+      orgId: req.orgId!,
     })
     res.json({ template, mergeFields })
   }

@@ -23,7 +23,7 @@ policyLogsRouter.post("/policy-logs", requireAuth, async (req: Request, res: Res
     return
   }
 
-  const policy = await findAutoPolicyById(parsed.data.policyId)
+  const policy = await findAutoPolicyById(req.orgId!, parsed.data.policyId)
   if (!policy) {
     res.status(404).json({ error: "Policy not found" })
     return

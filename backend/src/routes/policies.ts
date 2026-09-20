@@ -8,6 +8,7 @@ import {
 import {
   createAutoPolicyWithDetails,
   createPolicyLog,
+  CrossOrgReferenceError,
   deleteAutoPolicy,
   getClientWithDetails,
   getPolicyWithDetails,
@@ -65,7 +66,7 @@ async function recordPolicyChangeFormUnsafe(
   }
 
   try {
-    const client = await getClientWithDetails(after.clientId)
+    const client = await getClientWithDetails(req.orgId!, after.clientId)
     const clientName = client
       ? `${client.namedInsured.firstName} ${client.namedInsured.lastName}`
       : "Unknown client"
@@ -107,6 +108,10 @@ function handlePolicyWriteError(err: unknown, res: Response): boolean {
     res.status(400).json({ error: err.message })
     return true
   }
+  if (err instanceof CrossOrgReferenceError) {
+    res.status(400).json({ error: "Invalid client or carrier" })
+    return true
+  }
   if (isPgUniqueViolation(err, "auto_policies_org_id_policy_number_unique")) {
     res.status(409).json({ error: "Policy number already exists" })
     return true
@@ -129,7 +134,7 @@ policiesRouter.get("/policies", requireAuth, async (req: Request, res: Response)
       res.status(400).json({ error: firstIssue(parsed.error) })
       return
     }
-    res.json(await searchPolicies(parsed.data.q, 50))
+    res.json(await searchPolicies(req.orgId!, parsed.data.q, 50))
     return
   }
 
@@ -139,18 +144,18 @@ policiesRouter.get("/policies", requireAuth, async (req: Request, res: Response)
       res.status(400).json({ error: "Invalid clientId" })
       return
     }
-    res.json(await listAutoPoliciesByClientId(clientId.data))
+    res.json(await listAutoPoliciesByClientId(req.orgId!, clientId.data))
     return
   }
 
-  res.json(await listAutoPolicies())
+  res.json(await listAutoPolicies(req.orgId!))
 })
 
 policiesRouter.get("/policies/:id", requireAuth, async (req: Request, res: Response) => {
   const id = parseId(req.params.id, res)
   if (id === undefined) return
 
-  const policy = await getPolicyWithDetails(id)
+  const policy = await getPolicyWithDetails(req.orgId!, id)
   if (!policy) {
     res.status(404).json({ error: "Policy not found" })
     return
@@ -166,7 +171,7 @@ policiesRouter.post("/policies", requireAuth, async (req: Request, res: Response
   }
 
   try {
-    res.status(201).json(await createAutoPolicyWithDetails(parsed.data))
+    res.status(201).json(await createAutoPolicyWithDetails(req.orgId!, parsed.data))
   } catch (err) {
     if (!handlePolicyWriteError(err, res)) throw err
   }
@@ -182,7 +187,7 @@ policiesRouter.patch("/policies/:id", requireAuth, async (req: Request, res: Res
     return
   }
 
-  const before = await getPolicyWithDetails(id)
+  const before = await getPolicyWithDetails(req.orgId!, id)
   if (!before) {
     res.status(404).json({ error: "Policy not found" })
     return
@@ -193,7 +198,7 @@ policiesRouter.patch("/policies/:id", requireAuth, async (req: Request, res: Res
   const { endorsementEffectiveDate, ...policyInput } = parsed.data
 
   try {
-    const policy = await updateAutoPolicyWithDetails(id, policyInput)
+    const policy = await updateAutoPolicyWithDetails(req.orgId!, id, policyInput)
     if (!policy) {
       res.status(404).json({ error: "Policy not found" })
       return
@@ -216,7 +221,7 @@ policiesRouter.delete(
     const id = parseId(req.params.id, res)
     if (id === undefined) return
 
-    const deleted = await deleteAutoPolicy(id)
+    const deleted = await deleteAutoPolicy(req.orgId!, id)
     if (!deleted) {
       res.status(404).json({ error: "Policy not found" })
       return

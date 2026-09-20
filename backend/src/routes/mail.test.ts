@@ -114,7 +114,7 @@ describe("POST /clients/:clientId/send-email", () => {
     const user = await ctx.user("mail-unknownto", "admin")
     const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
-    await addEmailToClient(client.id, "onfile@example.com")
+    await addEmailToClient(await ctx.orgId(), client.id, "onfile@example.com")
 
     const res = await request(app)
       .post(`/clients/${client.id}/send-email`)
@@ -129,8 +129,8 @@ describe("POST /clients/:clientId/send-email", () => {
     const user = await ctx.user("mail-allon", "admin")
     const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
-    await addEmailToClient(client.id, "first@example.com")
-    await addEmailToClient(client.id, "second@example.com")
+    await addEmailToClient(await ctx.orgId(), client.id, "first@example.com")
+    await addEmailToClient(await ctx.orgId(), client.id, "second@example.com")
     const fetchMock = stubResend({ id: "msg_1" })
 
     const res = await request(app)
@@ -153,8 +153,8 @@ describe("POST /clients/:clientId/send-email", () => {
     const user = await ctx.user("mail-subset", "admin")
     const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
-    await addEmailToClient(client.id, "First@Example.com")
-    await addEmailToClient(client.id, "second@example.com")
+    await addEmailToClient(await ctx.orgId(), client.id, "First@Example.com")
+    await addEmailToClient(await ctx.orgId(), client.id, "second@example.com")
     stubResend({ id: "msg_2" })
 
     const res = await request(app)
@@ -172,7 +172,7 @@ describe("POST /clients/:clientId/send-email", () => {
     const user = await ctx.user("mail-unconfigured", "admin")
     const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
-    await addEmailToClient(client.id, "onfile@example.com")
+    await addEmailToClient(await ctx.orgId(), client.id, "onfile@example.com")
 
     const res = await request(app)
       .post(`/clients/${client.id}/send-email`)
@@ -187,7 +187,7 @@ describe("POST /clients/:clientId/send-email", () => {
     const user = await ctx.user("mail-5xx", "admin")
     const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
-    await addEmailToClient(client.id, "onfile@example.com")
+    await addEmailToClient(await ctx.orgId(), client.id, "onfile@example.com")
     stubResend(
       { name: "rate_limit_exceeded", message: "Too many requests." },
       { ok: false, status: 429 }
@@ -241,7 +241,7 @@ async function makeSendFixture(prefix: string, role: "staff" | "admin" = "staff"
   const cookie = await ctx.cookie(user.id)
   const person = await ctx.person({ firstName: "Jane", lastName: "Doe" })
   const client = await ctx.client({ namedInsuredId: person.id })
-  await addEmailToClient(client.id, "jane@example.com")
+  await addEmailToClient(await ctx.orgId(), client.id, "jane@example.com")
   const carrier = await ctx.carrier({ name: "Progressive" })
   const policy = await ctx.policy({ clientId: client.id, carrierId: carrier.id })
   return { user, cookie, client, carrier, policy }

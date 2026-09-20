@@ -1,18 +1,32 @@
 import { eq } from "drizzle-orm"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest"
 import { db } from "../db"
-import { persons } from "../db/schema"
+import { organizations, persons } from "../db/schema"
 import { createPerson, deletePerson, findPersonById, listPersons, updatePerson } from "./persons"
 
 const testFirstName = "PersonsRepoTest"
+
+let orgId: string
+
+beforeAll(async () => {
+  const [org] = await db
+    .insert(organizations)
+    .values({ name: "Persons Repo Test Org", slug: `persons-repo-test-${Date.now()}` })
+    .returning()
+  orgId = org.id
+})
 
 afterEach(async () => {
   await db.delete(persons).where(eq(persons.firstName, testFirstName))
 })
 
+afterAll(async () => {
+  await db.delete(organizations).where(eq(organizations.id, orgId))
+})
+
 describe("persons repository", () => {
   it("creates and finds a person", async () => {
-    const created = await createPerson({
+    const created = await createPerson(orgId, {
       firstName: testFirstName,
       lastName: "Create",
       dateOfBirth: "1990-01-01",
@@ -20,12 +34,12 @@ describe("persons repository", () => {
       relationToInsured: "self",
     })
 
-    const found = await findPersonById(created.id)
+    const found = await findPersonById(orgId, created.id)
     expect(found?.lastName).toBe("Create")
   })
 
   it("lists persons including the created one", async () => {
-    const created = await createPerson({
+    const created = await createPerson(orgId, {
       firstName: testFirstName,
       lastName: "List",
       dateOfBirth: "1990-01-01",
@@ -33,12 +47,12 @@ describe("persons repository", () => {
       relationToInsured: "self",
     })
 
-    const all = await listPersons()
+    const all = await listPersons(orgId)
     expect(all.some((p) => p.id === created.id)).toBe(true)
   })
 
   it("updates a person", async () => {
-    const created = await createPerson({
+    const created = await createPerson(orgId, {
       firstName: testFirstName,
       lastName: "Before",
       dateOfBirth: "1990-01-01",
@@ -46,12 +60,12 @@ describe("persons repository", () => {
       relationToInsured: "self",
     })
 
-    const updated = await updatePerson(created.id, { lastName: "After" })
+    const updated = await updatePerson(orgId, created.id, { lastName: "After" })
     expect(updated?.lastName).toBe("After")
   })
 
   it("deletes a person", async () => {
-    const created = await createPerson({
+    const created = await createPerson(orgId, {
       firstName: testFirstName,
       lastName: "Delete",
       dateOfBirth: "1990-01-01",
@@ -59,8 +73,8 @@ describe("persons repository", () => {
       relationToInsured: "self",
     })
 
-    const result = await deletePerson(created.id)
+    const result = await deletePerson(orgId, created.id)
     expect(result).toBe(true)
-    expect(await findPersonById(created.id)).toBeUndefined()
+    expect(await findPersonById(orgId, created.id)).toBeUndefined()
   })
 })

@@ -6,7 +6,7 @@ import { chunk, faker, toDateString } from "./rng"
 export interface Household {
   client: Client
   // Person ids of every household member old enough to plausibly drive.
-  driverPersonIds: number[]
+  driverPersonIds: string[]
   zip: string
 }
 

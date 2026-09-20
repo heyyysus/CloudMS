@@ -3,16 +3,16 @@ import { db } from "../db"
 import { clientEmails } from "../db/schema"
 import type { ClientEmail } from "../types"
 
-export async function listEmailsByClientId(clientId: number): Promise<ClientEmail[]> {
+export async function listEmailsByClientId(clientId: string): Promise<ClientEmail[]> {
   return db.select().from(clientEmails).where(eq(clientEmails.clientId, clientId))
 }
 
-export async function addEmailToClient(clientId: number, email: string): Promise<ClientEmail> {
+export async function addEmailToClient(clientId: string, email: string): Promise<ClientEmail> {
   const [row] = await db.insert(clientEmails).values({ clientId, email }).returning()
   return row
 }
 
-export async function deleteEmail(id: number): Promise<boolean> {
+export async function deleteEmail(id: string): Promise<boolean> {
   const deleted = await db
     .delete(clientEmails)
     .where(eq(clientEmails.id, id))
@@ -21,7 +21,7 @@ export async function deleteEmail(id: number): Promise<boolean> {
 }
 
 export async function replaceClientEmails(
-  clientId: number,
+  clientId: string,
   emails: string[]
 ): Promise<ClientEmail[]> {
   return db.transaction(async (tx) => {

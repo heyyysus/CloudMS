@@ -30,7 +30,7 @@ export async function deleteSessionByTokenHash(tokenHash: string): Promise<boole
 // Kills a user's sessions bound to one org, leaving their sessions in other
 // orgs (and any org-less session) alive - used when a membership is
 // deactivated.
-export async function deleteSessionsByUserIdAndOrg(userId: number, orgId: number): Promise<number> {
+export async function deleteSessionsByUserIdAndOrg(userId: string, orgId: string): Promise<number> {
   const deleted = await db
     .delete(sessions)
     .where(and(eq(sessions.userId, userId), eq(sessions.orgId, orgId)))
@@ -39,8 +39,8 @@ export async function deleteSessionsByUserIdAndOrg(userId: number, orgId: number
 }
 
 export async function setSessionOrg(
-  sessionId: number,
-  orgId: number
+  sessionId: string,
+  orgId: string
 ): Promise<Session | undefined> {
   const [row] = await db
     .update(sessions)

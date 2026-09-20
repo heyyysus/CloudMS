@@ -6,17 +6,17 @@ import { putObject } from "../storage/r2"
 import type { AttachmentSourceType } from "../types"
 
 export interface PolicyAttachmentWithUploader {
-  id: number
-  policyId: number
+  id: string
+  policyId: string
   fileName: string
   description: string | null
   mimeType: string
   sizeBytes: number
   isVoided: boolean
   sourceType: AttachmentSourceType
-  sourceId: number | null
+  sourceId: string | null
   createdAt: Date
-  uploadedBy: { id: number; name: string | null; email: string }
+  uploadedBy: { id: string; name: string | null; email: string }
 }
 
 // storageKey is deliberately absent - see listPolicyAttachmentsByPolicyId.
@@ -38,7 +38,7 @@ export const attachmentPublicColumns = {
 // Every R2 object for a policy lives under this prefix. Presign generates keys
 // with it, confirm re-checks it so an upload presigned for one policy can't be
 // confirmed against another, and generated documents reuse it.
-export function attachmentKeyPrefix(policyId: number): string {
+export function attachmentKeyPrefix(policyId: string): string {
   return `policy-attachments/${policyId}/`
 }
 
@@ -50,7 +50,7 @@ export function attachmentKeyPrefix(policyId: number): string {
 // a payment that was reversed. Admins pass includeVoided to get the full
 // audit trail back.
 export async function listPolicyAttachmentsByPolicyId(
-  policyId: number,
+  policyId: string,
   options?: { includeVoided?: boolean }
 ): Promise<PolicyAttachmentWithUploader[]> {
   const rows = await db.query.policyAttachments.findMany({
@@ -64,7 +64,7 @@ export async function listPolicyAttachmentsByPolicyId(
   return rows.map(({ createdByUser, ...rest }) => ({ ...rest, uploadedBy: createdByUser }))
 }
 
-export function findPolicyAttachmentById(id: number) {
+export function findPolicyAttachmentById(id: string) {
   return db.query.policyAttachments.findFirst({ where: eq(policyAttachments.id, id) })
 }
 
@@ -75,7 +75,7 @@ function startOfToday(): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate())
 }
 
-export async function countAttachmentsCreatedTodayByUser(userId: number): Promise<number> {
+export async function countAttachmentsCreatedTodayByUser(userId: string): Promise<number> {
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)` })
     .from(policyAttachments)
@@ -86,15 +86,15 @@ export async function countAttachmentsCreatedTodayByUser(userId: number): Promis
 }
 
 export async function createPolicyAttachment(input: {
-  policyId: number
+  policyId: string
   fileName: string
   description?: string | null
   storageKey: string
   mimeType: string
   sizeBytes: number
   sourceType?: AttachmentSourceType
-  sourceId?: number | null
-  createdBy: number
+  sourceId?: string | null
+  createdBy: string
 }): Promise<PolicyAttachmentWithUploader> {
   const [row] = await db
     .insert(policyAttachments)
@@ -116,7 +116,7 @@ export async function createPolicyAttachment(input: {
 // and no size cap or daily quota - these documents are produced by the server
 // itself.
 export async function storeGeneratedPolicyAttachment(input: {
-  policyId: number
+  policyId: string
   pdf: Buffer
   // Display name, extension included - it becomes the download filename.
   fileName: string
@@ -124,11 +124,11 @@ export async function storeGeneratedPolicyAttachment(input: {
   keySlug: string
   description: string | null
   sourceType: AttachmentSourceType
-  sourceId: number
-  createdBy: number
+  sourceId: string
+  createdBy: string
   // The log this document belongs to, when the same action wrote one, so the
   // document shows up under that log without anyone linking it by hand.
-  linkToLogId?: number
+  linkToLogId?: string
 }): Promise<PolicyAttachmentWithUploader> {
   const storageKey = `${attachmentKeyPrefix(input.policyId)}${randomUUID()}-${input.keySlug}.pdf`
   await putObject(storageKey, input.pdf, "application/pdf")
@@ -172,7 +172,7 @@ export async function storeGeneratedPolicyAttachment(input: {
 // object and the row are both kept - this only controls who can still see it.
 export async function markAttachmentsVoidedBySource(
   sourceType: AttachmentSourceType,
-  sourceId: number
+  sourceId: string
 ): Promise<void> {
   await db
     .update(policyAttachments)

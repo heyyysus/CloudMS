@@ -32,7 +32,7 @@ function reasonSuffix(reason: string | null | undefined): string {
 }
 
 export function invoiceCreatedLogBody(input: {
-  invoiceId: number
+  invoiceId: string
   total: string
   items: { type: InvoiceItemType; amount: string }[]
 }): string {
@@ -43,7 +43,7 @@ export function invoiceCreatedLogBody(input: {
 }
 
 export function paymentRecordedLogBody(input: {
-  invoiceId: number
+  invoiceId: string
   method: PaymentMethod
   amount: string
   amountApplied: string
@@ -66,7 +66,7 @@ export function paymentRecordedLogBody(input: {
 }
 
 export function invoiceVoidedLogBody(input: {
-  invoiceId: number
+  invoiceId: string
   total: string
   reason: string | null
 }): string {
@@ -77,8 +77,8 @@ export function invoiceVoidedLogBody(input: {
 // "closed" means this payment had settled it and it reopens, "void" means the
 // invoice stays void (voidPayment leaves a void invoice void).
 export function paymentVoidedLogBody(input: {
-  paymentId: number
-  invoiceId: number
+  paymentId: string
+  invoiceId: string
   method: PaymentMethod
   amount: string
   amountApplied: string

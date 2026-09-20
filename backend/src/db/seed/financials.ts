@@ -22,11 +22,11 @@ const NOTE_TEMPLATES = [
 
 const PAYMENT_METHODS = ["cash", "check", "credit_card", "debit_card"] as const
 
-function randomStaffId(staff: User[]): number {
+function randomStaffId(staff: User[]): string {
   return faker.helpers.arrayElement(staff).id
 }
 
-async function backdateLog(logId: number, date: Date): Promise<void> {
+async function backdateLog(logId: string, date: Date): Promise<void> {
   await db.update(policyLogs).set({ createdAt: date }).where(eq(policyLogs.id, logId))
 }
 
@@ -53,7 +53,7 @@ async function createInvoiceAt(
   date: Date,
   sweepType: "new_business_sweep" | "installment_payment_sweep",
   feeType: "new_business_fee" | "installment_payment_fee"
-): Promise<{ id: number; total: string } | null> {
+): Promise<{ id: string; total: string } | null> {
   const result = await createInvoiceWithDetails({
     policyId: policy.id,
     createdBy: randomStaffId(staff),
@@ -78,7 +78,7 @@ async function createInvoiceAt(
 }
 
 async function recordPaymentAt(
-  invoiceId: number,
+  invoiceId: string,
   staff: User[],
   date: Date,
   amount: string
@@ -121,7 +121,7 @@ async function recordPaymentAt(
 }
 
 async function payDownInvoice(
-  invoiceId: number,
+  invoiceId: string,
   total: string,
   staff: User[],
   startDate: Date,

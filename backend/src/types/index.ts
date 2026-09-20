@@ -116,7 +116,7 @@ declare global {
       // Set by requireAuth only: the session's bound org and the caller's
       // membership in it. Optional to match `user?`/the existing `req.user!`
       // convention - routes behind requireAuth use `req.orgId!`/`req.membership!`.
-      orgId?: number
+      orgId?: string
       membership?: OrgMembership
     }
   }

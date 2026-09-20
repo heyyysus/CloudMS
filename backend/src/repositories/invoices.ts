@@ -19,14 +19,14 @@ const SWEEP_TYPES = new Set<InvoiceItemType>([
 export interface CreateInvoiceItemInput {
   category: InvoiceItemCategory
   type: InvoiceItemType
-  carrierId?: number | null
+  carrierId?: string | null
   description?: string | null
   amount: string
 }
 
 export interface CreateInvoiceInput {
-  policyId: number
-  createdBy: number
+  policyId: string
+  createdBy: string
   note?: string | null
   items: CreateInvoiceItemInput[]
 }
@@ -39,25 +39,25 @@ const invoiceDetailWith = {
   createdByUser: { columns: { id: true, name: true, email: true } },
 } as const
 
-export async function getInvoiceWithDetails(id: number) {
+export async function getInvoiceWithDetails(id: string) {
   return db.query.invoices.findFirst({
     where: eq(invoices.id, id),
     with: invoiceDetailWith,
   })
 }
 
-export async function listInvoicesByPolicyId(policyId: number) {
+export async function listInvoicesByPolicyId(policyId: string) {
   return db.query.invoices.findMany({
     where: eq(invoices.policyId, policyId),
-    orderBy: desc(invoices.id),
+    orderBy: [desc(invoices.createdAt), desc(invoices.id)],
     with: { items: { with: { carrier: true } } },
   })
 }
 
-export async function listInvoicesByClientId(clientId: number) {
+export async function listInvoicesByClientId(clientId: string) {
   return db.query.invoices.findMany({
     where: eq(invoices.clientId, clientId),
-    orderBy: desc(invoices.id),
+    orderBy: [desc(invoices.createdAt), desc(invoices.id)],
     with: { items: { with: { carrier: true } } },
   })
 }
@@ -154,8 +154,8 @@ export type VoidInvoiceResult =
 // that must be reversed individually. An unpaid invoice has no trust-ledger
 // entries, so voiding just flips its status.
 export async function voidInvoice(
-  id: number,
-  voidedBy: number,
+  id: string,
+  voidedBy: string,
   reason: string | null
 ): Promise<VoidInvoiceResult> {
   return withLogNumberRetry(async () =>

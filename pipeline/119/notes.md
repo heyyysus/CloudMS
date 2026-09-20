@@ -90,3 +90,13 @@ None. Implemented exactly the modules, routes, and tests the plan scoped; no sco
 - `cd frontend && npm run lint` — pass (pre-existing `only-export-components` warnings only, no
   errors; unrelated to this issue, no frontend files touched)
 - `cd frontend && npm run build` — pass
+
+## Docs
+
+`docs/API.md`'s Tenancy bullet and `docs/multitenancy.md`'s *Request scoping*/
+rollout-step-4 sections were already updated by an earlier commit in this
+pipeline and accurately reflect the shipped scope (people/clients/carriers/
+policies/vehicles/search org-scoped, 404-not-403 invisibility, per-org NAIC/
+policy-number uniqueness); no further doc changes needed. No auth/session,
+UI, or setup/env-var behavior changed, so `AUTH_SESSIONS_EXPLAINED.md`,
+`frontend-ui-design.md`, and `README.md` are untouched.

@@ -53,6 +53,7 @@ describe("POST /invoices", () => {
 
     expect(res.status).toBe(201)
     expect(res.body.status).toBe("open")
+    expect(res.body.invoiceNumber).toBe(1)
     expect(res.body.total).toBe("399.00")
     expect(res.body.amountPaid).toBe("0.00")
     expect(res.body.clientId).toBe(policy.clientId)
@@ -95,6 +96,44 @@ describe("POST /invoices", () => {
         items: [{ category: "agency", type: "new_business_fee", amount: 10 }],
       })
     expect(res.status).toBe(404)
+  })
+
+  it("returns 404 for another org's policy", async () => {
+    const { cookie } = await authed("inv-wrongorg-policy")
+    const other = await ctx.org()
+    const theirPolicy = await ctx.policy({ orgId: other.id })
+
+    const res = await request(app)
+      .post("/invoices")
+      .set("Cookie", cookie)
+      .send({
+        policyId: theirPolicy.id,
+        items: [{ category: "agency", type: "new_business_fee", amount: 10 }],
+      })
+    expect(res.status).toBe(404)
+  })
+
+  it("returns 409 for a sweep item naming another org's carrier", async () => {
+    const { cookie } = await authed("inv-wrongorg-carrier")
+    const policy = await ctx.policy()
+    const other = await ctx.org()
+    const theirCarrier = await ctx.carrier({ orgId: other.id })
+
+    const res = await request(app)
+      .post("/invoices")
+      .set("Cookie", cookie)
+      .send({
+        policyId: policy.id,
+        items: [
+          { category: "sweep", type: "new_business_sweep", carrierId: theirCarrier.id, amount: 50 },
+        ],
+      })
+    expect(res.status).toBe(409)
+
+    const list = await request(app)
+      .get(`/invoices?policyId=${policy.id}`)
+      .set("Cookie", cookie)
+    expect(list.body).toEqual([])
   })
 
   it("rejects an empty items list", async () => {
@@ -171,7 +210,7 @@ describe("POST /invoices", () => {
     expect(logs[0].logNumber).toBe(1)
     expect(logs[0].author.id).toBe(user.id)
     expect(logs[0].body).toBe(
-      `Invoice #${created.body.id} created — total $400.00 (new business sweep $300.00, new business fee $100.00).`
+      `Invoice #${created.body.invoiceNumber} created — total $400.00 (new business sweep $300.00, new business fee $100.00).`
     )
   })
 
@@ -234,6 +273,93 @@ describe("GET /invoices", () => {
     expect(
       (await request(app).get(`/invoices/${MISSING_ROW_ID}`).set("Cookie", cookie)).status
     ).toBe(404)
+  })
+
+  it("does not see another org's invoice, by list or by id", async () => {
+    const { cookie } = await authed("inv-wrongorg-read")
+    const other = await ctx.org()
+    const otherUser = await ctx.user("inv-wrongorg-read-other", "staff", other.id)
+    const otherCookie = await ctx.cookie(otherUser.id, other.id)
+    const theirPolicy = await ctx.policy({ orgId: other.id })
+    const theirInvoice = await request(app)
+      .post("/invoices")
+      .set("Cookie", otherCookie)
+      .send({
+        policyId: theirPolicy.id,
+        items: [{ category: "agency", type: "new_business_fee", amount: 10 }],
+      })
+    expect(theirInvoice.status).toBe(201)
+
+    const byPolicy = await request(app)
+      .get(`/invoices?policyId=${theirPolicy.id}`)
+      .set("Cookie", cookie)
+    expect(byPolicy.body).toEqual([])
+
+    const byClient = await request(app)
+      .get(`/invoices?clientId=${theirPolicy.clientId}`)
+      .set("Cookie", cookie)
+    expect(byClient.body).toEqual([])
+
+    expect(
+      (await request(app).get(`/invoices/${theirInvoice.body.id}`).set("Cookie", cookie)).status
+    ).toBe(404)
+  })
+})
+
+describe("per-org invoice numbering", () => {
+  it("counts 1, 2, 3 independently per organization", async () => {
+    const { cookie: cookieA } = await authed("inv-num-a")
+    const policyA = await ctx.policy()
+    const orgB = await ctx.org()
+    const userB = await ctx.user("inv-num-b", "staff", orgB.id)
+    const cookieB = await ctx.cookie(userB.id, orgB.id)
+    const policyB = await ctx.policy({ orgId: orgB.id })
+
+    const mk = (cookie: string, policyId: string) =>
+      request(app)
+        .post("/invoices")
+        .set("Cookie", cookie)
+        .send({ policyId, items: [{ category: "agency", type: "new_business_fee", amount: 10 }] })
+
+    const a1 = await mk(cookieA, policyA.id)
+    const b1 = await mk(cookieB, policyB.id)
+    const a2 = await mk(cookieA, policyA.id)
+    const b2 = await mk(cookieB, policyB.id)
+    const a3 = await mk(cookieA, policyA.id)
+    const b3 = await mk(cookieB, policyB.id)
+
+    expect([a1, a2, a3].map((r) => r.body.invoiceNumber)).toEqual([1, 2, 3])
+    expect([b1, b2, b3].map((r) => r.body.invoiceNumber)).toEqual([1, 2, 3])
+  })
+
+  it("does not burn a number when the create rolls back after allocation", async () => {
+    const { cookie } = await authed("inv-num-rollback")
+    const policy = await ctx.policy()
+
+    // The zod body has no upper bound on amount, so an amount overflowing
+    // numeric(12,2) (11 digits before the decimal) reaches the transaction and
+    // fails the invoice_items insert, which runs after the number has already
+    // been allocated. app.ts has no specific mapping for that pg error code,
+    // so this 500s - the point of the assertion below is that the failed
+    // attempt's number isn't burned, not the status code of the failure.
+    const failed = await request(app)
+      .post("/invoices")
+      .set("Cookie", cookie)
+      .send({
+        policyId: policy.id,
+        items: [{ category: "agency", type: "new_business_fee", amount: "99999999999.99" }],
+      })
+    expect(failed.status).toBeGreaterThanOrEqual(400)
+
+    const ok = await request(app)
+      .post("/invoices")
+      .set("Cookie", cookie)
+      .send({
+        policyId: policy.id,
+        items: [{ category: "agency", type: "new_business_fee", amount: 10 }],
+      })
+    expect(ok.status).toBe(201)
+    expect(ok.body.invoiceNumber).toBe(1)
   })
 })
 
@@ -321,7 +447,7 @@ describe("POST /invoices/:id/void", () => {
     // Newest first: the void, then the create.
     expect(logs.map((l) => l.logNumber)).toEqual([2, 1])
     expect(logs[0].body).toBe(
-      `Invoice #${created.body.id} voided — total $75.00. Reason: created in error.`
+      `Invoice #${created.body.invoiceNumber} voided — total $75.00. Reason: created in error.`
     )
     expect(logs[0].author.id).toBe(user.id)
   })

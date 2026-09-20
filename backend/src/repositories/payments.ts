@@ -4,6 +4,7 @@ import { db } from "../db"
 import { invoiceItems, invoices, payments, receipts, trustLedger } from "../db/schema"
 import { centsToAmount, toCents } from "../money"
 import type { PaymentMethod } from "../types"
+import { allocateReceiptNumberInTx } from "./organizations"
 import { insertPolicyLogInTx, withLogNumberRetry } from "./policyLogs"
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -27,7 +28,7 @@ export type RecordPaymentResult =
 // On full payment the carrier's share leaves the trust account (a
 // "carrier_sweep" per sweep item) and the agency keeps its fee (an
 // "agency_fee" per agency item). Posted once, when the invoice closes.
-async function postSweepAndFeeEntries(tx: Tx, invoiceId: string): Promise<void> {
+async function postSweepAndFeeEntries(tx: Tx, orgId: string, invoiceId: string): Promise<void> {
   const [invoice] = await tx
     .select({ policyId: invoices.policyId, clientId: invoices.clientId })
     .from(invoices)
@@ -36,6 +37,7 @@ async function postSweepAndFeeEntries(tx: Tx, invoiceId: string): Promise<void> 
 
   for (const item of items) {
     await tx.insert(trustLedger).values({
+      orgId,
       policyId: invoice.policyId,
       clientId: invoice.clientId,
       invoiceId,
@@ -53,10 +55,16 @@ async function postSweepAndFeeEntries(tx: Tx, invoiceId: string): Promise<void> 
 // posts the money into the trust account, appends the policy log recording it,
 // and - if this payment settles the invoice - closes it and sweeps the
 // carrier/agency shares back out.
-export async function recordPayment(input: RecordPaymentInput): Promise<RecordPaymentResult> {
+export async function recordPayment(
+  orgId: string,
+  input: RecordPaymentInput
+): Promise<RecordPaymentResult> {
   return withLogNumberRetry(async () =>
     db.transaction(async (tx): Promise<RecordPaymentResult> => {
-      const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, input.invoiceId))
+      const [invoice] = await tx
+        .select()
+        .from(invoices)
+        .where(and(eq(invoices.id, input.invoiceId), eq(invoices.orgId, orgId)))
       if (!invoice) return { status: "invoice_not_found" }
       if (invoice.status !== "open") return { status: "invoice_not_open" }
 
@@ -73,6 +81,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
       const [payment] = await tx
         .insert(payments)
         .values({
+          orgId,
           invoiceId: invoice.id,
           policyId: invoice.policyId,
           clientId: invoice.clientId,
@@ -89,6 +98,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
       // in trust).
       if (appliedC > 0) {
         await tx.insert(trustLedger).values({
+          orgId,
           policyId: invoice.policyId,
           clientId: invoice.clientId,
           invoiceId: invoice.id,
@@ -99,9 +109,15 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
         })
       }
 
+      // Allocated as late as correctness allows, since the UPDATE it runs
+      // holds a row lock on the organization for the rest of the transaction.
+      const receiptNumber = await allocateReceiptNumberInTx(tx, orgId)
+
       const [receipt] = await tx
         .insert(receipts)
         .values({
+          orgId,
+          receiptNumber,
           paymentId: payment.id,
           invoiceId: invoice.id,
           policyId: invoice.policyId,
@@ -125,14 +141,14 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
         .where(eq(invoices.id, invoice.id))
 
       if (closed) {
-        await postSweepAndFeeEntries(tx, invoice.id)
+        await postSweepAndFeeEntries(tx, orgId, invoice.id)
       }
 
-      const logId = await insertPolicyLogInTx(tx, {
+      const logId = await insertPolicyLogInTx(tx, orgId, {
         policyId: invoice.policyId,
         authorId: input.createdBy,
         body: paymentRecordedLogBody({
-          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
           method: input.method,
           amount: input.amount,
           amountApplied: centsToAmount(appliedC),
@@ -153,6 +169,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
 // couldn't have been swept if the money wasn't fully collected.
 async function reverseSweepAndFeeEntries(
   tx: Tx,
+  orgId: string,
   invoiceId: string,
   note: string | null
 ): Promise<void> {
@@ -169,6 +186,7 @@ async function reverseSweepAndFeeEntries(
 
   for (const entry of active) {
     await tx.insert(trustLedger).values({
+      orgId,
       policyId: entry.policyId,
       clientId: entry.clientId,
       invoiceId,
@@ -193,13 +211,17 @@ export type VoidPaymentResult =
 // the sweep/fee entries too). The payment and receipt rows are kept for the
 // audit trail, stamped with voidedAt.
 export async function voidPayment(
+  orgId: string,
   paymentId: string,
   voidedBy: string,
   reason: string | null
 ): Promise<VoidPaymentResult> {
   return withLogNumberRetry(async () =>
     db.transaction(async (tx): Promise<VoidPaymentResult> => {
-      const [payment] = await tx.select().from(payments).where(eq(payments.id, paymentId))
+      const [payment] = await tx
+        .select()
+        .from(payments)
+        .where(and(eq(payments.id, paymentId), eq(payments.orgId, orgId)))
       if (!payment) return { status: "not_found" }
       if (payment.voidedAt) return { status: "already_void" }
 
@@ -218,6 +240,7 @@ export async function voidPayment(
             )
           )
         await tx.insert(trustLedger).values({
+          orgId,
           policyId: payment.policyId,
           clientId: payment.clientId,
           invoiceId: payment.invoiceId,
@@ -231,7 +254,7 @@ export async function voidPayment(
       }
 
       if (invoice.status === "closed") {
-        await reverseSweepAndFeeEntries(tx, invoice.id, reason)
+        await reverseSweepAndFeeEntries(tx, orgId, invoice.id, reason)
       }
 
       const newPaidC = Math.max(toCents(invoice.amountPaid) - appliedC, 0)
@@ -257,12 +280,12 @@ export async function voidPayment(
         .set({ voidedAt: new Date(), voidedBy, voidReason: reason })
         .where(eq(payments.id, payment.id))
 
-      await insertPolicyLogInTx(tx, {
+      await insertPolicyLogInTx(tx, orgId, {
         policyId: payment.policyId,
         authorId: voidedBy,
         body: paymentVoidedLogBody({
           paymentId: payment.id,
-          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
           method: payment.method,
           amount: payment.amount,
           amountApplied: payment.amountApplied,
@@ -285,21 +308,24 @@ const paymentDetailWith = {
   createdByUser: { columns: { id: true, name: true, email: true } },
 } as const
 
-export async function getPaymentWithDetails(id: string) {
-  return db.query.payments.findFirst({ where: eq(payments.id, id), with: paymentDetailWith })
+export async function getPaymentWithDetails(orgId: string, id: string) {
+  return db.query.payments.findFirst({
+    where: and(eq(payments.id, id), eq(payments.orgId, orgId)),
+    with: paymentDetailWith,
+  })
 }
 
-export async function listPaymentsByPolicyId(policyId: string) {
+export async function listPaymentsByPolicyId(orgId: string, policyId: string) {
   return db.query.payments.findMany({
-    where: eq(payments.policyId, policyId),
+    where: and(eq(payments.policyId, policyId), eq(payments.orgId, orgId)),
     orderBy: [desc(payments.createdAt), desc(payments.id)],
     with: { receipt: true },
   })
 }
 
-export async function listPaymentsByClientId(clientId: string) {
+export async function listPaymentsByClientId(orgId: string, clientId: string) {
   return db.query.payments.findMany({
-    where: eq(payments.clientId, clientId),
+    where: and(eq(payments.clientId, clientId), eq(payments.orgId, orgId)),
     orderBy: [desc(payments.createdAt), desc(payments.id)],
     with: { receipt: true },
   })

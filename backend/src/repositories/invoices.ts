@@ -1,9 +1,11 @@
 import { and, desc, eq, isNull } from "drizzle-orm"
 import { invoiceCreatedLogBody, invoiceVoidedLogBody } from "../accountingLogs"
 import { db } from "../db"
-import { autoPolicies, invoiceItems, invoices, payments } from "../db/schema"
+import { autoPolicies, carriers, invoiceItems, invoices, payments } from "../db/schema"
 import { sumAmounts } from "../money"
 import type { InvoiceItemCategory, InvoiceItemType } from "../types"
+import { CrossOrgReferenceError } from "./errors"
+import { allocateInvoiceNumberInTx } from "./organizations"
 import { insertPolicyLogInTx, withLogNumberRetry } from "./policyLogs"
 
 // Validation failures raised inside the create transaction that the route
@@ -39,24 +41,24 @@ const invoiceDetailWith = {
   createdByUser: { columns: { id: true, name: true, email: true } },
 } as const
 
-export async function getInvoiceWithDetails(id: string) {
+export async function getInvoiceWithDetails(orgId: string, id: string) {
   return db.query.invoices.findFirst({
-    where: eq(invoices.id, id),
+    where: and(eq(invoices.id, id), eq(invoices.orgId, orgId)),
     with: invoiceDetailWith,
   })
 }
 
-export async function listInvoicesByPolicyId(policyId: string) {
+export async function listInvoicesByPolicyId(orgId: string, policyId: string) {
   return db.query.invoices.findMany({
-    where: eq(invoices.policyId, policyId),
+    where: and(eq(invoices.policyId, policyId), eq(invoices.orgId, orgId)),
     orderBy: [desc(invoices.createdAt), desc(invoices.id)],
     with: { items: { with: { carrier: true } } },
   })
 }
 
-export async function listInvoicesByClientId(clientId: string) {
+export async function listInvoicesByClientId(orgId: string, clientId: string) {
   return db.query.invoices.findMany({
-    where: eq(invoices.clientId, clientId),
+    where: and(eq(invoices.clientId, clientId), eq(invoices.orgId, orgId)),
     orderBy: [desc(invoices.createdAt), desc(invoices.id)],
     with: { items: { with: { carrier: true } } },
   })
@@ -64,13 +66,14 @@ export async function listInvoicesByClientId(clientId: string) {
 
 // Creates an invoice plus its line items in one transaction, and appends the
 // policy log recording it. Sweep items default their carrier to the policy's
-// carrier when none is given; agency-fee items never carry a carrier. Returns
-// undefined when the policy doesn't exist. The invoice opens with amountPaid 0
-// and status "open".
+// carrier when none is given; agency-fee items never carry a carrier. An
+// explicit carrierId on an item must belong to orgId - a cross-org id throws
+// CrossOrgReferenceError, which app.ts maps to 409. Returns undefined when the
+// policy doesn't exist. The invoice opens with amountPaid 0 and status "open".
 //
 // `logId` comes back alongside the invoice so the route can attach the invoice
 // PDF - generated after this commits - to the very log written here.
-export async function createInvoiceWithDetails(input: CreateInvoiceInput) {
+export async function createInvoiceWithDetails(orgId: string, input: CreateInvoiceInput) {
   if (input.items.length === 0) {
     throw new InvoiceWriteError("An invoice needs at least one item")
   }
@@ -84,38 +87,53 @@ export async function createInvoiceWithDetails(input: CreateInvoiceInput) {
           carrierId: autoPolicies.carrierId,
         })
         .from(autoPolicies)
-        .where(eq(autoPolicies.id, input.policyId))
+        .where(and(eq(autoPolicies.id, input.policyId), eq(autoPolicies.orgId, orgId)))
       if (!policy) return undefined
 
-      const resolvedItems = input.items.map((item) => {
+      const resolvedItems = []
+      for (const item of input.items) {
         const isSweep = SWEEP_TYPES.has(item.type)
         if (isSweep) {
           const carrierId = item.carrierId ?? policy.carrierId
           if (!carrierId) {
             throw new InvoiceWriteError("A sweep item needs a carrier")
           }
-          return {
+          if (item.carrierId) {
+            const [carrier] = await tx
+              .select({ id: carriers.id })
+              .from(carriers)
+              .where(and(eq(carriers.id, item.carrierId), eq(carriers.orgId, orgId)))
+            if (!carrier) throw new CrossOrgReferenceError()
+          }
+          resolvedItems.push({
             category: "sweep" as const,
             type: item.type,
             carrierId,
             description: item.description ?? null,
             amount: item.amount,
-          }
+          })
+        } else {
+          resolvedItems.push({
+            category: "agency" as const,
+            type: item.type,
+            carrierId: null,
+            description: item.description ?? null,
+            amount: item.amount,
+          })
         }
-        return {
-          category: "agency" as const,
-          type: item.type,
-          carrierId: null,
-          description: item.description ?? null,
-          amount: item.amount,
-        }
-      })
+      }
 
       const total = sumAmounts(resolvedItems.map((i) => i.amount))
+
+      // Allocated as late as correctness allows, since the UPDATE it runs
+      // holds a row lock on the organization for the rest of the transaction.
+      const invoiceNumber = await allocateInvoiceNumberInTx(tx, orgId)
 
       const [invoice] = await tx
         .insert(invoices)
         .values({
+          orgId,
+          invoiceNumber,
           policyId: input.policyId,
           clientId: policy.clientId,
           createdBy: input.createdBy,
@@ -126,12 +144,12 @@ export async function createInvoiceWithDetails(input: CreateInvoiceInput) {
 
       await tx
         .insert(invoiceItems)
-        .values(resolvedItems.map((item) => ({ ...item, invoiceId: invoice.id })))
+        .values(resolvedItems.map((item) => ({ ...item, orgId, invoiceId: invoice.id })))
 
-      const logId = await insertPolicyLogInTx(tx, {
+      const logId = await insertPolicyLogInTx(tx, orgId, {
         policyId: input.policyId,
         authorId: input.createdBy,
-        body: invoiceCreatedLogBody({ invoiceId: invoice.id, total, items: resolvedItems }),
+        body: invoiceCreatedLogBody({ invoiceNumber, total, items: resolvedItems }),
       })
 
       return { invoiceId: invoice.id, logId }
@@ -139,7 +157,7 @@ export async function createInvoiceWithDetails(input: CreateInvoiceInput) {
   )
 
   if (created === undefined) return undefined
-  const invoice = await getInvoiceWithDetails(created.invoiceId)
+  const invoice = await getInvoiceWithDetails(orgId, created.invoiceId)
   return invoice && { invoice, logId: created.logId }
 }
 
@@ -154,13 +172,17 @@ export type VoidInvoiceResult =
 // that must be reversed individually. An unpaid invoice has no trust-ledger
 // entries, so voiding just flips its status.
 export async function voidInvoice(
+  orgId: string,
   id: string,
   voidedBy: string,
   reason: string | null
 ): Promise<VoidInvoiceResult> {
   return withLogNumberRetry(async () =>
     db.transaction(async (tx): Promise<VoidInvoiceResult> => {
-      const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, id))
+      const [invoice] = await tx
+        .select()
+        .from(invoices)
+        .where(and(eq(invoices.id, id), eq(invoices.orgId, orgId)))
       if (!invoice) return { status: "not_found" }
       if (invoice.status === "void") return { status: "already_void" }
 
@@ -181,10 +203,14 @@ export async function voidInvoice(
         })
         .where(eq(invoices.id, id))
 
-      await insertPolicyLogInTx(tx, {
+      await insertPolicyLogInTx(tx, orgId, {
         policyId: invoice.policyId,
         authorId: voidedBy,
-        body: invoiceVoidedLogBody({ invoiceId: invoice.id, total: invoice.total, reason }),
+        body: invoiceVoidedLogBody({
+          invoiceNumber: invoice.invoiceNumber,
+          total: invoice.total,
+          reason,
+        }),
       })
 
       return { status: "ok" }

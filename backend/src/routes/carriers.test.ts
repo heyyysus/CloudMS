@@ -30,6 +30,30 @@ describe("GET /carriers/:id", () => {
       (await request(app).get(`/carriers/${MISSING_ROW_ID}`).set("Cookie", cookie)).status
     ).toBe(404)
   })
+
+  it("does not see a carrier from another org", async () => {
+    const user = await ctx.user("carriers-wrongorg", "admin")
+    const cookie = await ctx.cookie(user.id)
+    const other = await ctx.org()
+    const carrier = await ctx.carrier({ orgId: other.id })
+
+    const list = await request(app).get("/carriers").set("Cookie", cookie)
+    expect(list.body.some((c: { id: string }) => c.id === carrier.id)).toBe(false)
+    expect((await request(app).get(`/carriers/${carrier.id}`).set("Cookie", cookie)).status).toBe(
+      404
+    )
+    expect(
+      (
+        await request(app)
+          .patch(`/carriers/${carrier.id}`)
+          .set("Cookie", cookie)
+          .send({ name: "X" })
+      ).status
+    ).toBe(404)
+    expect(
+      (await request(app).delete(`/carriers/${carrier.id}`).set("Cookie", cookie)).status
+    ).toBe(404)
+  })
 })
 
 describe("POST /carriers", () => {

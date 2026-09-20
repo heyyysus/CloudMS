@@ -32,18 +32,18 @@ function reasonSuffix(reason: string | null | undefined): string {
 }
 
 export function invoiceCreatedLogBody(input: {
-  invoiceId: string
+  invoiceNumber: number
   total: string
   items: { type: InvoiceItemType; amount: string }[]
 }): string {
   const breakdown = input.items
     .map((item) => `${itemTypeLabel(item.type)} ${formatUsd(item.amount)}`)
     .join(", ")
-  return `Invoice #${input.invoiceId} created — total ${formatUsd(input.total)} (${breakdown}).`
+  return `Invoice #${input.invoiceNumber} created — total ${formatUsd(input.total)} (${breakdown}).`
 }
 
 export function paymentRecordedLogBody(input: {
-  invoiceId: string
+  invoiceNumber: number
   method: PaymentMethod
   amount: string
   amountApplied: string
@@ -62,23 +62,25 @@ export function paymentRecordedLogBody(input: {
   )
 
   const method = methodLabel(input.method)
-  return `Payment of ${formatUsd(input.amount)} by ${method} on invoice #${input.invoiceId} — ${parts.join(", ")}.`
+  return `Payment of ${formatUsd(input.amount)} by ${method} on invoice #${input.invoiceNumber} — ${parts.join(", ")}.`
 }
 
 export function invoiceVoidedLogBody(input: {
-  invoiceId: string
+  invoiceNumber: number
   total: string
   reason: string | null
 }): string {
-  return `Invoice #${input.invoiceId} voided — total ${formatUsd(input.total)}.${reasonSuffix(input.reason)}`
+  return `Invoice #${input.invoiceNumber} voided — total ${formatUsd(input.total)}.${reasonSuffix(input.reason)}`
 }
 
 // `invoiceStatusBefore` is the invoice's status as of just before the void:
 // "closed" means this payment had settled it and it reopens, "void" means the
-// invoice stays void (voidPayment leaves a void invoice void).
+// invoice stays void (voidPayment leaves a void invoice void). Payments have
+// no per-org number of their own, so the payment is still identified by its
+// uid; only the invoice reference switches to the number.
 export function paymentVoidedLogBody(input: {
   paymentId: string
-  invoiceId: string
+  invoiceNumber: number
   method: PaymentMethod
   amount: string
   amountApplied: string
@@ -94,5 +96,5 @@ export function paymentVoidedLogBody(input: {
         : `${formatUsd(input.amountDueAfter)} now due`
 
   const method = methodLabel(input.method)
-  return `Payment #${input.paymentId} of ${formatUsd(input.amount)} by ${method} on invoice #${input.invoiceId} voided — ${formatUsd(input.amountApplied)} reversed, ${outcome}.${reasonSuffix(input.reason)}`
+  return `Payment #${input.paymentId} of ${formatUsd(input.amount)} by ${method} on invoice #${input.invoiceNumber} voided — ${formatUsd(input.amountApplied)} reversed, ${outcome}.${reasonSuffix(input.reason)}`
 }

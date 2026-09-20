@@ -6,8 +6,11 @@
 // 2). `persons`, `drivers`, `clients`, `clientPhones`, `clientEmails`,
 // `carriers`, `autoPolicies`, `policyDrivers`, `vehicles` and `search` take a
 // caller-supplied orgId and scope every read/write to it (rollout step 3,
-// sub-issue 4 part 1); the remaining modules (logs, attachments, accounting,
-// email, reminders, scheduler) pick this up in sub-issues 6-7.
+// sub-issue 4 part 1); `policyLogs`, `policyAttachments`,
+// `policyLogAttachments`, `invoices`, `payments`, `receipts` and `trustLedger`
+// do the same (sub-issue 4 part 2, #120), with `invoices.invoiceNumber` /
+// `receipts.receiptNumber` allocated per organization; email, reminders and
+// the scheduler pick this up in sub-issue 7 (#121).
 
 export * from "./autoPolicies"
 export * from "./carriers"

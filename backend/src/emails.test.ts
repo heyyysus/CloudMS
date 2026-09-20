@@ -68,7 +68,7 @@ describe("sendWelcomeEmail", () => {
 
   async function makeUsers(): Promise<{ invitee: User; admin: User }> {
     const invitee = await makeTestUser("emails-invitee")
-    const admin = await makeTestUser("emails-admin", "admin")
+    const admin = await makeTestUser("emails-admin")
     createdUserIds.push(invitee.id, admin.id)
     return { invitee, admin }
   }
@@ -78,7 +78,7 @@ describe("sendWelcomeEmail", () => {
     const fetchMock = stubResend({ id: "msg_1" })
     const { invitee, admin } = await makeUsers()
 
-    const result = await sendWelcomeEmail(invitee, admin)
+    const result = await sendWelcomeEmail(invitee, admin, "staff")
 
     expect(result).toEqual({ status: "sent", resendId: "msg_1" })
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -94,7 +94,7 @@ describe("sendWelcomeEmail", () => {
     delete process.env.MAIL_FROM
     const { invitee, admin } = await makeUsers()
 
-    const result = await sendWelcomeEmail(invitee, admin)
+    const result = await sendWelcomeEmail(invitee, admin, "staff")
 
     expect(result.status).toBe("failed")
     const [logRow] = await db.select().from(emailLog).where(eq(emailLog.recipient, invitee.email))

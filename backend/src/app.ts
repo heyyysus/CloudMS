@@ -3,6 +3,7 @@ import express, { Application, NextFunction, Request, Response } from "express"
 import pinoHttp from "pino-http"
 import { authRouter } from "./auth/routes"
 import { logger } from "./logger"
+import { CrossOrgReferenceError } from "./repositories"
 import { carriersRouter } from "./routes/carriers"
 import { clientsRouter } from "./routes/clients"
 import { correspondenceTemplatesRouter } from "./routes/correspondenceTemplates"
@@ -77,6 +78,10 @@ interface PgError extends Error {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: PgError, req: Request, res: Response, next: NextFunction) => {
+  if (err instanceof CrossOrgReferenceError) {
+    res.status(409).json({ error: "Referenced by or references other records" })
+    return
+  }
   const code = err.code ?? err.cause?.code
   if (code === "23505") {
     res.status(409).json({ error: "Duplicate value" })

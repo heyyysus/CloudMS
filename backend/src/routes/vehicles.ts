@@ -20,17 +20,17 @@ vehiclesRouter.get("/vehicles", requireAuth, async (req: Request, res: Response)
       res.status(400).json({ error: "Invalid policyId" })
       return
     }
-    res.json(await listVehiclesByPolicyId(policyId.data))
+    res.json(await listVehiclesByPolicyId(req.orgId!, policyId.data))
     return
   }
-  res.json(await listVehicles())
+  res.json(await listVehicles(req.orgId!))
 })
 
 vehiclesRouter.get("/vehicles/:id", requireAuth, async (req: Request, res: Response) => {
   const id = parseId(req.params.id, res)
   if (id === undefined) return
 
-  const vehicle = await findVehicleById(id)
+  const vehicle = await findVehicleById(req.orgId!, id)
   if (!vehicle) {
     res.status(404).json({ error: "Vehicle not found" })
     return
@@ -44,7 +44,7 @@ vehiclesRouter.post("/vehicles", requireAuth, async (req: Request, res: Response
     res.status(400).json({ error: firstIssue(parsed.error) })
     return
   }
-  res.status(201).json(await createVehicle(parsed.data))
+  res.status(201).json(await createVehicle(req.orgId!, parsed.data))
 })
 
 vehiclesRouter.patch("/vehicles/:id", requireAuth, async (req: Request, res: Response) => {
@@ -57,7 +57,7 @@ vehiclesRouter.patch("/vehicles/:id", requireAuth, async (req: Request, res: Res
     return
   }
 
-  const vehicle = await updateVehicle(id, parsed.data)
+  const vehicle = await updateVehicle(req.orgId!, id, parsed.data)
   if (!vehicle) {
     res.status(404).json({ error: "Vehicle not found" })
     return
@@ -69,7 +69,7 @@ vehiclesRouter.delete("/vehicles/:id", requireAuth, async (req: Request, res: Re
   const id = parseId(req.params.id, res)
   if (id === undefined) return
 
-  const deleted = await deleteVehicle(id)
+  const deleted = await deleteVehicle(req.orgId!, id)
   if (!deleted) {
     res.status(404).json({ error: "Vehicle not found" })
     return

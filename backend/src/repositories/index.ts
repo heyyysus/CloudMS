@@ -3,9 +3,11 @@
 // middleware exists) before or after calling into these functions. Don't thread
 // an actor/context param through every repository call in anticipation of that;
 // every tenant table now carries org_id (see docs/multitenancy.md rollout step
-// 2), but nothing calls into these functions with a caller-supplied org yet -
-// that's rollout step 3. Add an explicit orgId param only to the specific
-// functions that need it as that work lands.
+// 2). `persons`, `drivers`, `clients`, `clientPhones`, `clientEmails`,
+// `carriers`, `autoPolicies`, `policyDrivers`, `vehicles` and `search` take a
+// caller-supplied orgId and scope every read/write to it (rollout step 3,
+// sub-issue 4 part 1); the remaining modules (logs, attachments, accounting,
+// email, reminders, scheduler) pick this up in sub-issues 6-7.
 
 export * from "./autoPolicies"
 export * from "./carriers"
@@ -15,6 +17,7 @@ export * from "./clients"
 export * from "./drivers"
 export * from "./emailLog"
 export * from "./emailTemplates"
+export * from "./errors"
 export * from "./invoices"
 export * from "./orgMemberships"
 export * from "./organizations"

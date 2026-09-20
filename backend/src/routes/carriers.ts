@@ -18,15 +18,15 @@ const DUPLICATE_NAIC = "A carrier with this NAIC already exists"
 // list to render their picker. Writes are admin-only: carriers are shared
 // reference data that invoices and the trust ledger point at.
 
-carriersRouter.get("/carriers", requireAuth, async (_req: Request, res: Response) => {
-  res.json(await listCarriers())
+carriersRouter.get("/carriers", requireAuth, async (req: Request, res: Response) => {
+  res.json(await listCarriers(req.orgId!))
 })
 
 carriersRouter.get("/carriers/:id", requireAuth, async (req: Request, res: Response) => {
   const id = parseId(req.params.id, res)
   if (id === undefined) return
 
-  const carrier = await findCarrierById(id)
+  const carrier = await findCarrierById(req.orgId!, id)
   if (!carrier) {
     res.status(404).json({ error: "Carrier not found" })
     return
@@ -46,7 +46,7 @@ carriersRouter.post(
     }
 
     try {
-      res.status(201).json(await createCarrier(parsed.data))
+      res.status(201).json(await createCarrier(req.orgId!, parsed.data))
     } catch (err) {
       if (isPgUniqueViolation(err, "carriers_org_id_naic_unique")) {
         res.status(409).json({ error: DUPLICATE_NAIC })
@@ -73,7 +73,7 @@ carriersRouter.patch(
 
     let carrier
     try {
-      carrier = await updateCarrier(id, parsed.data)
+      carrier = await updateCarrier(req.orgId!, id, parsed.data)
     } catch (err) {
       if (isPgUniqueViolation(err, "carriers_org_id_naic_unique")) {
         res.status(409).json({ error: DUPLICATE_NAIC })
@@ -100,7 +100,7 @@ carriersRouter.delete(
 
     let deleted
     try {
-      deleted = await deleteCarrier(id)
+      deleted = await deleteCarrier(req.orgId!, id)
     } catch (err) {
       // Policies, invoice items, and trust ledger rows all point here with ON
       // DELETE no action. Deactivating is the intended way to retire a carrier.

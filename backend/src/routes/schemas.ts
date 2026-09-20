@@ -45,7 +45,7 @@ export const vinDecodeQuery = z.object({
     .regex(/^[A-HJ-NPR-Z0-9]+$/, "Invalid VIN"),
 })
 
-const omitMeta = { id: true, createdAt: true, updatedAt: true } as const
+const omitMeta = { id: true, orgId: true, createdAt: true, updatedAt: true } as const
 
 // Address state/zip columns come back from drizzle-zod as bare nullable
 // strings; re-tighten them here so bad values are rejected before the DB.

@@ -140,10 +140,10 @@ function buildDraft(): Draft {
   }
 }
 
-export async function seedHouseholds(count: number): Promise<Household[]> {
+export async function seedHouseholds(count: number, orgId: number): Promise<Household[]> {
   const drafts = Array.from({ length: count }, buildDraft)
 
-  const allPersonSpecs = drafts.flatMap((d) => d.personSpecs)
+  const allPersonSpecs = drafts.flatMap((d) => d.personSpecs.map((p) => ({ ...p, orgId })))
   const insertedPersons = (
     await Promise.all(
       chunk(allPersonSpecs, 250).map((rows) => db.insert(persons).values(rows).returning())
@@ -160,6 +160,7 @@ export async function seedHouseholds(count: number): Promise<Household[]> {
   const driverSpecs = drafts.flatMap((d, i) => {
     const start = personRanges[i]
     return d.driverIdxs.map((idx) => ({
+      orgId,
       personId: insertedPersons[start + idx].id,
       dlNumber: `${faker.string.alpha({ length: 1, casing: "upper" })}${faker.string.numeric(7)}`,
       rating: faker.helpers.weightedArrayElement([
@@ -177,6 +178,7 @@ export async function seedHouseholds(count: number): Promise<Household[]> {
   const clientValues = drafts.map((d, i) => {
     const start = personRanges[i]
     return {
+      orgId,
       namedInsuredId: insertedPersons[start + d.namedIdx].id,
       secondNamedInsuredId: d.secondIdx !== null ? insertedPersons[start + d.secondIdx].id : null,
       mailingAddress1: d.mailing.address1,
@@ -197,10 +199,12 @@ export async function seedHouseholds(count: number): Promise<Household[]> {
   ).flat()
 
   const phoneValues = drafts.map((d, i) => ({
+    orgId,
     clientId: insertedClients[i].id,
     phoneNumber: d.phone,
   }))
   const emailValues = drafts.map((d, i) => ({
+    orgId,
     clientId: insertedClients[i].id,
     email: d.email,
   }))

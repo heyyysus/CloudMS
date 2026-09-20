@@ -2,9 +2,10 @@
 // belongs at the controller/route layer, which will check req.user (once auth
 // middleware exists) before or after calling into these functions. Don't thread
 // an actor/context param through every repository call in anticipation of that;
-// none of the tables have an owner/tenant column today, so there's nothing to
-// scope by yet. Add scoping params only to the specific functions that need them
-// once a real ownership model exists.
+// every tenant table now carries org_id (see docs/multitenancy.md rollout step
+// 2), but nothing calls into these functions with a caller-supplied org yet -
+// that's rollout step 3. Add an explicit orgId param only to the specific
+// functions that need it as that work lands.
 
 export * from "./autoPolicies"
 export * from "./carriers"
@@ -15,6 +16,8 @@ export * from "./drivers"
 export * from "./emailLog"
 export * from "./emailTemplates"
 export * from "./invoices"
+export * from "./orgMemberships"
+export * from "./organizations"
 export * from "./payments"
 export * from "./persons"
 export * from "./policyAttachments"

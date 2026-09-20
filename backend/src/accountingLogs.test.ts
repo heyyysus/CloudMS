@@ -10,7 +10,7 @@ describe("invoiceCreatedLogBody", () => {
   it("lists every line item with its label and amount", () => {
     expect(
       invoiceCreatedLogBody({
-        invoiceId: "42",
+        invoiceNumber: 42,
         total: "400.00",
         items: [
           { type: "new_business_sweep", amount: "300.00" },
@@ -27,7 +27,7 @@ describe("invoiceCreatedLogBody", () => {
     // arrive as "300" rather than "300.00".
     expect(
       invoiceCreatedLogBody({
-        invoiceId: "7",
+        invoiceNumber: 7,
         total: "1250.00",
         items: [{ type: "endorsement_sweep", amount: "1250" }],
       })
@@ -37,7 +37,7 @@ describe("invoiceCreatedLogBody", () => {
 
 describe("paymentRecordedLogBody", () => {
   const base = {
-    invoiceId: "42",
+    invoiceNumber: 42,
     method: "cash" as const,
     changeGiven: "0.00",
   }
@@ -101,18 +101,18 @@ describe("paymentRecordedLogBody", () => {
 describe("invoiceVoidedLogBody", () => {
   it("appends the reason when one was given", () => {
     expect(
-      invoiceVoidedLogBody({ invoiceId: "42", total: "400.00", reason: "duplicate of #41" })
+      invoiceVoidedLogBody({ invoiceNumber: 42, total: "400.00", reason: "duplicate of #41" })
     ).toBe("Invoice #42 voided — total $400.00. Reason: duplicate of #41.")
   })
 
   it("stops after the total when no reason was given", () => {
-    expect(invoiceVoidedLogBody({ invoiceId: "42", total: "400.00", reason: null })).toBe(
+    expect(invoiceVoidedLogBody({ invoiceNumber: 42, total: "400.00", reason: null })).toBe(
       "Invoice #42 voided — total $400.00."
     )
   })
 
   it("treats a blank reason as no reason", () => {
-    expect(invoiceVoidedLogBody({ invoiceId: "42", total: "400.00", reason: "   " })).toBe(
+    expect(invoiceVoidedLogBody({ invoiceNumber: 42, total: "400.00", reason: "   " })).toBe(
       "Invoice #42 voided — total $400.00."
     )
   })
@@ -121,7 +121,7 @@ describe("invoiceVoidedLogBody", () => {
 describe("paymentVoidedLogBody", () => {
   const base = {
     paymentId: "17",
-    invoiceId: "42",
+    invoiceNumber: 42,
     method: "cash" as const,
     reason: null,
   }

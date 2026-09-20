@@ -19,10 +19,10 @@ import type { getInvoiceWithDetails } from "./repositories"
 
 export type InvoiceDetail = NonNullable<Awaited<ReturnType<typeof getInvoiceWithDetails>>>
 
-// Invoice and receipt numbers are the rows' serial ids (see db/schema.ts), so
-// they're padded here rather than stored. Ids past 99999 simply get longer.
-export function formatDocumentNumber(id: number): string {
-  return `#${String(id).padStart(5, "0")}`
+// Ids are opaque 22-char uids (see db/ids.ts), so there is nothing to pad -
+// the document number is just the row id.
+export function formatDocumentNumber(id: string): string {
+  return `#${id}`
 }
 
 export interface AccountingDocumentMeta {
@@ -30,7 +30,7 @@ export interface AccountingDocumentMeta {
   // is recorded, and then `receipt` names which payment it acknowledges.
   kind: "invoice" | "receipt"
   invoice: InvoiceDetail
-  receipt?: { id: number; paymentId: number }
+  receipt?: { id: string; paymentId: string }
   clientName: string
   policyNumber: string
   generatedAt: Date

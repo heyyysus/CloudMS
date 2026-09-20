@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { ROW_ID_PATTERN } from "../db/ids"
 import {
   driverRatingEnum,
   invoiceItemCategoryEnum,
@@ -29,7 +30,7 @@ export const ATTACHMENT_MIME_TYPES = ["application/pdf", "image/png", "image/jpe
 // those are re-added with `z.iso.date()` to reject garbage before it reaches
 // the DB.
 
-export const idParam = z.coerce.number().int().positive()
+export const idParam = z.string().regex(ROW_ID_PATTERN)
 
 export const searchQuery = z.object({ q: z.string().trim().min(2).max(100) })
 
@@ -107,7 +108,7 @@ const optionalDlNumber = z
 export const createPolicyDriver = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("existing"),
-    personId: z.number().int().positive(),
+    personId: idParam,
     dlNumber: optionalDlNumber,
     rating: z.enum(driverRatingEnum.enumValues).optional(),
     sr22: z.boolean().optional(),
@@ -144,7 +145,7 @@ function checkPolicyChildren(
     }
     vins.add(vehicle.vin)
   })
-  const personIds = new Set<number>()
+  const personIds = new Set<string>()
   body.drivers?.forEach((driver, i) => {
     if (driver.kind !== "existing") return
     if (personIds.has(driver.personId)) {
@@ -181,7 +182,7 @@ export const updateVehicleBody = createVehicleBody.partial()
 export const createPolicyLogBody = insertPolicyLogSchema
   .omit({ id: true, createdAt: true, logNumber: true, authorId: true })
   .extend({
-    policyId: z.number().int().positive(),
+    policyId: idParam,
     body: z.string().trim().min(1).max(5000),
   })
 
@@ -189,14 +190,14 @@ export const createPolicyLogBody = insertPolicyLogSchema
 // mimeType/sizeBytes are never trusted from the client at confirm time - the
 // route re-derives them from R2's HeadObject response instead.
 export const presignAttachmentBody = z.object({
-  policyId: z.number().int().positive(),
+  policyId: idParam,
   fileName: z.string().trim().min(1).max(255),
   contentType: z.enum(ATTACHMENT_MIME_TYPES),
   sizeBytes: z.number().int().positive(),
 })
 
 export const confirmAttachmentBody = z.object({
-  policyId: z.number().int().positive(),
+  policyId: idParam,
   storageKey: z.string().trim().min(1),
   fileName: z.string().trim().min(1).max(255),
   description: z.string().trim().max(2000).nullable().optional(),
@@ -213,8 +214,8 @@ export const attachmentLinkQuery = z.object({
 // then chooses a single log for all of them. The cap is a sanity bound on a
 // batch a human assembled by clicking, not a product limit.
 export const linkPolicyLogAttachmentsBody = z.object({
-  logId: z.number().int().positive(),
-  attachmentIds: z.array(z.number().int().positive()).min(1).max(50),
+  logId: idParam,
+  attachmentIds: z.array(idParam).min(1).max(50),
 })
 
 // drizzle-zod only knows the column lengths, so the optional detail fields are
@@ -267,7 +268,7 @@ export const createInvoiceItemBody = z
   .object({
     category: z.enum(invoiceItemCategoryEnum.enumValues),
     type: z.enum(invoiceItemTypeEnum.enumValues),
-    carrierId: z.number().int().positive().nullable().optional(),
+    carrierId: idParam.nullable().optional(),
     description: z.string().trim().max(500).nullable().optional(),
     amount: positiveMoney,
   })
@@ -297,13 +298,13 @@ export const createInvoiceItemBody = z
   })
 
 export const createInvoiceBody = z.object({
-  policyId: z.number().int().positive(),
+  policyId: idParam,
   note: z.string().trim().max(2000).nullable().optional(),
   items: z.array(createInvoiceItemBody).min(1),
 })
 
 export const recordPaymentBody = z.object({
-  invoiceId: z.number().int().positive(),
+  invoiceId: idParam,
   method: z.enum(paymentMethodEnum.enumValues),
   amount: positiveMoney,
   note: z.string().trim().max(2000).nullable().optional(),
@@ -352,7 +353,7 @@ export const updateUserBody = z.object({
 })
 
 export const setActiveOrgBody = z.object({
-  orgId: z.number().int().positive(),
+  orgId: idParam,
 })
 
 export const updateEmailTemplateBody = z.object({

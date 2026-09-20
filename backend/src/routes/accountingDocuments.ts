@@ -53,7 +53,7 @@ async function documentHeader(
 export async function recordInvoiceDocument(
   req: Request,
   invoice: InvoiceDetail,
-  logId?: number
+  logId?: string
 ): Promise<void> {
   await bestEffort(req, "record the invoice document", async () => {
     const header = await documentHeader(invoice)
@@ -79,8 +79,8 @@ export async function recordInvoiceDocument(
 
 export async function recordReceiptDocument(
   req: Request,
-  receiptId: number,
-  logId?: number
+  receiptId: string,
+  logId?: string
 ): Promise<void> {
   await bestEffort(req, "record the receipt document", async () => {
     const receipt = await getReceiptWithDetails(receiptId)
@@ -115,7 +115,7 @@ export async function recordReceiptDocument(
 export async function voidAccountingDocument(
   req: Request,
   sourceType: AttachmentSourceType,
-  sourceId: number
+  sourceId: string
 ): Promise<void> {
   await bestEffort(req, `void the ${sourceType} document`, () =>
     markAttachmentsVoidedBySource(sourceType, sourceId)

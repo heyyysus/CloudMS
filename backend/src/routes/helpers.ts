@@ -2,12 +2,14 @@ import { Response } from "express"
 import { z } from "zod"
 import { idParam } from "./schemas"
 
-// Parses an :id route param, writing a 400 response and returning undefined
-// on failure so callers can `if (id === undefined) return`.
-export function parseId(raw: unknown, res: Response): number | undefined {
+// Parses an :id route param, writing a 404 response and returning undefined
+// on failure so callers can `if (id === undefined) return`. A malformed id
+// can never match a row, so it is indistinguishable from a row that isn't
+// there - answering 400 here would leak which ids are well-formed.
+export function parseId(raw: unknown, res: Response): string | undefined {
   const parsed = idParam.safeParse(raw)
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid id" })
+    res.status(404).json({ error: "Not found" })
     return undefined
   }
   return parsed.data

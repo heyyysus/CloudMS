@@ -279,7 +279,9 @@ describe("GET /policies/:policyId/merge-fields", () => {
   it("returns 404 for an unknown policy", async () => {
     const user = await ctx.user("merge-404")
     const cookie = await ctx.cookie(user.id)
-    const res = await request(app).get(`/policies/${MISSING_ROW_ID}/merge-fields`).set("Cookie", cookie)
+    const res = await request(app)
+      .get(`/policies/${MISSING_ROW_ID}/merge-fields`)
+      .set("Cookie", cookie)
     expect(res.status).toBe(404)
   })
 })

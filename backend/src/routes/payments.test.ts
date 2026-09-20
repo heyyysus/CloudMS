@@ -360,7 +360,8 @@ describe("POST /payments/:id/void", () => {
   it("returns 404 for a nonexistent payment", async () => {
     const { cookie } = await authed("pay-void-404", "admin")
     expect(
-      (await request(app).post(`/payments/${MISSING_ROW_ID}/void`).set("Cookie", cookie).send({})).status
+      (await request(app).post(`/payments/${MISSING_ROW_ID}/void`).set("Cookie", cookie).send({}))
+        .status
     ).toBe(404)
   })
 })

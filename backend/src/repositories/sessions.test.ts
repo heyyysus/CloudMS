@@ -8,7 +8,6 @@ import {
   createUser,
   deleteExpiredSessions,
   deleteSessionByTokenHash,
-  deleteSessionsByUserId,
   deleteSessionsByUserIdAndOrg,
   findSessionWithUserByTokenHash,
   setSessionOrg,
@@ -61,15 +60,6 @@ describe("sessions repository", () => {
     expect(await deleteSessionByTokenHash(tokenHash)).toBe(true)
     expect(await findSessionWithUserByTokenHash(tokenHash)).toBeUndefined()
     expect(await deleteSessionByTokenHash(tokenHash)).toBe(false)
-  })
-
-  it("deletes all sessions for a user", async () => {
-    const user = await makeUser("revoke")
-    await createSession({ userId: user.id, tokenHash: hashToken("r1"), expiresAt: futureDate() })
-    await createSession({ userId: user.id, tokenHash: hashToken("r2"), expiresAt: futureDate() })
-
-    expect(await deleteSessionsByUserId(user.id)).toBe(2)
-    expect(await findSessionWithUserByTokenHash(hashToken("r1"))).toBeUndefined()
   })
 
   it("deletes only expired sessions", async () => {

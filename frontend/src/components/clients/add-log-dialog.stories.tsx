@@ -7,12 +7,12 @@ import { ApiError } from '@/api/client'
 import { createPolicyLog, type PolicyLog } from '@/api/policyLogs'
 
 const savedLog: PolicyLog = {
-  id: 1,
-  policyId: 900,
+  id: '1',
+  policyId: '900',
   logNumber: 1,
   body: 'Called the client back.',
   createdAt: '2026-07-14T17:48:07.653Z',
-  author: { id: 1, name: 'Jane Staff', email: 'jane@example.com' },
+  author: { id: '1', name: 'Jane Staff', email: 'jane@example.com' },
 }
 
 function createTestQueryClient() {
@@ -28,7 +28,7 @@ function StatefulAddLogDialog({
   policyId,
   createLogFn,
 }: {
-  policyId: number
+  policyId: string
   createLogFn?: typeof createPolicyLog
 }) {
   const [open, setOpen] = useState(true)
@@ -47,7 +47,7 @@ const meta = {
   component: StatefulAddLogDialog,
   tags: ['autodocs'],
   args: {
-    policyId: 900,
+    policyId: '900',
   },
   decorators: [
     (Story) => (
@@ -72,7 +72,7 @@ export const SubmitSavesAndCloses: Story = {
     await userEvent.click(screen.getByRole('button', { name: /^add log$/i }))
 
     await expect(args.createLogFn).toHaveBeenCalledWith({
-      policyId: 900,
+      policyId: '900',
       body: 'Called the client back.',
     })
     await waitFor(() =>
@@ -95,7 +95,7 @@ export const ShortcutSubmits: Story = {
     await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
 
     await expect(args.createLogFn).toHaveBeenCalledWith({
-      policyId: 900,
+      policyId: '900',
       body: 'Filed by shortcut.',
     })
   },

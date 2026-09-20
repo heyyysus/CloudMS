@@ -36,7 +36,7 @@ export const EmailSent: Story = {
     inviteUserFn: fn(
       async (): Promise<InviteUserResult> => ({
         user: {
-          id: 1,
+          id: '1',
           email: 'newperson@example.com',
           name: null,
           role: 'staff',
@@ -65,7 +65,7 @@ export const EmailFailed: Story = {
     inviteUserFn: fn(
       async (): Promise<InviteUserResult> => ({
         user: {
-          id: 2,
+          id: '2',
           email: 'noreach@example.com',
           name: null,
           role: 'staff',
@@ -126,12 +126,12 @@ export const DuplicateEmail: Story = {
 export const OfferstoRestoreADeletedUser: Story = {
   args: {
     inviteUserFn: fn(async () => {
-      throw new ApiError(409, 'This email belonged to a deleted user', { deletedUserId: 7 })
+      throw new ApiError(409, 'This email belonged to a deleted user', { deletedUserId: '7' })
     }),
     restoreUserFn: fn(
       async (): Promise<InviteUserResult> => ({
         user: {
-          id: 7,
+          id: '7',
           email: 'wasdeleted@example.com',
           name: 'Riley Restored',
           role: 'staff',
@@ -151,7 +151,7 @@ export const OfferstoRestoreADeletedUser: Story = {
     await expect(alert).toHaveTextContent('wasdeleted@example.com belonged to a deleted user')
 
     await userEvent.click(within(alert).getByRole('button', { name: 'Restore' }))
-    await expect(args.restoreUserFn).toHaveBeenCalledWith(7)
+    await expect(args.restoreUserFn).toHaveBeenCalledWith('7')
     await expect(await screen.findByText(/user restored/i)).toBeInTheDocument()
   },
 }

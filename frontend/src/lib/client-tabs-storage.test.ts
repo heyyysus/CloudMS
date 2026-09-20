@@ -21,29 +21,29 @@ beforeEach(() => {
 
 describe('upsertTab', () => {
   it('appends a new tab', () => {
-    const tabs: ClientTab[] = [{ id: 1, label: 'Jane Doe' }]
-    const next = upsertTab(tabs, { id: 2, label: 'John Smith' })
+    const tabs: ClientTab[] = [{ id: '1', label: 'Jane Doe' }]
+    const next = upsertTab(tabs, { id: '2', label: 'John Smith' })
     expect(next).toEqual([
-      { id: 1, label: 'Jane Doe' },
-      { id: 2, label: 'John Smith' },
+      { id: '1', label: 'Jane Doe' },
+      { id: '2', label: 'John Smith' },
     ])
   })
 
   it('updates the label of an existing tab in place (no reorder)', () => {
     const tabs: ClientTab[] = [
-      { id: 1, label: 'Jane Doe' },
-      { id: 2, label: 'John Smith' },
+      { id: '1', label: 'Jane Doe' },
+      { id: '2', label: 'John Smith' },
     ]
-    const next = upsertTab(tabs, { id: 1, label: 'Jane D.' })
+    const next = upsertTab(tabs, { id: '1', label: 'Jane D.' })
     expect(next).toEqual([
-      { id: 1, label: 'Jane D.' },
-      { id: 2, label: 'John Smith' },
+      { id: '1', label: 'Jane D.' },
+      { id: '2', label: 'John Smith' },
     ])
   })
 
   it('returns the same array reference when nothing changed', () => {
-    const tabs: ClientTab[] = [{ id: 1, label: 'Jane Doe' }]
-    const next = upsertTab(tabs, { id: 1, label: 'Jane Doe' })
+    const tabs: ClientTab[] = [{ id: '1', label: 'Jane Doe' }]
+    const next = upsertTab(tabs, { id: '1', label: 'Jane Doe' })
     expect(next).toBe(tabs)
   })
 })
@@ -51,21 +51,21 @@ describe('upsertTab', () => {
 describe('removeTabById', () => {
   it('removes the matching tab', () => {
     const tabs: ClientTab[] = [
-      { id: 1, label: 'Jane Doe' },
-      { id: 2, label: 'John Smith' },
+      { id: '1', label: 'Jane Doe' },
+      { id: '2', label: 'John Smith' },
     ]
-    expect(removeTabById(tabs, 1)).toEqual([{ id: 2, label: 'John Smith' }])
+    expect(removeTabById(tabs, '1')).toEqual([{ id: '2', label: 'John Smith' }])
   })
 
   it('is a no-op when the id is not present', () => {
-    const tabs: ClientTab[] = [{ id: 1, label: 'Jane Doe' }]
-    expect(removeTabById(tabs, 999)).toEqual(tabs)
+    const tabs: ClientTab[] = [{ id: '1', label: 'Jane Doe' }]
+    expect(removeTabById(tabs, '999')).toEqual(tabs)
   })
 })
 
 describe('loadTabs / saveTabs', () => {
   it('round-trips through localStorage', () => {
-    const tabs: ClientTab[] = [{ id: 1, label: 'Jane Doe' }]
+    const tabs: ClientTab[] = [{ id: '1', label: 'Jane Doe' }]
     saveTabs(tabs)
     expect(loadTabs()).toEqual(tabs)
   })
@@ -80,15 +80,15 @@ describe('loadTabs / saveTabs', () => {
   })
 
   it('returns [] when the stored value is not an array', () => {
-    localStorage.setItem('cloudms.open-client-tabs', JSON.stringify({ id: 1 }))
+    localStorage.setItem('cloudms.open-client-tabs', JSON.stringify({ id: '1' }))
     expect(loadTabs()).toEqual([])
   })
 
   it('filters out malformed entries', () => {
     localStorage.setItem(
       'cloudms.open-client-tabs',
-      JSON.stringify([{ id: 1, label: 'Jane Doe' }, { id: 'oops' }, { label: 'no id' }, null]),
+      JSON.stringify([{ id: '1', label: 'Jane Doe' }, { id: 'oops' }, { label: 'no id' }, null]),
     )
-    expect(loadTabs()).toEqual([{ id: 1, label: 'Jane Doe' }])
+    expect(loadTabs()).toEqual([{ id: '1', label: 'Jane Doe' }])
   })
 })

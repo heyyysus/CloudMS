@@ -5,9 +5,9 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import type { ClientDetail } from '@/api/clients'
 
 const fullClient: Omit<ClientDetail, 'policies'> = {
-  id: 155,
-  namedInsuredId: 229,
-  secondNamedInsuredId: 230,
+  id: '155',
+  namedInsuredId: '229',
+  secondNamedInsuredId: '230',
   mailingAddress1: '42 Wallaby Way',
   mailingAddress2: null,
   mailingCity: 'Sydney',
@@ -21,7 +21,7 @@ const fullClient: Omit<ClientDetail, 'policies'> = {
   createdAt: '2026-07-14T17:48:07.653Z',
   updatedAt: '2026-07-14T17:48:07.653Z',
   namedInsured: {
-    id: 229,
+    id: '229',
     firstName: 'Jane',
     lastName: 'Doe',
     dateOfBirth: '1987-07-22',
@@ -32,7 +32,7 @@ const fullClient: Omit<ClientDetail, 'policies'> = {
     updatedAt: '2026-07-14T17:48:07.653Z',
   },
   secondNamedInsured: {
-    id: 230,
+    id: '230',
     firstName: 'John',
     lastName: 'Doe',
     dateOfBirth: '1985-03-10',
@@ -42,8 +42,8 @@ const fullClient: Omit<ClientDetail, 'policies'> = {
     createdAt: '2026-07-14T17:48:07.653Z',
     updatedAt: '2026-07-14T17:48:07.653Z',
   },
-  phones: [{ id: 26, clientId: 155, phoneNumber: '555-867-5309', createdAt: '2026-07-14T17:48:07.653Z' }],
-  emails: [{ id: 14, clientId: 155, email: 'jane@example.com', createdAt: '2026-07-14T17:48:07.653Z' }],
+  phones: [{ id: '26', clientId: '155', phoneNumber: '555-867-5309', createdAt: '2026-07-14T17:48:07.653Z' }],
+  emails: [{ id: '14', clientId: '155', email: 'jane@example.com', createdAt: '2026-07-14T17:48:07.653Z' }],
 }
 
 const minimalClient: Omit<ClientDetail, 'policies'> = {

@@ -7,7 +7,7 @@ import type { ClientDetail, Person } from '@/api/clients'
 import { ToastProvider } from '@/components/ui/toast'
 
 const personFixture: Person = {
-  id: 301,
+  id: '301',
   firstName: 'John',
   lastName: 'Smith',
   dateOfBirth: '1990-01-01',
@@ -19,7 +19,7 @@ const personFixture: Person = {
 }
 
 const clientFixture: ClientDetail = {
-  id: 400,
+  id: '400',
   namedInsuredId: personFixture.id,
   secondNamedInsuredId: null,
   mailingAddress1: null,

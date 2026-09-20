@@ -9,7 +9,7 @@ function isClientTab(value: unknown): value is ClientTab {
   return (
     typeof value === 'object' &&
     value !== null &&
-    typeof (value as ClientTab).id === 'number' &&
+    typeof (value as ClientTab).id === 'string' &&
     typeof (value as ClientTab).label === 'string'
   )
 }

@@ -55,7 +55,7 @@ const meta = {
   component: PolicyActivities,
   tags: ['autodocs'],
   args: {
-    policyId: 7,
+    policyId: '7',
     getPolicyActivitiesFn: fn(async () => ({ activities: [pending, sent] })),
     cancelScheduledEmailFn: fn(async () => ({}) as never),
   },
@@ -135,6 +135,6 @@ export const CancelsAPendingReminder: Story = {
 
     // The mutationFn wraps this rather than being it, so react-query's
     // context object is not passed through - just the recovered numeric id.
-    await expect(args.cancelScheduledEmailFn).toHaveBeenCalledWith(42)
+    await expect(args.cancelScheduledEmailFn).toHaveBeenCalledWith('42')
   },
 }

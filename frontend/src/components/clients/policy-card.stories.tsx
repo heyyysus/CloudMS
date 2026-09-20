@@ -7,9 +7,9 @@ import type { PolicyDetail } from '@/api/policies'
 // Expiration dates in fixtures must be far-future (or clearly past): the card
 // displays a policy as expired once its expiration date passes.
 const bare: AutoPolicy = {
-  id: 104,
-  clientId: 155,
-  carrierId: 140,
+  id: '104',
+  clientId: '155',
+  carrierId: '140',
   policyNumber: 'SMOKE-POL-001',
   policyAddress1: null,
   policyAddress2: null,
@@ -26,8 +26,8 @@ const bare: AutoPolicy = {
 const detail: PolicyDetail = {
   ...bare,
   client: {
-    id: 155,
-    namedInsuredId: 229,
+    id: '155',
+    namedInsuredId: '229',
     secondNamedInsuredId: null,
     mailingAddress1: null,
     mailingAddress2: null,
@@ -43,7 +43,7 @@ const detail: PolicyDetail = {
     updatedAt: '2026-07-14T17:48:07.653Z',
   },
   carrier: {
-    id: 140,
+    id: '140',
     name: 'SmokeCarrier',
     naic: 'SMK0000001',
     isActive: true,
@@ -57,8 +57,8 @@ const detail: PolicyDetail = {
   },
   vehicles: [
     {
-      id: 1,
-      policyId: 104,
+      id: '1',
+      policyId: '104',
       vin: '1HGCM82633A123456',
       make: 'Honda',
       model: 'Accord',
@@ -80,18 +80,18 @@ const detail: PolicyDetail = {
   ],
   policyDrivers: [
     {
-      id: 60,
-      policyId: 104,
-      driverId: 61,
+      id: '60',
+      policyId: '104',
+      driverId: '61',
       createdAt: '2026-07-14T17:48:07.653Z',
       driver: {
-        id: 61,
-        personId: 229,
+        id: '61',
+        personId: '229',
         dlNumber: 'D1234567',
         rating: 'rated',
         sr22: false,
         person: {
-          id: 229,
+          id: '229',
           firstName: 'Jane',
           lastName: 'Doe',
           dateOfBirth: '1987-07-22',
@@ -180,9 +180,9 @@ export const DriverMissingDl: Story = {
       policyDrivers: [
         {
           ...detail.policyDrivers[0],
-          id: 61,
-          driverId: 62,
-          driver: { ...detail.policyDrivers[0].driver, id: 62, dlNumber: null },
+          id: '61',
+          driverId: '62',
+          driver: { ...detail.policyDrivers[0].driver, id: '62', dlNumber: null },
         },
       ],
     },

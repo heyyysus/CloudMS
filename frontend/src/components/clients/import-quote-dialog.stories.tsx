@@ -16,7 +16,7 @@ import fixtureRaw from '@/lib/__fixtures__/integration-file.tt2x?raw'
 const raterFile = new File([fixtureRaw], 'quote.tt2x', { type: 'application/octet-stream' })
 
 const johnPerson: Person = {
-  id: 501,
+  id: '501',
   firstName: 'JOHN',
   lastName: 'VAN DER BERG',
   dateOfBirth: '1985-03-12',
@@ -30,7 +30,7 @@ const johnPerson: Person = {
 // Named insured intentionally matches the fixture's insured exactly, so the
 // existing-client stories exercise the by-name driver-matching path.
 const existingClient: ClientDetail = {
-  id: 700,
+  id: '700',
   namedInsuredId: johnPerson.id,
   secondNamedInsuredId: null,
   mailingAddress1: '500 Fictional Ave',
@@ -53,7 +53,7 @@ const existingClient: ClientDetail = {
 }
 
 const alexPerson: Person = {
-  id: 812,
+  id: '812',
   firstName: 'Alex',
   lastName: 'Rivera',
   dateOfBirth: '1990-01-01',
@@ -65,7 +65,7 @@ const alexPerson: Person = {
 }
 
 const otherClient: ClientDetail = {
-  id: 701,
+  id: '701',
   namedInsuredId: alexPerson.id,
   secondNamedInsuredId: null,
   mailingAddress1: null,
@@ -87,11 +87,11 @@ const otherClient: ClientDetail = {
   policies: [],
 }
 
-const createdClient: ClientDetail = { ...existingClient, id: 702 }
+const createdClient: ClientDetail = { ...existingClient, id: '702' }
 
 const carriers: Carrier[] = [
   {
-    id: 9,
+    id: '9',
     name: 'Sample Mutual',
     naic: '00000',
     isActive: true,
@@ -106,7 +106,7 @@ const carriers: Carrier[] = [
 ]
 
 const createdPolicy: PolicyDetail = {
-  id: 900,
+  id: '900',
   clientId: existingClient.id,
   carrierId: carriers[0].id,
   policyNumber: 'IMPORTED-1',
@@ -164,12 +164,12 @@ const meta = {
     getCarriersFn: fn(async () => carriers),
     createPolicyFn: fn(async () => createdPolicy),
     createPolicyLogFn: fn(async () => ({
-      id: 1,
+      id: '1',
       policyId: createdPolicy.id,
       logNumber: 1,
       body: 'imported',
       createdAt: '2026-08-01T00:00:00.000Z',
-      author: { id: 1, name: 'Test User', email: 'test@example.com' },
+      author: { id: '1', name: 'Test User', email: 'test@example.com' },
     })),
   },
   decorators: [

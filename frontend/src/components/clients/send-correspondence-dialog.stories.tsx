@@ -11,8 +11,8 @@ import type { PolicyDetail } from '@/api/policies'
 import type { CorrespondenceTemplate } from '@/api/correspondenceTemplates'
 
 const client = {
-  id: 42,
-  namedInsuredId: 1,
+  id: '42',
+  namedInsuredId: '1',
   secondNamedInsuredId: null,
   mailingAddress1: '123 Main St',
   mailingAddress2: null,
@@ -27,7 +27,7 @@ const client = {
   createdAt: '2026-01-01T00:00:00',
   updatedAt: '2026-01-01T00:00:00',
   namedInsured: {
-    id: 1,
+    id: '1',
     firstName: 'Jane',
     lastName: 'Doe',
     dateOfBirth: '1990-01-01',
@@ -40,17 +40,17 @@ const client = {
   secondNamedInsured: null,
   phones: [],
   emails: [
-    { id: 1, clientId: 42, email: 'jane@example.com', createdAt: '2026-01-01T00:00:00' },
-    { id: 2, clientId: 42, email: 'john@example.com', createdAt: '2026-01-01T00:00:00' },
+    { id: '1', clientId: '42', email: 'jane@example.com', createdAt: '2026-01-01T00:00:00' },
+    { id: '2', clientId: '42', email: 'john@example.com', createdAt: '2026-01-01T00:00:00' },
   ],
   policies: [],
 } as unknown as ClientDetail
 
-const policy = { id: 900, policyNumber: 'POL-100482' } as unknown as PolicyDetail
+const policy = { id: '900', policyNumber: 'POL-100482' } as unknown as PolicyDetail
 
 const templates: CorrespondenceTemplate[] = [
   {
-    id: 7,
+    id: '7',
     key: 'correspondence-renewal-notice-ab12cd34',
     name: 'Renewal Notice',
     subject: 'Policy {{policyNumber}} renews soon',
@@ -58,7 +58,7 @@ const templates: CorrespondenceTemplate[] = [
     updatedAt: '2026-02-01T00:00:00',
   },
   {
-    id: 8,
+    id: '8',
     key: 'correspondence-document-request-ef56gh78',
     name: 'Document Request',
     subject: 'We need a document for {{policyNumber}}',
@@ -177,7 +177,7 @@ export const PreviewsRealClientAndPolicyData: Story = {
 export const DistinguishesSameNamedTemplates: Story = {
   args: {
     getTemplatesFn: fn(async () => ({
-      templates: [templates[0], { ...templates[0], id: 9, name: 'Renewal Notice' }],
+      templates: [templates[0], { ...templates[0], id: '9', name: 'Renewal Notice' }],
       mergeFields: Object.keys(mergeValues),
     })),
   },
@@ -198,8 +198,8 @@ export const DistinguishesSameNamedTemplates: Story = {
     // Picking the second one sends the second one, not the first.
     await userEvent.click(options[1])
     await userEvent.click(within(dialog).getByRole('button', { name: /^Send/ }))
-    await expect(args.sendFn).toHaveBeenCalledWith(900, {
-      templateId: 9,
+    await expect(args.sendFn).toHaveBeenCalledWith('900', {
+      templateId: '9',
       to: ['jane@example.com'],
       cc: [],
     })
@@ -215,8 +215,8 @@ export const AddsAnOnFileAddressToCc: Story = {
     await chooseTemplate('Renewal Notice')
     await userEvent.click(within(dialog).getByRole('button', { name: /^Send/ }))
 
-    await expect(args.sendFn).toHaveBeenCalledWith(900, {
-      templateId: 7,
+    await expect(args.sendFn).toHaveBeenCalledWith('900', {
+      templateId: '7',
       to: ['jane@example.com'],
       cc: ['john@example.com'],
     })
@@ -234,8 +234,8 @@ export const AcceptsAFreeTextAddress: Story = {
     await chooseTemplate('Renewal Notice')
     await userEvent.click(within(dialog).getByRole('button', { name: /^Send/ }))
 
-    await expect(args.sendFn).toHaveBeenCalledWith(900, {
-      templateId: 7,
+    await expect(args.sendFn).toHaveBeenCalledWith('900', {
+      templateId: '7',
       to: ['jane@example.com'],
       cc: ['lienholder@bank.example.com'],
     })

@@ -4,8 +4,8 @@ import { VehicleDetailDialog } from './vehicle-detail-dialog'
 import type { Vehicle } from '@/api/policies'
 
 const vehicle: Vehicle = {
-  id: 40,
-  policyId: 900,
+  id: '40',
+  policyId: '900',
   vin: '1HGCM82633A004352',
   make: 'Honda',
   model: 'Accord',

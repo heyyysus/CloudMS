@@ -8,7 +8,7 @@ import type { Invoice } from '@/api/invoices'
 import type { InvoicePayment } from '@/api/invoices'
 
 const carrier: Carrier = {
-  id: 7,
+  id: '7',
   name: 'Acme Insurance',
   naic: '12345',
   isActive: true,
@@ -22,10 +22,10 @@ const carrier: Carrier = {
 }
 
 const openInvoice: Invoice = {
-  id: 10,
-  policyId: 900,
-  clientId: 155,
-  createdBy: 1,
+  id: '10',
+  policyId: '900',
+  clientId: '155',
+  createdBy: '1',
   status: 'open',
   total: '100.00',
   amountPaid: '40.00',
@@ -37,19 +37,19 @@ const openInvoice: Invoice = {
   updatedAt: '2026-07-01T17:48:07.653Z',
   items: [
     {
-      id: 2,
-      invoiceId: 10,
+      id: '2',
+      invoiceId: '10',
       category: 'sweep',
       type: 'new_business_sweep',
-      carrierId: 7,
+      carrierId: '7',
       description: null,
       amount: '80.00',
       createdAt: '2026-07-01T17:48:07.653Z',
       carrier,
     },
     {
-      id: 3,
-      invoiceId: 10,
+      id: '3',
+      invoiceId: '10',
       category: 'agency',
       type: 'new_business_fee',
       carrierId: null,
@@ -66,18 +66,18 @@ const openInvoice: Invoice = {
 // every policy's Accounting subtab).
 const otherPolicyInvoice: Invoice = {
   ...openInvoice,
-  id: 11,
-  policyId: 901,
+  id: '11',
+  policyId: '901',
   status: 'open',
   total: '75.00',
   amountPaid: '0.00',
 }
 
 const payment: InvoicePayment = {
-  id: 5,
-  invoiceId: 10,
-  policyId: 900,
-  clientId: 155,
+  id: '5',
+  invoiceId: '10',
+  policyId: '900',
+  clientId: '155',
   method: 'cash',
   amount: '40.00',
   amountApplied: '40.00',
@@ -90,17 +90,17 @@ const payment: InvoicePayment = {
 }
 
 const voidedPayment: InvoicePayment = {
-  id: 6,
-  invoiceId: 10,
-  policyId: 900,
-  clientId: 155,
+  id: '6',
+  invoiceId: '10',
+  policyId: '900',
+  clientId: '155',
   method: 'check',
   amount: '25.00',
   amountApplied: '25.00',
   changeGiven: '0.00',
   note: null,
   voidedAt: '2026-07-03T17:48:07.653Z',
-  voidedBy: 2,
+  voidedBy: '2',
   voidReason: 'Deposited to the wrong invoice',
   createdAt: '2026-07-03T00:00:00.000Z',
 }
@@ -114,8 +114,8 @@ const meta = {
   component: PolicyLedger,
   tags: ['autodocs'],
   args: {
-    clientId: 155,
-    policyId: 900,
+    clientId: '155',
+    policyId: '900',
     onPay: fn(),
     onSelect: fn(),
     getInvoicesFn: fn(async () => [openInvoice]),
@@ -147,13 +147,13 @@ export const RunningBalance: Story = {
 
     // Selecting the invoice row opens its receipt.
     await userEvent.click(canvas.getByRole('button', { name: /open invoice #10/i }))
-    await expect(args.onSelect).toHaveBeenCalledWith(10)
+    await expect(args.onSelect).toHaveBeenCalledWith('10')
 
     // The invoice is still open, so it gets a Pay button. Clicking it must
     // fire only onPay - the z-10 overlay ordering exists precisely so Pay
     // doesn't also open the receipt.
     await userEvent.click(canvas.getByRole('button', { name: /^pay$/i }))
-    await expect(args.onPay).toHaveBeenCalledWith(10)
+    await expect(args.onPay).toHaveBeenCalledWith('10')
     await expect(args.onSelect).toHaveBeenCalledTimes(1)
   },
 }
@@ -190,7 +190,7 @@ export const VoidedPayment: Story = {
     // Payment rows open their invoice too, not just invoice rows - every
     // ledger row has an invoiceId, so the click overlay covers all of them.
     await userEvent.click(canvas.getByRole('button', { name: /open payment #5/i }))
-    await expect(args.onSelect).toHaveBeenCalledWith(10)
+    await expect(args.onSelect).toHaveBeenCalledWith('10')
   },
 }
 

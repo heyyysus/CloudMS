@@ -4,18 +4,18 @@ import { DriverDetailDialog } from './driver-detail-dialog'
 import type { PolicyDriver } from '@/api/policies'
 
 const driver: PolicyDriver = {
-  id: 60,
-  policyId: 900,
-  driverId: 61,
+  id: '60',
+  policyId: '900',
+  driverId: '61',
   createdAt: '2026-01-14T17:48:07.653Z',
   driver: {
-    id: 61,
-    personId: 229,
+    id: '61',
+    personId: '229',
     dlNumber: 'D1234567',
     rating: 'rated',
     sr22: false,
     person: {
-      id: 229,
+      id: '229',
       firstName: 'Jane',
       lastName: 'Doe',
       dateOfBirth: '1987-07-22',

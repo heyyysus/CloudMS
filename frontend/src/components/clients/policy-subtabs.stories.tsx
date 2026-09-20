@@ -77,11 +77,11 @@ export const SwitchToAccounting: Story = {
 // Policy id → policy number, mirroring the shape ClientDetail passes to
 // PolicyTabs. The subtab lives in the parent, shared across policies, so
 // switching policy tabs must not reset it back to Policy Details.
-function policyFixture(id: number, policyNumber: string): AutoPolicy {
+function policyFixture(id: string, policyNumber: string): AutoPolicy {
   return {
     id,
-    clientId: 155,
-    carrierId: 140,
+    clientId: '155',
+    carrierId: '140',
     policyNumber,
     policyAddress1: null,
     policyAddress2: null,
@@ -97,12 +97,12 @@ function policyFixture(id: number, policyNumber: string): AutoPolicy {
 }
 
 const policies: AutoPolicy[] = [
-  policyFixture(10, 'POL-OLDEST'),
-  policyFixture(20, 'POL-NEWEST'),
+  policyFixture('10', 'POL-OLDEST'),
+  policyFixture('20', 'POL-NEWEST'),
 ]
 
 function SharedSubtabAcrossPolicies() {
-  const [policyId, setPolicyId] = useState(20)
+  const [policyId, setPolicyId] = useState('20')
   const [subtab, setSubtab] = useState<PolicySubtabValue>('details')
   return (
     <PolicyTabs policies={policies} selectedId={policyId} onSelect={setPolicyId}>

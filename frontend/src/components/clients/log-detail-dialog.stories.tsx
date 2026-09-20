@@ -8,17 +8,17 @@ import type { PolicyLogAttachment } from '@/api/policyLogAttachments'
 import type { PolicyLog } from '@/api/policyLogs'
 
 const log: PolicyLog = {
-  id: 2,
-  policyId: 900,
+  id: '2',
+  policyId: '900',
   logNumber: 2,
   body: 'Insured called in to inquire about renewal offer.\n\nConfirmed the multi-policy discount still applies.',
   createdAt: '2026-03-02T14:31:00',
-  author: { id: 1, name: 'Jane Staff', email: 'jane@example.com' },
+  author: { id: '1', name: 'Jane Staff', email: 'jane@example.com' },
 }
 
 const declarations: PolicyAttachment = {
-  id: 10,
-  policyId: 900,
+  id: '10',
+  policyId: '900',
   fileName: 'declarations-page.pdf',
   description: 'Declarations page from carrier',
   mimeType: 'application/pdf',
@@ -27,25 +27,25 @@ const declarations: PolicyAttachment = {
   sourceType: 'upload',
   sourceId: null,
   createdAt: '2026-03-02T14:31:00',
-  uploadedBy: { id: 1, name: 'Jane Staff', email: 'jane@example.com' },
+  uploadedBy: { id: '1', name: 'Jane Staff', email: 'jane@example.com' },
 }
 
 const links: PolicyLogAttachment[] = [
   {
-    id: 501,
-    logId: 2,
+    id: '501',
+    logId: '2',
     createdAt: '2026-03-02T14:35:00',
     // Deliberately not the uploader, so the story proves the credit follows
     // the link rather than the file.
-    linkedBy: { id: 2, name: 'Tom Reyes', email: 'tom@example.com' },
+    linkedBy: { id: '2', name: 'Tom Reyes', email: 'tom@example.com' },
     attachment: declarations,
   },
   {
-    id: 502,
-    logId: 2,
+    id: '502',
+    logId: '2',
     createdAt: '2026-03-02T14:36:00',
-    linkedBy: { id: 1, name: 'Jane Staff', email: 'jane@example.com' },
-    attachment: { ...declarations, id: 11, fileName: 'id-card.png', mimeType: 'image/png' },
+    linkedBy: { id: '1', name: 'Jane Staff', email: 'jane@example.com' },
+    attachment: { ...declarations, id: '11', fileName: 'id-card.png', mimeType: 'image/png' },
   },
 ]
 
@@ -62,12 +62,12 @@ function StatefulLogDetailDialog({
   onUnlink,
   unlinkingId,
 }: {
-  currentUserId?: number
+  currentUserId?: string
   onOpenChange: (open: boolean) => void
   links?: PolicyLogAttachment[]
   onPreviewAttachment?: (attachment: PolicyAttachment) => void
-  onUnlink?: (linkId: number) => void
-  unlinkingId?: number
+  onUnlink?: (linkId: string) => void
+  unlinkingId?: string
 }) {
   const [selected, setSelected] = useState<PolicyLog | null>(log)
   return (
@@ -91,7 +91,7 @@ const meta = {
   component: StatefulLogDetailDialog,
   tags: ['autodocs'],
   args: {
-    currentUserId: 1,
+    currentUserId: '1',
     onOpenChange: fn(),
     onPreviewAttachment: fn(),
     onUnlink: fn(),
@@ -157,12 +157,12 @@ export const UnlinksOnClick: Story = {
   play: async ({ args }) => {
     await screen.findByText('Log #2')
     await userEvent.click(screen.getByRole('button', { name: 'Unlink id-card' }))
-    await expect(args.onUnlink).toHaveBeenCalledWith(502)
+    await expect(args.onUnlink).toHaveBeenCalledWith('502')
   },
 }
 
 export const UnlinkInFlight: Story = {
-  args: { links, unlinkingId: 501 },
+  args: { links, unlinkingId: '501' },
   play: async () => {
     await screen.findByText('Log #2')
     await expect(screen.getByRole('button', { name: 'Unlink declarations-page' })).toBeDisabled()

@@ -4,10 +4,10 @@ import type { Invoice, InvoicePayment } from '@/api/invoices'
 
 function makeInvoice(overrides: Partial<Invoice> = {}): Invoice {
   return {
-    id: 1,
-    policyId: 900,
-    clientId: 155,
-    createdBy: 1,
+    id: '1',
+    policyId: '900',
+    clientId: '155',
+    createdBy: '1',
     status: 'open',
     total: '100.00',
     amountPaid: '0.00',
@@ -19,8 +19,8 @@ function makeInvoice(overrides: Partial<Invoice> = {}): Invoice {
     updatedAt: '2026-01-01T00:00:00.000Z',
     items: [
       {
-        id: 1,
-        invoiceId: 1,
+        id: '1',
+        invoiceId: '1',
         category: 'agency',
         type: 'new_business_fee',
         carrierId: null,
@@ -36,10 +36,10 @@ function makeInvoice(overrides: Partial<Invoice> = {}): Invoice {
 
 function makePayment(overrides: Partial<InvoicePayment> = {}): InvoicePayment {
   return {
-    id: 1,
-    invoiceId: 1,
-    policyId: 900,
-    clientId: 155,
+    id: '1',
+    invoiceId: '1',
+    policyId: '900',
+    clientId: '155',
     method: 'cash',
     amount: '40.00',
     amountApplied: '40.00',
@@ -82,7 +82,7 @@ describe('buildPolicyLedger', () => {
   it('closes the balance to zero when payments cover the invoice total', () => {
     const rows = buildPolicyLedger(
       [makeInvoice({ total: '100.00' })],
-      [makePayment({ id: 1, amountApplied: '100.00' })]
+      [makePayment({ id: '1', amountApplied: '100.00' })]
     )
     expect(rows.at(-1)?.balanceCents).toBe(0)
   })
@@ -103,7 +103,7 @@ describe('buildPolicyLedger', () => {
         makeInvoice({
           total: '100.00',
           voidedAt: '2026-01-03T00:00:00.000Z',
-          voidedBy: 2,
+          voidedBy: '2',
           voidReason: 'entered in error',
         }),
       ],
@@ -127,7 +127,7 @@ describe('buildPolicyLedger', () => {
         makePayment({
           amountApplied: '40.00',
           voidedAt: '2026-01-03T00:00:00.000Z',
-          voidedBy: 2,
+          voidedBy: '2',
           voidReason: 'wrong invoice',
         }),
       ]
@@ -141,8 +141,8 @@ describe('buildPolicyLedger', () => {
   it('orders oldest to newest and breaks same-timestamp ties by entity id', () => {
     const at = '2026-01-05T00:00:00.000Z'
     const rows = buildPolicyLedger(
-      [makeInvoice({ id: 2, total: '20.00', createdAt: at })],
-      [makePayment({ id: 1, invoiceId: 2, amountApplied: '5.00', createdAt: at })]
+      [makeInvoice({ id: '2', total: '20.00', createdAt: at })],
+      [makePayment({ id: '1', invoiceId: '2', amountApplied: '5.00', createdAt: at })]
     )
     // invoice id 2 vs payment id 1: tiebreak is by id, so payment (id 1) sorts first.
     expect(rows.map((r) => r.kind)).toEqual(['payment', 'invoice'])

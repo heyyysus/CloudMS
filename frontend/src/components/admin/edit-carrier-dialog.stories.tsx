@@ -9,7 +9,7 @@ function createTestQueryClient() {
 }
 
 const carrier: Carrier = {
-  id: 7,
+  id: '7',
   name: 'Acme Insurance',
   naic: '12345',
   isActive: true,
@@ -50,7 +50,7 @@ export const SavesChanges: Story = {
     await userEvent.type(name, 'Acme Renamed')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
-    await expect(args.updateCarrierFn).toHaveBeenCalledWith(7, {
+    await expect(args.updateCarrierFn).toHaveBeenCalledWith('7', {
       name: 'Acme Renamed',
       naic: '12345',
       producerCode: 'PRD-42',

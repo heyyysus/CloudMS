@@ -20,9 +20,9 @@ afterEach(() => {
 })
 
 let fileCounter = 0
-async function makeAttachment(policyId: string, createdBy: string) {
+async function makeAttachment(orgId: string, policyId: string, createdBy: string) {
   fileCounter += 1
-  return createPolicyAttachment({
+  return createPolicyAttachment(orgId, {
     policyId,
     fileName: `doc-${fileCounter}.pdf`,
     storageKey: `policy-attachments/${policyId}/${Date.now()}-${fileCounter}.pdf`,
@@ -74,8 +74,8 @@ describe("POST /policy-log-attachments", () => {
     const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const log = await ctx.log(policy.id, user.id)
-    const a = await makeAttachment(policy.id, user.id)
-    const b = await makeAttachment(policy.id, user.id)
+    const a = await makeAttachment(await ctx.orgId(), policy.id, user.id)
+    const b = await makeAttachment(await ctx.orgId(), policy.id, user.id)
 
     const res = await request(app)
       .post("/policy-log-attachments")
@@ -96,7 +96,7 @@ describe("POST /policy-log-attachments", () => {
     const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const log = await ctx.log(policy.id, user.id)
-    const a = await makeAttachment(policy.id, user.id)
+    const a = await makeAttachment(await ctx.orgId(), policy.id, user.id)
 
     await request(app)
       .post("/policy-log-attachments")
@@ -115,7 +115,7 @@ describe("POST /policy-log-attachments", () => {
     // Anyone may link to anyone's log, so the log author is a third user.
     const author = await ctx.user("logatt-author")
     const log = await ctx.log(policy.id, author.id)
-    const a = await makeAttachment(policy.id, uploader.id)
+    const a = await makeAttachment(await ctx.orgId(), policy.id, uploader.id)
 
     await request(app)
       .post("/policy-log-attachments")
@@ -131,7 +131,7 @@ describe("POST /policy-log-attachments", () => {
     const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const log = await ctx.log(policy.id, user.id)
-    const a = await makeAttachment(policy.id, user.id)
+    const a = await makeAttachment(await ctx.orgId(), policy.id, user.id)
 
     const body = { logId: log.id, attachmentIds: [a.id] }
     expect(
@@ -153,7 +153,7 @@ describe("POST /policy-log-attachments", () => {
     const policy = await ctx.policy()
     const other = await ctx.policy()
     const log = await ctx.log(policy.id, user.id)
-    const stranger = await makeAttachment(other.id, user.id)
+    const stranger = await makeAttachment(await ctx.orgId(), other.id, user.id)
 
     const res = await request(app)
       .post("/policy-log-attachments")
@@ -168,7 +168,7 @@ describe("POST /policy-log-attachments", () => {
     const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const log = await ctx.log(policy.id, user.id)
-    const a = await makeAttachment(policy.id, user.id)
+    const a = await makeAttachment(await ctx.orgId(), policy.id, user.id)
 
     expect(
       (
@@ -214,7 +214,7 @@ describe("DELETE /policy-log-attachments/:id", () => {
     const otherCookie = await ctx.cookie(other.id)
     const policy = await ctx.policy()
     const log = await ctx.log(policy.id, linker.id)
-    const a = await makeAttachment(policy.id, linker.id)
+    const a = await makeAttachment(await ctx.orgId(), policy.id, linker.id)
 
     await request(app)
       .post("/policy-log-attachments")
@@ -293,7 +293,7 @@ describe("auto-linked generated documents", () => {
 
     const logs = await request(app).get(`/policy-logs?policyId=${policy.id}`).set("Cookie", cookie)
     const invoiceLog = logs.body.find((log: { body: string }) =>
-      log.body.startsWith(`Invoice #${invoice.body.id} created`)
+      log.body.startsWith(`Invoice #${invoice.body.invoiceNumber} created`)
     )
     expect(invoiceLog).toBeDefined()
     expect(rows[0].logId).toBe(invoiceLog.id)
@@ -357,7 +357,7 @@ describe("auto-linked generated documents", () => {
     const user = await ctx.user("logatt-auto-nolog")
     const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
-    const attachment = await storeGeneratedPolicyAttachment({
+    const attachment = await storeGeneratedPolicyAttachment(await ctx.orgId(), {
       policyId: policy.id,
       pdf: Buffer.from("%PDF-1.4"),
       fileName: "Orphan.pdf",

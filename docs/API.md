@@ -606,6 +606,11 @@ A sweep item defaults its `carrierId` to the policy's carrier (overridable per
 item); an agency item never carries a carrier. `status` is `open` (amount still
 due), `closed` (paid in full), or `void`. `total`/`amountPaid` are server-managed.
 
+Every invoice carries an `invoiceNumber` — a plain integer allocated per
+organization (1, 2, 3, ... independently per agency), alongside its `id`.
+`id` is still the opaque row id that URLs and query keys use; `invoiceNumber`
+is what's printed on PDFs and policy-log entries.
+
 | Method | Path | Role | Notes |
 |---|---|---|---|
 | GET | `/invoices?clientId=` or `?policyId=` | any | list, newest first; one filter required |
@@ -638,7 +643,9 @@ payments over time until closed. Payment methods: `cash`, `check`,
 Payment body: `invoiceId`, `method`, `amount` (> 0), `note` (optional, on the
 payment), `receiptNote` (optional, on the receipt). `createdBy` is the session
 user. A receipt carries `amountApplied`, `changeGiven`, `amountDueAfter`, and
-`invoiceClosed` (whether this payment closed the invoice).
+`invoiceClosed` (whether this payment closed the invoice), plus a
+`receiptNumber` — a plain integer allocated per organization, alongside its
+`id`, the same way `invoiceNumber` works above.
 
 ### Trust ledger
 

@@ -1,7 +1,7 @@
 import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
-import { makeSessionCookie, TestContext } from "./testHelpers"
+import { TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 afterEach(() => ctx.cleanup())
@@ -13,7 +13,7 @@ describe("GET /clients", () => {
 
   it("lists clients", async () => {
     const user = await ctx.user("clients-list")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
 
     const res = await request(app).get("/clients").set("Cookie", cookie)
@@ -25,7 +25,7 @@ describe("GET /clients", () => {
 describe("GET /clients/:id", () => {
   it("returns a client with nested named insured, phones, and emails", async () => {
     const user = await ctx.user("clients-get")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const person = await ctx.person({ firstName: "Jane", lastName: "Doe" })
     const client = await ctx.client({ namedInsuredId: person.id })
 
@@ -38,7 +38,7 @@ describe("GET /clients/:id", () => {
 
   it("returns 404 for an unknown id", async () => {
     const user = await ctx.user("clients-404")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     expect((await request(app).get("/clients/999999999").set("Cookie", cookie)).status).toBe(404)
   })
 })
@@ -46,7 +46,7 @@ describe("GET /clients/:id", () => {
 describe("POST /clients", () => {
   it("creates a client with phones and emails", async () => {
     const user = await ctx.user("clients-create")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const person = await ctx.person()
 
     const res = await request(app)
@@ -67,7 +67,7 @@ describe("POST /clients", () => {
 describe("PATCH /clients/:id", () => {
   it("leaves phones untouched when omitted from the body", async () => {
     const user = await ctx.user("clients-patch-omit")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
     await request(app)
       .patch(`/clients/${client.id}`)
@@ -87,7 +87,7 @@ describe("PATCH /clients/:id", () => {
 
   it("rejects an invalid state code", async () => {
     const user = await ctx.user("clients-patch-invalid-state")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
 
     const res = await request(app)
@@ -99,7 +99,7 @@ describe("PATCH /clients/:id", () => {
 
   it("replaces phones when an array is given", async () => {
     const user = await ctx.user("clients-patch-replace")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
     await request(app)
       .patch(`/clients/${client.id}`)
@@ -116,7 +116,7 @@ describe("PATCH /clients/:id", () => {
 
   it("clears phones when an empty array is given", async () => {
     const user = await ctx.user("clients-patch-clear")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
     await request(app)
       .patch(`/clients/${client.id}`)
@@ -135,7 +135,7 @@ describe("PATCH /clients/:id", () => {
 describe("DELETE /clients/:id", () => {
   it("rejects staff with 403", async () => {
     const user = await ctx.user("clients-del-staff", "staff")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
 
     expect((await request(app).delete(`/clients/${client.id}`).set("Cookie", cookie)).status).toBe(
@@ -145,7 +145,7 @@ describe("DELETE /clients/:id", () => {
 
   it("allows admins", async () => {
     const user = await ctx.user("clients-del-admin", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
 
     expect((await request(app).delete(`/clients/${client.id}`).set("Cookie", cookie)).status).toBe(
@@ -155,7 +155,7 @@ describe("DELETE /clients/:id", () => {
 
   it("returns 409 when the client still has a policy", async () => {
     const user = await ctx.user("clients-del-conflict", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
 
     const res = await request(app).delete(`/clients/${policy.clientId}`).set("Cookie", cookie)
@@ -166,7 +166,7 @@ describe("DELETE /clients/:id", () => {
 describe("GET /clients?q=", () => {
   it("finds a client by partial phone number", async () => {
     const user = await ctx.user("clients-search-phone")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
     await request(app)
       .patch(`/clients/${client.id}`)
@@ -180,7 +180,7 @@ describe("GET /clients?q=", () => {
 
   it("finds a client by cross-column full name", async () => {
     const user = await ctx.user("clients-search-name")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const person = await ctx.person({ firstName: "Marisol", lastName: "Alvarez" })
     const client = await ctx.client({ namedInsuredId: person.id })
 
@@ -191,7 +191,7 @@ describe("GET /clients?q=", () => {
 
   it("returns 400 when q is too short", async () => {
     const user = await ctx.user("clients-search-short")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     expect((await request(app).get("/clients?q=a").set("Cookie", cookie)).status).toBe(400)
   })

@@ -331,7 +331,13 @@ export class TestContext {
     // Organizations last: org_memberships cascades from both users and
     // organizations, so it needs neither side deleted first, but everything
     // above (sessions, users) that references an org must already be gone.
-    if (this.orgIds.length)
+    if (this.orgIds.length) {
       await db.delete(organizations).where(inArray(organizations.id, this.orgIds))
+      this.orgIds = []
+    }
+    // cleanup() runs in afterEach, so a cached default org is gone the moment
+    // this returns - the next test's user()/cookie() must mint a new one
+    // rather than reuse an id that no longer exists.
+    this.defaultOrgId = undefined
   }
 }

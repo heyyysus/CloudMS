@@ -1,7 +1,7 @@
 import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
-import { makeSessionCookie, TestContext } from "./testHelpers"
+import { TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 afterEach(() => ctx.cleanup())
@@ -13,7 +13,7 @@ describe("GET /carriers", () => {
 
   it("lists carriers", async () => {
     const user = await ctx.user("carriers-list")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const carrier = await ctx.carrier()
 
     const res = await request(app).get("/carriers").set("Cookie", cookie)
@@ -25,7 +25,7 @@ describe("GET /carriers", () => {
 describe("GET /carriers/:id", () => {
   it("returns 404 for an unknown id", async () => {
     const user = await ctx.user("carriers-404")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     expect((await request(app).get("/carriers/999999999").set("Cookie", cookie)).status).toBe(404)
   })
 })
@@ -33,7 +33,7 @@ describe("GET /carriers/:id", () => {
 describe("POST /carriers", () => {
   it("rejects staff with 403", async () => {
     const user = await ctx.user("carriers-create-staff", "staff")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     const res = await request(app)
       .post("/carriers")
@@ -44,7 +44,7 @@ describe("POST /carriers", () => {
 
   it("creates a carrier", async () => {
     const user = await ctx.user("carriers-create", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     const res = await request(app)
       .post("/carriers")
@@ -57,7 +57,7 @@ describe("POST /carriers", () => {
 
   it("stores the contact details and normalizes blanks to null", async () => {
     const user = await ctx.user("carriers-details", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     const res = await request(app).post("/carriers").set("Cookie", cookie).send({
       name: "Detailed Insurance",
@@ -82,7 +82,7 @@ describe("POST /carriers", () => {
 
   it("returns 400 for a malformed email", async () => {
     const user = await ctx.user("carriers-bademail", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     const res = await request(app)
       .post("/carriers")
@@ -93,7 +93,7 @@ describe("POST /carriers", () => {
 
   it("returns 409 for a duplicate NAIC", async () => {
     const user = await ctx.user("carriers-dup", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const carrier = await ctx.carrier()
 
     const res = await request(app)
@@ -108,7 +108,7 @@ describe("POST /carriers", () => {
 describe("PATCH /carriers/:id", () => {
   it("rejects staff with 403", async () => {
     const user = await ctx.user("carriers-update-staff", "staff")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const carrier = await ctx.carrier()
 
     const res = await request(app)
@@ -120,7 +120,7 @@ describe("PATCH /carriers/:id", () => {
 
   it("updates a carrier", async () => {
     const user = await ctx.user("carriers-update", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const carrier = await ctx.carrier({ name: "Before" })
 
     const res = await request(app)
@@ -133,7 +133,7 @@ describe("PATCH /carriers/:id", () => {
 
   it("deactivates a carrier without touching its other fields", async () => {
     const user = await ctx.user("carriers-deactivate", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const carrier = await ctx.carrier({ name: "Retiring", producerCode: "PRD-9" })
 
     const res = await request(app)
@@ -147,7 +147,7 @@ describe("PATCH /carriers/:id", () => {
 
   it("returns 409 when the new NAIC is taken", async () => {
     const user = await ctx.user("carriers-patch-dup", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const taken = await ctx.carrier()
     const carrier = await ctx.carrier()
 
@@ -163,7 +163,7 @@ describe("PATCH /carriers/:id", () => {
 describe("DELETE /carriers/:id", () => {
   it("rejects staff with 403", async () => {
     const user = await ctx.user("carriers-del-staff", "staff")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const carrier = await ctx.carrier()
 
     expect(
@@ -173,7 +173,7 @@ describe("DELETE /carriers/:id", () => {
 
   it("allows admins", async () => {
     const user = await ctx.user("carriers-del-admin", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const carrier = await ctx.carrier()
 
     expect(
@@ -183,7 +183,7 @@ describe("DELETE /carriers/:id", () => {
 
   it("returns 409 when the carrier still has policies", async () => {
     const user = await ctx.user("carriers-del-conflict", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
 
     const res = await request(app).delete(`/carriers/${policy.carrierId}`).set("Cookie", cookie)

@@ -4,7 +4,7 @@ import app from "../app"
 import { WELCOME_TEMPLATE_KEY } from "../emails"
 import { findEmailTemplateByKey, upsertEmailTemplate } from "../repositories"
 import type { EmailTemplate } from "../types"
-import { makeSessionCookie, TestContext } from "./testHelpers"
+import { TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 
@@ -18,7 +18,7 @@ describe("GET/PUT /email-templates/:key", () => {
 
   it("returns 403 for a non-admin user", async () => {
     const user = await ctx.user("tmpl-staff", "staff")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     const res = await request(app)
       .get(`/email-templates/${WELCOME_TEMPLATE_KEY}`)
@@ -29,7 +29,7 @@ describe("GET/PUT /email-templates/:key", () => {
 
   it("returns 404 for an unknown template key", async () => {
     const user = await ctx.user("tmpl-unknown", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     const res = await request(app).get("/email-templates/bogus").set("Cookie", cookie)
 
@@ -38,7 +38,7 @@ describe("GET/PUT /email-templates/:key", () => {
 
   it("returns the seeded welcome template with its merge fields", async () => {
     const user = await ctx.user("tmpl-get", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     const res = await request(app)
       .get(`/email-templates/${WELCOME_TEMPLATE_KEY}`)
@@ -71,7 +71,7 @@ describe("GET/PUT /email-templates/:key", () => {
 
     it("returns 400 for an unknown merge field", async () => {
       const user = await ctx.user("tmpl-badfield", "admin")
-      const cookie = await makeSessionCookie(user.id)
+      const cookie = await ctx.cookie(user.id)
 
       const res = await request(app)
         .put(`/email-templates/${WELCOME_TEMPLATE_KEY}`)
@@ -84,7 +84,7 @@ describe("GET/PUT /email-templates/:key", () => {
 
     it("returns 400 for an empty subject", async () => {
       const user = await ctx.user("tmpl-emptysubj", "admin")
-      const cookie = await makeSessionCookie(user.id)
+      const cookie = await ctx.cookie(user.id)
 
       const res = await request(app)
         .put(`/email-templates/${WELCOME_TEMPLATE_KEY}`)
@@ -96,7 +96,7 @@ describe("GET/PUT /email-templates/:key", () => {
 
     it("saves an updated template using only whitelisted merge fields", async () => {
       const user = await ctx.user("tmpl-save", "admin")
-      const cookie = await makeSessionCookie(user.id)
+      const cookie = await ctx.cookie(user.id)
 
       const res = await request(app)
         .put(`/email-templates/${WELCOME_TEMPLATE_KEY}`)

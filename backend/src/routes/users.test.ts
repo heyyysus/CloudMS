@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
 import { db } from "../db"
 import { emailLog, users } from "../db/schema"
-import { makeSessionCookie, makeTestUser, TestContext } from "./testHelpers"
+import { makeTestUser, TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 
@@ -39,7 +39,7 @@ describe("POST /users/invite", () => {
 
   it("returns 403 for a non-admin user", async () => {
     const admin = await ctx.user("invite-staff", "staff")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
       .post("/users/invite")
@@ -51,7 +51,7 @@ describe("POST /users/invite", () => {
 
   it("returns 400 for an invalid email", async () => {
     const admin = await ctx.user("invite-badmail", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
       .post("/users/invite")
@@ -63,7 +63,7 @@ describe("POST /users/invite", () => {
 
   it("returns 400 for an invalid role", async () => {
     const admin = await ctx.user("invite-badrole", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
       .post("/users/invite")
@@ -75,7 +75,7 @@ describe("POST /users/invite", () => {
 
   it("returns 409 when a user with that email already exists", async () => {
     const admin = await ctx.user("invite-dupe-admin", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
     const existing = await makeTestUser("invite-dupe-existing")
 
     const res = await request(app)
@@ -90,7 +90,7 @@ describe("POST /users/invite", () => {
   it("creates the user and sends the welcome email", async () => {
     configureMail()
     const admin = await ctx.user("invite-admin", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
     const fetchMock = stubResend({ id: "msg_1" })
     const email = `invitee-${Date.now()}@example.com`
 
@@ -122,7 +122,7 @@ describe("POST /users/invite", () => {
     delete process.env.RESEND_API_KEY
     delete process.env.MAIL_FROM
     const admin = await ctx.user("invite-unconfigured", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
     const email = `invitee-unconfigured-${Date.now()}@example.com`
 
     const res = await request(app).post("/users/invite").set("Cookie", cookie).send({ email })
@@ -138,7 +138,7 @@ describe("POST /users/invite", () => {
   it("still creates the user when Resend errors, reporting a failed email", async () => {
     configureMail()
     const admin = await ctx.user("invite-5xx", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
     stubResend(
       { name: "rate_limit_exceeded", message: "Too many requests." },
       { ok: false, status: 429 }
@@ -160,14 +160,14 @@ describe("GET /users", () => {
 
   it("returns 403 for a non-admin user", async () => {
     const staff = await ctx.user("list-users-staff", "staff")
-    const cookie = await makeSessionCookie(staff.id)
+    const cookie = await ctx.cookie(staff.id)
 
     expect((await request(app).get("/users").set("Cookie", cookie)).status).toBe(403)
   })
 
   it("lists users without exposing googleSub", async () => {
     const admin = await ctx.user("list-users-admin", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app).get("/users").set("Cookie", cookie)
     expect(res.status).toBe(200)
@@ -187,7 +187,7 @@ describe("PATCH /users/:id", () => {
   it("returns 403 for a non-admin user", async () => {
     const staff = await ctx.user("patch-user-staff", "staff")
     const target = await ctx.user("patch-user-target", "staff")
-    const cookie = await makeSessionCookie(staff.id)
+    const cookie = await ctx.cookie(staff.id)
 
     const res = await request(app)
       .patch(`/users/${target.id}`)
@@ -198,7 +198,7 @@ describe("PATCH /users/:id", () => {
 
   it("returns 404 for an unknown id", async () => {
     const admin = await ctx.user("patch-user-404", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
       .patch("/users/999999999")
@@ -210,7 +210,7 @@ describe("PATCH /users/:id", () => {
   it("returns 400 for an invalid role", async () => {
     const admin = await ctx.user("patch-user-badrole", "admin")
     const target = await ctx.user("patch-user-badrole-target", "staff")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
       .patch(`/users/${target.id}`)
@@ -222,7 +222,7 @@ describe("PATCH /users/:id", () => {
   it("renames a user and changes their role", async () => {
     const admin = await ctx.user("patch-user-admin", "admin")
     const target = await ctx.user("patch-user-promote", "staff")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
       .patch(`/users/${target.id}`)
@@ -236,8 +236,8 @@ describe("PATCH /users/:id", () => {
   it("disabling a user drops their live sessions", async () => {
     const admin = await ctx.user("patch-user-disabler", "admin")
     const target = await ctx.user("patch-user-disabled", "staff")
-    const adminCookie = await makeSessionCookie(admin.id)
-    const targetCookie = await makeSessionCookie(target.id)
+    const adminCookie = await ctx.cookie(admin.id)
+    const targetCookie = await ctx.cookie(target.id)
 
     expect((await request(app).get("/auth/me").set("Cookie", targetCookie)).status).toBe(200)
 
@@ -256,7 +256,7 @@ describe("PATCH /users/:id", () => {
   it("re-enables a disabled user", async () => {
     const admin = await ctx.user("patch-user-enabler", "admin")
     const target = await ctx.user("patch-user-enable", "staff")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     await request(app).patch(`/users/${target.id}`).set("Cookie", cookie).send({ isActive: false })
     const res = await request(app)
@@ -270,7 +270,7 @@ describe("PATCH /users/:id", () => {
 
   it("refuses to let an admin change their own role", async () => {
     const admin = await ctx.user("patch-self-role", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
       .patch(`/users/${admin.id}`)
@@ -282,7 +282,7 @@ describe("PATCH /users/:id", () => {
 
   it("refuses to let an admin disable their own account", async () => {
     const admin = await ctx.user("patch-self-disable", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
       .patch(`/users/${admin.id}`)
@@ -299,7 +299,7 @@ describe("PATCH /users/:id", () => {
   it("allows an admin to demote another admin", async () => {
     const admin = await ctx.user("patch-demoter", "admin")
     const other = await ctx.user("patch-demoted", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
       .patch(`/users/${other.id}`)
@@ -313,7 +313,7 @@ describe("PATCH /users/:id", () => {
   it("allows an admin to disable another admin", async () => {
     const admin = await ctx.user("patch-admin-disabler", "admin")
     const other = await ctx.user("patch-admin-disabled", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
       .patch(`/users/${other.id}`)
@@ -326,7 +326,7 @@ describe("PATCH /users/:id", () => {
 
   it("allows an admin to rename themselves", async () => {
     const admin = await ctx.user("patch-self-name", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
       .patch(`/users/${admin.id}`)
@@ -341,7 +341,7 @@ describe("POST /users/:id/resend-welcome", () => {
   it("returns 403 for a non-admin user", async () => {
     const staff = await ctx.user("resend-staff", "staff")
     const target = await ctx.user("resend-staff-target", "staff")
-    const cookie = await makeSessionCookie(staff.id)
+    const cookie = await ctx.cookie(staff.id)
 
     const res = await request(app)
       .post(`/users/${target.id}/resend-welcome`)
@@ -352,7 +352,7 @@ describe("POST /users/:id/resend-welcome", () => {
 
   it("returns 404 for an unknown id", async () => {
     const admin = await ctx.user("resend-404", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
       .post("/users/999999999/resend-welcome")
@@ -365,7 +365,7 @@ describe("POST /users/:id/resend-welcome", () => {
     configureMail()
     const admin = await ctx.user("resend-admin", "admin")
     const target = await ctx.user("resend-target", "staff")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
     const fetchMock = stubResend({ id: "msg_resend" })
 
     const res = await request(app)
@@ -387,7 +387,7 @@ describe("POST /users/:id/resend-welcome", () => {
     delete process.env.MAIL_FROM
     const admin = await ctx.user("resend-unconfigured", "admin")
     const target = await ctx.user("resend-unconfigured-target", "staff")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
       .post(`/users/${target.id}/resend-welcome`)
@@ -407,7 +407,7 @@ describe("DELETE /users/:id", () => {
   it("returns 403 for a non-admin user", async () => {
     const staff = await ctx.user("delete-user-staff", "staff")
     const target = await ctx.user("delete-user-staff-target", "staff")
-    const cookie = await makeSessionCookie(staff.id)
+    const cookie = await ctx.cookie(staff.id)
 
     const res = await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)
     expect(res.status).toBe(403)
@@ -415,7 +415,7 @@ describe("DELETE /users/:id", () => {
 
   it("returns 404 for an unknown id", async () => {
     const admin = await ctx.user("delete-user-404", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app).delete("/users/999999999").set("Cookie", cookie)
     expect(res.status).toBe(404)
@@ -423,7 +423,7 @@ describe("DELETE /users/:id", () => {
 
   it("refuses to let an admin delete their own account", async () => {
     const admin = await ctx.user("delete-self", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app).delete(`/users/${admin.id}`).set("Cookie", cookie)
     expect(res.status).toBe(400)
@@ -433,8 +433,8 @@ describe("DELETE /users/:id", () => {
   it("deletes a user: hides them, drops their sessions, but keeps the row", async () => {
     const admin = await ctx.user("delete-user-admin", "admin")
     const target = await ctx.user("delete-user-target", "staff")
-    const adminCookie = await makeSessionCookie(admin.id)
-    const targetCookie = await makeSessionCookie(target.id)
+    const adminCookie = await ctx.cookie(admin.id)
+    const targetCookie = await ctx.cookie(target.id)
 
     const res = await request(app).delete(`/users/${target.id}`).set("Cookie", adminCookie)
     expect(res.status).toBe(204)
@@ -456,7 +456,7 @@ describe("DELETE /users/:id", () => {
   it("returns 404 for a user that is already deleted", async () => {
     const admin = await ctx.user("delete-user-twice-admin", "admin")
     const target = await ctx.user("delete-user-twice-target", "staff")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)
     const res = await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)
@@ -466,7 +466,7 @@ describe("DELETE /users/:id", () => {
   it("returns 404 when PATCHing a deleted user", async () => {
     const admin = await ctx.user("delete-then-patch-admin", "admin")
     const target = await ctx.user("delete-then-patch-target", "staff")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)
     const res = await request(app)
@@ -481,7 +481,7 @@ describe("DELETE /users/:id", () => {
     // the real guard - this checks that guard directly rather than trusting
     // the list filter alone.
     const admin = await ctx.user("delete-automation-admin", "admin")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
     const [automation] = await db
       .select()
       .from(users)
@@ -497,7 +497,7 @@ describe("re-inviting a deleted user's email", () => {
   it("returns 409 with the deleted user's id instead of creating a duplicate", async () => {
     const admin = await ctx.user("reinvite-admin", "admin")
     const target = await ctx.user("reinvite-target", "staff")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)
 
@@ -515,7 +515,7 @@ describe("POST /users/:id/restore", () => {
   it("returns 404 for a user that was never deleted", async () => {
     const admin = await ctx.user("restore-not-deleted-admin", "admin")
     const target = await ctx.user("restore-not-deleted-target", "staff")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app).post(`/users/${target.id}/restore`).set("Cookie", cookie)
     expect(res.status).toBe(404)
@@ -525,7 +525,7 @@ describe("POST /users/:id/restore", () => {
     configureMail()
     const admin = await ctx.user("restore-admin", "admin")
     const target = await ctx.user("restore-target", "staff")
-    const cookie = await makeSessionCookie(admin.id)
+    const cookie = await ctx.cookie(admin.id)
     stubResend({ id: "msg_restore" })
 
     await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)

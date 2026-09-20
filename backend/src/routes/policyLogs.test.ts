@@ -1,7 +1,7 @@
 import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
-import { makeSessionCookie, TestContext } from "./testHelpers"
+import { TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 afterEach(() => ctx.cleanup())
@@ -13,13 +13,13 @@ describe("GET /policy-logs", () => {
 
   it("returns 400 without a policyId", async () => {
     const user = await ctx.user("logs-list-nopolicyid")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     expect((await request(app).get("/policy-logs").set("Cookie", cookie)).status).toBe(400)
   })
 
   it("returns 400 for a non-numeric policyId", async () => {
     const user = await ctx.user("logs-list-badpolicyid")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     expect((await request(app).get("/policy-logs?policyId=abc").set("Cookie", cookie)).status).toBe(
       400
     )
@@ -27,7 +27,7 @@ describe("GET /policy-logs", () => {
 
   it("lists a policy's logs newest-first with author info, scoped to that policy", async () => {
     const user = await ctx.user("logs-list")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policyA = await ctx.policy()
     const policyB = await ctx.policy()
     const first = await ctx.log(policyA.id, user.id, "First note")
@@ -53,7 +53,7 @@ describe("POST /policy-logs", () => {
 
   it("creates a log, starting log numbers at 1 and stamping the session user as author", async () => {
     const user = await ctx.user("logs-create")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
 
     const res = await request(app)
@@ -70,7 +70,7 @@ describe("POST /policy-logs", () => {
 
   it("increments the log number per policy and keeps counters independent across policies", async () => {
     const user = await ctx.user("logs-increment")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policyA = await ctx.policy()
     const policyB = await ctx.policy()
 
@@ -94,7 +94,7 @@ describe("POST /policy-logs", () => {
 
   it("allows staff (no admin restriction)", async () => {
     const user = await ctx.user("logs-create-staff", "staff")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
 
     expect(
@@ -109,7 +109,7 @@ describe("POST /policy-logs", () => {
 
   it("returns 400 for an empty body", async () => {
     const user = await ctx.user("logs-empty-body")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
 
     expect(
@@ -124,7 +124,7 @@ describe("POST /policy-logs", () => {
 
   it("returns 400 for a missing policyId", async () => {
     const user = await ctx.user("logs-missing-policyid")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     expect(
       (await request(app).post("/policy-logs").set("Cookie", cookie).send({ body: "x" })).status
@@ -133,7 +133,7 @@ describe("POST /policy-logs", () => {
 
   it("returns 404 for a nonexistent policy", async () => {
     const user = await ctx.user("logs-404-policy")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     expect(
       (
@@ -148,7 +148,7 @@ describe("POST /policy-logs", () => {
   it("ignores a client-supplied logNumber or authorId", async () => {
     const user = await ctx.user("logs-ignore-clientfields")
     const otherUser = await ctx.user("logs-ignore-clientfields-other")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
 
     const res = await request(app)
@@ -164,7 +164,7 @@ describe("POST /policy-logs", () => {
 describe("immutability", () => {
   it("has no PATCH or DELETE route for a log", async () => {
     const user = await ctx.user("logs-immutable")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const log = await ctx.log(policy.id, user.id)
 

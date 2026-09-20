@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
 import { attachmentKeyPrefix, createPolicyAttachment } from "../repositories"
 import { getPresignedDownloadUrl, headObject } from "../storage/r2"
-import { makeSessionCookie, TestContext } from "./testHelpers"
+import { TestContext } from "./testHelpers"
 
 // getPresignedDownloadUrl and headObject are mocked so tests don't need real
 // R2 credentials; asserting on the download call's args is how these tests
@@ -34,7 +34,7 @@ describe("GET /policy-attachments/:id/link", () => {
 
   it("returns 404 for an unknown id", async () => {
     const user = await ctx.user("attach-link-404")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     expect(
       (await request(app).get("/policy-attachments/999999999/link").set("Cookie", cookie)).status
@@ -43,7 +43,7 @@ describe("GET /policy-attachments/:id/link", () => {
 
   it("returns 400 for an invalid disposition", async () => {
     const user = await ctx.user("attach-link-baddisp")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const attachment = await createPolicyAttachment({
       policyId: policy.id,
@@ -62,7 +62,7 @@ describe("GET /policy-attachments/:id/link", () => {
 
   it("requests an inline URL by default, without a file name", async () => {
     const user = await ctx.user("attach-link-inline")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const attachment = await createPolicyAttachment({
       policyId: policy.id,
@@ -86,7 +86,7 @@ describe("GET /policy-attachments/:id/link", () => {
 
   it("passes the file name to force a download when disposition=attachment", async () => {
     const user = await ctx.user("attach-link-download")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const attachment = await createPolicyAttachment({
       policyId: policy.id,
@@ -113,7 +113,7 @@ describe("POST /policy-attachments/confirm", () => {
   // these cover the second use: the name persisted to the database.
   it("strips path separators and control characters from the stored file name", async () => {
     const user = await ctx.user("attach-confirm-sanitize")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     vi.mocked(headObject).mockResolvedValue(HEAD)
 
@@ -132,7 +132,7 @@ describe("POST /policy-attachments/confirm", () => {
 
   it("keeps an ordinary file name intact", async () => {
     const user = await ctx.user("attach-confirm-plain")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     vi.mocked(headObject).mockResolvedValue(HEAD)
 
@@ -153,7 +153,7 @@ describe("POST /policy-attachments/confirm", () => {
   // raises 22021. app.ts maps that to a 400 rather than letting it 500.
   it("returns 400 when a text field carries a NUL byte", async () => {
     const user = await ctx.user("attach-confirm-nul")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     vi.mocked(headObject).mockResolvedValue(HEAD)
 

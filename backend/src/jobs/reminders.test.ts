@@ -19,7 +19,7 @@ import { db } from "../db"
 import { emailLog, reminderRules, scheduledEmails } from "../db/schema"
 import { WELCOME_TEMPLATE_KEY } from "../emails"
 import { findEmailTemplateByKey, listPolicyLogsByPolicyId } from "../repositories"
-import { isoDaysFromToday, makeSessionCookie, TestContext } from "../routes/testHelpers"
+import { isoDaysFromToday, TestContext } from "../routes/testHelpers"
 import { AUTOMATION_USER_EMAIL, resetAutomationUserCache } from "./automationUser"
 import { dispatchReminders } from "./dispatcher"
 import { PLANNER_LOCK_KEY, planDueReminders, planReminders } from "./planner"
@@ -518,7 +518,7 @@ describe("dispatchReminders", () => {
 
 async function cookieFor(prefix: string, role: "admin" | "staff" = "admin") {
   const user = await ctx.user(prefix, role)
-  return makeSessionCookie(user.id)
+  return ctx.cookie(user.id)
 }
 
 // reminder_rules is unique on (trigger, offset_days) across the whole table
@@ -697,7 +697,7 @@ describe("reminder rules", () => {
 // their own admin cookie so a staff-scoped test can still set up state.
 async function tick() {
   const admin = await ctx.user("tick-helper", "admin")
-  const cookie = await makeSessionCookie(admin.id)
+  const cookie = await ctx.cookie(admin.id)
   return request(app).post("/reminders/tick").set("Cookie", cookie)
 }
 

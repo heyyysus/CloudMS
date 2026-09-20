@@ -107,7 +107,7 @@ function handlePolicyWriteError(err: unknown, res: Response): boolean {
     res.status(400).json({ error: err.message })
     return true
   }
-  if (isPgUniqueViolation(err, "auto_policies_policy_number_unique")) {
+  if (isPgUniqueViolation(err, "auto_policies_org_id_policy_number_unique")) {
     res.status(409).json({ error: "Policy number already exists" })
     return true
   }

@@ -395,7 +395,7 @@ export const carriers = pgTable(
     // explicit org id.
     orgId: rowIdFk("org_id").references(() => organizations.id),
     name: varchar("name", { length: 150 }).notNull(),
-    naic: varchar("naic", { length: 10 }).notNull().unique(),
+    naic: varchar("naic", { length: 10 }).notNull(),
     isActive: boolean("is_active").notNull().default(true),
     phone: varchar("phone", { length: 30 }),
     email: varchar("email", { length: 255 }),
@@ -405,7 +405,10 @@ export const carriers = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [index("carriers_org_id_idx").on(table.orgId)]
+  (table) => [
+    index("carriers_org_id_idx").on(table.orgId),
+    unique("carriers_org_id_naic_unique").on(table.orgId, table.naic),
+  ]
 )
 
 export const autoPolicies = pgTable(
@@ -421,7 +424,7 @@ export const autoPolicies = pgTable(
     carrierId: rowIdFk("carrier_id")
       .notNull()
       .references(() => carriers.id),
-    policyNumber: varchar("policy_number", { length: 50 }).notNull().unique(),
+    policyNumber: varchar("policy_number", { length: 50 }).notNull(),
     policyAddress1: text("policy_address1"),
     policyAddress2: text("policy_address2"),
     policyCity: varchar("policy_city", { length: 100 }),
@@ -444,6 +447,7 @@ export const autoPolicies = pgTable(
       sql`(coalesce(${table.policyAddress1}, '') || ' ' || coalesce(${table.policyAddress2}, '') || ' ' || coalesce(${table.policyCity}, '') || ' ' || coalesce(${table.policyState}, '') || ' ' || coalesce(${table.policyZip}, '')) gin_trgm_ops`
     ),
     index("auto_policies_org_client_idx").on(table.orgId, table.clientId),
+    unique("auto_policies_org_id_policy_number_unique").on(table.orgId, table.policyNumber),
   ]
 )
 

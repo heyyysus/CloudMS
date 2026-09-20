@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
 import { db } from "../db"
 import { emailLog, users } from "../db/schema"
+import { createMembership, findMembership, softDeleteUser } from "../repositories"
 import { makeTestUser, TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
@@ -73,10 +74,10 @@ describe("POST /users/invite", () => {
     expect(res.status).toBe(400)
   })
 
-  it("returns 409 when a user with that email already exists", async () => {
+  it("returns 409 when inviting an email that is already an active member", async () => {
     const admin = await ctx.user("invite-dupe-admin", "admin")
+    const existing = await ctx.user("invite-dupe-existing", "staff")
     const cookie = await ctx.cookie(admin.id)
-    const existing = await makeTestUser("invite-dupe-existing")
 
     const res = await request(app)
       .post("/users/invite")
@@ -84,7 +85,28 @@ describe("POST /users/invite", () => {
       .send({ email: existing.email })
 
     expect(res.status).toBe(409)
+    expect(res.body.error).toBe("This user is already a member of this organization")
+  })
+
+  it("adds a membership rather than a duplicate users row for an existing live user", async () => {
+    const admin = await ctx.user("invite-existing-admin", "admin")
+    const cookie = await ctx.cookie(admin.id)
+    // A user who exists (e.g. a member of some other org) but has no
+    // membership in this admin's org yet.
+    const existing = await makeTestUser("invite-existing-user")
     ctx.track("user", existing.id)
+
+    const res = await request(app)
+      .post("/users/invite")
+      .set("Cookie", cookie)
+      .send({ email: existing.email, role: "staff" })
+
+    expect(res.status).toBe(201)
+    expect(res.body.user.id).toBe(existing.id)
+    expect(res.body.user.role).toBe("staff")
+
+    const rows = await db.select().from(users).where(eq(users.email, existing.email))
+    expect(rows).toHaveLength(1)
   })
 
   it("creates the user and sends the welcome email", async () => {
@@ -176,6 +198,20 @@ describe("GET /users", () => {
     expect(row).toMatchObject({ email: admin.email, role: "admin", isActive: true })
     expect(row.hasSignedIn).toBe(false)
     expect(row).not.toHaveProperty("googleSub")
+  })
+
+  it("only lists members of the caller's own org", async () => {
+    const admin = await ctx.user("list-org-scope-admin", "admin")
+    const cookie = await ctx.cookie(admin.id)
+
+    const otherOrg = await ctx.org()
+    const otherOrgMember = await ctx.user("list-org-scope-other", "staff", otherOrg.id)
+
+    const res = await request(app).get("/users").set("Cookie", cookie)
+    expect(res.status).toBe(200)
+    const ids = res.body.map((u: { id: number }) => u.id)
+    expect(ids).toContain(admin.id)
+    expect(ids).not.toContain(otherOrgMember.id)
   })
 })
 
@@ -335,6 +371,54 @@ describe("PATCH /users/:id", () => {
     expect(res.status).toBe(200)
     expect(res.body.name).toBe("My New Name")
   })
+
+  it("changes the membership role only in the caller's org, leaving another org's untouched", async () => {
+    const admin = await ctx.user("patch-cross-org-admin", "admin")
+    const cookie = await ctx.cookie(admin.id)
+    const target = await ctx.user("patch-cross-org-target", "staff")
+
+    const otherOrg = await ctx.org()
+    const otherMembership = await createMembership({
+      userId: target.id,
+      orgId: otherOrg.id,
+      role: "staff",
+    })
+
+    const res = await request(app)
+      .patch(`/users/${target.id}`)
+      .set("Cookie", cookie)
+      .send({ role: "admin" })
+    expect(res.status).toBe(200)
+    expect(res.body.role).toBe("admin")
+
+    const otherOrgMembership = await findMembership(target.id, otherOrg.id)
+    expect(otherOrgMembership?.role).toBe("staff")
+    expect(otherOrgMembership?.id).toBe(otherMembership.id)
+  })
+
+  it("disabling a user in one org leaves their session in another org alive", async () => {
+    const admin = await ctx.user("patch-multi-org-admin", "admin")
+    const adminCookie = await ctx.cookie(admin.id)
+    const target = await ctx.user("patch-multi-org-target", "staff")
+    const targetCookieInAdminOrg = await ctx.cookie(target.id)
+
+    const otherOrg = await ctx.org()
+    await createMembership({ userId: target.id, orgId: otherOrg.id, role: "staff" })
+    const targetCookieInOtherOrg = await ctx.cookie(target.id, otherOrg.id)
+
+    const res = await request(app)
+      .patch(`/users/${target.id}`)
+      .set("Cookie", adminCookie)
+      .send({ isActive: false })
+    expect(res.status).toBe(200)
+
+    expect(
+      (await request(app).get("/auth/me").set("Cookie", targetCookieInAdminOrg)).status
+    ).toBe(401)
+    expect(
+      (await request(app).get("/auth/me").set("Cookie", targetCookieInOtherOrg)).status
+    ).toBe(200)
+  })
 })
 
 describe("POST /users/:id/resend-welcome", () => {
@@ -430,7 +514,7 @@ describe("DELETE /users/:id", () => {
     expect(res.body.error).toBe("You cannot delete your own account")
   })
 
-  it("deletes a user: hides them, drops their sessions, but keeps the row", async () => {
+  it("deletes a user: deactivates their membership, drops their sessions, but keeps the row", async () => {
     const admin = await ctx.user("delete-user-admin", "admin")
     const target = await ctx.user("delete-user-target", "staff")
     const adminCookie = await ctx.cookie(admin.id)
@@ -439,31 +523,43 @@ describe("DELETE /users/:id", () => {
     const res = await request(app).delete(`/users/${target.id}`).set("Cookie", adminCookie)
     expect(res.status).toBe(204)
 
-    // Gone from the admin's view...
+    // Still listed for the admin, now flagged disabled in this org...
     const list = await request(app).get("/users").set("Cookie", adminCookie)
-    expect(list.body.map((u: { id: number }) => u.id)).not.toContain(target.id)
+    const row = list.body.find((u: { id: number }) => u.id === target.id)
+    expect(row.isActive).toBe(false)
 
     // ...and logged out immediately...
     expect((await request(app).get("/auth/me").set("Cookie", targetCookie)).status).toBe(401)
 
-    // ...but the row itself, and its history, still exist.
-    const [row] = await db.select().from(users).where(eq(users.id, target.id))
-    expect(row).toBeDefined()
-    expect(row.deletedAt).not.toBeNull()
-    expect(row.deletedBy).toBe(admin.id)
+    // ...but the row itself, and its history, still exist - this is not the
+    // platform-level soft delete.
+    const [userRow] = await db.select().from(users).where(eq(users.id, target.id))
+    expect(userRow).toBeDefined()
+    expect(userRow.deletedAt).toBeNull()
   })
 
-  it("returns 404 for a user that is already deleted", async () => {
+  it("deactivating an already-deactivated membership is a no-op, not a 404", async () => {
     const admin = await ctx.user("delete-user-twice-admin", "admin")
     const target = await ctx.user("delete-user-twice-target", "staff")
     const cookie = await ctx.cookie(admin.id)
 
     await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)
     const res = await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)
+    expect(res.status).toBe(204)
+  })
+
+  it("returns 404 for DELETE on a user with no membership in the caller's org", async () => {
+    const admin = await ctx.user("delete-no-membership-admin", "admin")
+    const cookie = await ctx.cookie(admin.id)
+    // Exists (has a membership elsewhere) but not in this admin's org.
+    const otherOrg = await ctx.org()
+    const target = await ctx.user("delete-no-membership-target", "staff", otherOrg.id)
+
+    const res = await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)
     expect(res.status).toBe(404)
   })
 
-  it("returns 404 when PATCHing a deleted user", async () => {
+  it("re-activates a deactivated membership via PATCH isActive: true", async () => {
     const admin = await ctx.user("delete-then-patch-admin", "admin")
     const target = await ctx.user("delete-then-patch-target", "staff")
     const cookie = await ctx.cookie(admin.id)
@@ -473,7 +569,8 @@ describe("DELETE /users/:id", () => {
       .patch(`/users/${target.id}`)
       .set("Cookie", cookie)
       .send({ isActive: true })
-    expect(res.status).toBe(404)
+    expect(res.status).toBe(200)
+    expect(res.body.isActive).toBe(true)
   })
 
   it("offers the automation user's own email a 409, not a delete", async () => {
@@ -493,13 +590,36 @@ describe("DELETE /users/:id", () => {
   })
 })
 
-describe("re-inviting a deleted user's email", () => {
-  it("returns 409 with the deleted user's id instead of creating a duplicate", async () => {
+describe("re-inviting a deactivated member's email", () => {
+  it("reactivates the membership rather than creating a duplicate", async () => {
     const admin = await ctx.user("reinvite-admin", "admin")
     const target = await ctx.user("reinvite-target", "staff")
     const cookie = await ctx.cookie(admin.id)
 
     await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)
+
+    const res = await request(app)
+      .post("/users/invite")
+      .set("Cookie", cookie)
+      .send({ email: target.email, role: "admin" })
+
+    expect(res.status).toBe(201)
+    expect(res.body.user.id).toBe(target.id)
+    expect(res.body.user.role).toBe("admin")
+    expect(res.body.user.isActive).toBe(true)
+
+    const rows = await db.select().from(users).where(eq(users.email, target.email))
+    expect(rows).toHaveLength(1)
+  })
+
+  it("returns 409 with the deleted user's id for a platform-level soft-deleted email", async () => {
+    const admin = await ctx.user("reinvite-platform-admin", "admin")
+    const target = await ctx.user("reinvite-platform-target", "staff")
+    const cookie = await ctx.cookie(admin.id)
+
+    // Platform-level soft delete isn't reachable through any route in this
+    // sub-issue (see softDeleteUser) - exercised directly here.
+    await softDeleteUser(target.id, admin.id)
 
     const res = await request(app)
       .post("/users/invite")
@@ -521,14 +641,17 @@ describe("POST /users/:id/restore", () => {
     expect(res.status).toBe(404)
   })
 
-  it("brings a deleted user back, active and visible again", async () => {
+  it("brings a platform-level soft-deleted user back, active and visible again", async () => {
     configureMail()
     const admin = await ctx.user("restore-admin", "admin")
     const target = await ctx.user("restore-target", "staff")
     const cookie = await ctx.cookie(admin.id)
     stubResend({ id: "msg_restore" })
 
-    await request(app).delete(`/users/${target.id}`).set("Cookie", cookie)
+    // Not reachable through DELETE /users/:id in this sub-issue (that only
+    // deactivates the org membership) - exercised directly, same as the
+    // platform-level re-invite case above.
+    await softDeleteUser(target.id, admin.id)
 
     const res = await request(app).post(`/users/${target.id}/restore`).set("Cookie", cookie)
     expect(res.status).toBe(200)

@@ -1,7 +1,7 @@
 import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
-import { makeSessionCookie, TestContext } from "./testHelpers"
+import { TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 afterEach(() => ctx.cleanup())
@@ -13,7 +13,7 @@ describe("GET /vehicles", () => {
 
   it("lists all vehicles when no policyId is given", async () => {
     const user = await ctx.user("vehicles-list")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const vehicle = await ctx.vehicle()
 
     const res = await request(app).get("/vehicles").set("Cookie", cookie)
@@ -23,7 +23,7 @@ describe("GET /vehicles", () => {
 
   it("filters by policyId", async () => {
     const user = await ctx.user("vehicles-filter")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policyA = await ctx.policy()
     const policyB = await ctx.policy()
     const vehicleA = await ctx.vehicle({ policyId: policyA.id })
@@ -36,7 +36,7 @@ describe("GET /vehicles", () => {
 
   it("returns 400 for a non-numeric policyId", async () => {
     const user = await ctx.user("vehicles-badpolicyid")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     expect((await request(app).get("/vehicles?policyId=abc").set("Cookie", cookie)).status).toBe(
       400
@@ -47,7 +47,7 @@ describe("GET /vehicles", () => {
 describe("POST /vehicles", () => {
   it("creates a vehicle", async () => {
     const user = await ctx.user("vehicles-create")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
 
     const res = await request(app).post("/vehicles").set("Cookie", cookie).send({
@@ -64,7 +64,7 @@ describe("POST /vehicles", () => {
 
   it("returns 409 for a duplicate VIN on the same policy", async () => {
     const user = await ctx.user("vehicles-dupvin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const vehicle = await ctx.vehicle()
 
     const res = await request(app).post("/vehicles").set("Cookie", cookie).send({
@@ -80,7 +80,7 @@ describe("POST /vehicles", () => {
 
   it("allows the same VIN on a different policy", async () => {
     const user = await ctx.user("vehicles-dupvin-otherpolicy")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const vehicle = await ctx.vehicle()
     const policy = await ctx.policy()
 
@@ -100,7 +100,7 @@ describe("POST /vehicles", () => {
 describe("PATCH /vehicles/:id", () => {
   it("updates a vehicle", async () => {
     const user = await ctx.user("vehicles-update")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const vehicle = await ctx.vehicle({ make: "Honda" })
 
     const res = await request(app)
@@ -115,7 +115,7 @@ describe("PATCH /vehicles/:id", () => {
 describe("DELETE /vehicles/:id", () => {
   it("allows staff (no admin restriction)", async () => {
     const user = await ctx.user("vehicles-del-staff", "staff")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const vehicle = await ctx.vehicle()
 
     expect(
@@ -125,7 +125,7 @@ describe("DELETE /vehicles/:id", () => {
 
   it("returns 404 for an unknown id", async () => {
     const user = await ctx.user("vehicles-del-404")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     expect((await request(app).delete("/vehicles/999999999").set("Cookie", cookie)).status).toBe(
       404

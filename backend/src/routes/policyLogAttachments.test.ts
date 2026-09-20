@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
 import { createPolicyAttachment, storeGeneratedPolicyAttachment } from "../repositories"
 import { putObject } from "../storage/r2"
-import { makeSessionCookie, TestContext } from "./testHelpers"
+import { TestContext } from "./testHelpers"
 
 // The auto-link tests at the bottom create invoices and payments, which upload
 // generated PDFs. Mocked so tests don't need real R2 credentials.
@@ -53,7 +53,7 @@ describe("GET /policy-log-attachments", () => {
 
   it("returns 400 without a valid policyId", async () => {
     const user = await ctx.user("logatt-badquery")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     expect(
       (await request(app).get("/policy-log-attachments?policyId=abc").set("Cookie", cookie)).status
     ).toBe(400)
@@ -61,7 +61,7 @@ describe("GET /policy-log-attachments", () => {
 
   it("returns an empty list for a policy with no links", async () => {
     const user = await ctx.user("logatt-empty")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     expect(await links(policy.id, cookie)).toEqual([])
   })
@@ -70,7 +70,7 @@ describe("GET /policy-log-attachments", () => {
 describe("POST /policy-log-attachments", () => {
   it("links several attachments to one log and credits the linker", async () => {
     const user = await ctx.user("logatt-create")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const log = await ctx.log(policy.id, user.id)
     const a = await makeAttachment(policy.id, user.id)
@@ -92,7 +92,7 @@ describe("POST /policy-log-attachments", () => {
 
   it("never exposes the storage key", async () => {
     const user = await ctx.user("logatt-nokey")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const log = await ctx.log(policy.id, user.id)
     const a = await makeAttachment(policy.id, user.id)
@@ -109,7 +109,7 @@ describe("POST /policy-log-attachments", () => {
   it("credits the user who linked, not the one who uploaded", async () => {
     const uploader = await ctx.user("logatt-uploader")
     const linker = await ctx.user("logatt-linker")
-    const linkerCookie = await makeSessionCookie(linker.id)
+    const linkerCookie = await ctx.cookie(linker.id)
     const policy = await ctx.policy()
     // Anyone may link to anyone's log, so the log author is a third user.
     const author = await ctx.user("logatt-author")
@@ -127,7 +127,7 @@ describe("POST /policy-log-attachments", () => {
 
   it("is idempotent - re-linking the same pair does not duplicate or error", async () => {
     const user = await ctx.user("logatt-idempotent")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const log = await ctx.log(policy.id, user.id)
     const a = await makeAttachment(policy.id, user.id)
@@ -148,7 +148,7 @@ describe("POST /policy-log-attachments", () => {
 
   it("rejects an attachment from a different policy", async () => {
     const user = await ctx.user("logatt-crosspolicy")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const other = await ctx.policy()
     const log = await ctx.log(policy.id, user.id)
@@ -164,7 +164,7 @@ describe("POST /policy-log-attachments", () => {
 
   it("404s an unknown log or attachment", async () => {
     const user = await ctx.user("logatt-404")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const log = await ctx.log(policy.id, user.id)
     const a = await makeAttachment(policy.id, user.id)
@@ -190,7 +190,7 @@ describe("POST /policy-log-attachments", () => {
 
   it("400s an empty attachmentIds array", async () => {
     const user = await ctx.user("logatt-empty-ids")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const log = await ctx.log(policy.id, user.id)
 
@@ -208,9 +208,9 @@ describe("POST /policy-log-attachments", () => {
 describe("DELETE /policy-log-attachments/:id", () => {
   it("removes a link made by someone else", async () => {
     const linker = await ctx.user("logatt-del-linker")
-    const linkerCookie = await makeSessionCookie(linker.id)
+    const linkerCookie = await ctx.cookie(linker.id)
     const other = await ctx.user("logatt-del-other")
-    const otherCookie = await makeSessionCookie(other.id)
+    const otherCookie = await ctx.cookie(other.id)
     const policy = await ctx.policy()
     const log = await ctx.log(policy.id, linker.id)
     const a = await makeAttachment(policy.id, linker.id)
@@ -230,7 +230,7 @@ describe("DELETE /policy-log-attachments/:id", () => {
 
   it("404s an unknown link", async () => {
     const user = await ctx.user("logatt-del-404")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     expect(
       (await request(app).delete("/policy-log-attachments/999999999").set("Cookie", cookie)).status
     ).toBe(404)
@@ -240,9 +240,9 @@ describe("DELETE /policy-log-attachments/:id", () => {
 describe("voided documents", () => {
   it("drops out of the link list for staff and stays for admins", async () => {
     const staff = await ctx.user("logatt-void-staff")
-    const staffCookie = await makeSessionCookie(staff.id)
+    const staffCookie = await ctx.cookie(staff.id)
     const admin = await ctx.user("logatt-void-admin", "admin")
-    const adminCookie = await makeSessionCookie(admin.id)
+    const adminCookie = await ctx.cookie(admin.id)
     const policy = await ctx.policy()
 
     const invoice = await request(app)
@@ -272,7 +272,7 @@ describe("voided documents", () => {
 describe("auto-linked generated documents", () => {
   it("links the invoice PDF to the log the same write appended", async () => {
     const user = await ctx.user("logatt-auto-invoice")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
 
     const invoice = await request(app)
@@ -299,7 +299,7 @@ describe("auto-linked generated documents", () => {
 
   it("links the receipt PDF to the payment's own log, not the invoice's", async () => {
     const user = await ctx.user("logatt-auto-receipt")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
 
     const invoice = await request(app)
@@ -328,7 +328,7 @@ describe("auto-linked generated documents", () => {
 
   it("links the change form to the 'Policy updated' log the edit wrote", async () => {
     const user = await ctx.user("logatt-auto-change")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy({ status: "pending" })
 
     const updated = await request(app)
@@ -353,7 +353,7 @@ describe("auto-linked generated documents", () => {
     // storeGeneratedPolicyAttachment swallows a bad linkToLogId, so the
     // document lands and can be linked by hand later.
     const user = await ctx.user("logatt-auto-nolog")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const attachment = await storeGeneratedPolicyAttachment({
       policyId: policy.id,

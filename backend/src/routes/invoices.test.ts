@@ -1,7 +1,7 @@
 import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
-import { makeSessionCookie, TestContext } from "./testHelpers"
+import { TestContext } from "./testHelpers"
 import type { UserRole } from "../types"
 
 const ctx = new TestContext()
@@ -9,7 +9,7 @@ afterEach(() => ctx.cleanup())
 
 async function authed(prefix: string, role: UserRole = "staff") {
   const user = await ctx.user(prefix, role)
-  const cookie = await makeSessionCookie(user.id)
+  const cookie = await ctx.cookie(user.id)
   return { user, cookie }
 }
 

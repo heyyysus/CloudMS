@@ -2,7 +2,7 @@ import request from "supertest"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
 import { R2NotConfiguredError, putObject } from "../storage/r2"
-import { makeSessionCookie, TestContext } from "./testHelpers"
+import { TestContext } from "./testHelpers"
 
 // The policy change form (PATCH /policies/:id's auto-generated log +
 // attachment) uploads its PDF through storage/r2's putObject. Mocked here so
@@ -26,7 +26,7 @@ describe("GET /policies", () => {
 
   it("lists policies", async () => {
     const user = await ctx.user("policies-list")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
 
     const res = await request(app).get("/policies").set("Cookie", cookie)
@@ -36,7 +36,7 @@ describe("GET /policies", () => {
 
   it("filters by clientId", async () => {
     const user = await ctx.user("policies-filter")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
     const policyA = await ctx.policy({ clientId: client.id })
     await ctx.policy()
@@ -50,7 +50,7 @@ describe("GET /policies", () => {
 describe("GET /policies/:id", () => {
   it("returns a policy with nested client, carrier, and vehicles", async () => {
     const user = await ctx.user("policies-get")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     await ctx.vehicle({ policyId: policy.id })
 
@@ -63,7 +63,7 @@ describe("GET /policies/:id", () => {
 
   it("returns 404 for an unknown id", async () => {
     const user = await ctx.user("policies-404")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     expect((await request(app).get("/policies/999999999").set("Cookie", cookie)).status).toBe(404)
   })
 })
@@ -71,7 +71,7 @@ describe("GET /policies/:id", () => {
 describe("POST /policies", () => {
   it("creates a policy", async () => {
     const user = await ctx.user("policies-create")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
     const carrier = await ctx.carrier()
 
@@ -88,7 +88,7 @@ describe("POST /policies", () => {
 
   it("returns 409 for a duplicate policy number", async () => {
     const user = await ctx.user("policies-dup")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const client = await ctx.client()
     const carrier = await ctx.carrier()
@@ -105,7 +105,7 @@ describe("POST /policies", () => {
 
   it("returns 400 for an invalid effectiveDate", async () => {
     const user = await ctx.user("policies-baddate")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
     const carrier = await ctx.carrier()
 
@@ -121,7 +121,7 @@ describe("POST /policies", () => {
 
   it("treats a blank dlNumber for a new driver as not provided", async () => {
     const user = await ctx.user("policies-create-blankdl")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
     const carrier = await ctx.carrier()
 
@@ -158,7 +158,7 @@ describe("POST /policies", () => {
 describe("PATCH /policies/:id", () => {
   it("updates a scalar field and returns the detail shape", async () => {
     const user = await ctx.user("policies-update")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy({ status: "pending" })
 
     const res = await request(app)
@@ -174,7 +174,7 @@ describe("PATCH /policies/:id", () => {
 
   it("replaces vehicles and drivers when both keys are present", async () => {
     const user = await ctx.user("policies-update-nested")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     await ctx.vehicle({ policyId: policy.id })
     const person = await ctx.person()
@@ -204,7 +204,7 @@ describe("PATCH /policies/:id", () => {
 
   it("clears vehicles and drivers when given empty arrays, without deleting the underlying person", async () => {
     const user = await ctx.user("policies-update-clear")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     await ctx.vehicle({ policyId: policy.id })
     const { person } = await ctx.driverLink(policy.id)
@@ -224,7 +224,7 @@ describe("PATCH /policies/:id", () => {
 
   it("leaves vehicles untouched when the key is omitted", async () => {
     const user = await ctx.user("policies-update-omit")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const vehicle = await ctx.vehicle({ policyId: policy.id })
 
@@ -240,7 +240,7 @@ describe("PATCH /policies/:id", () => {
 
   it("returns 400 for a duplicate VIN within the payload", async () => {
     const user = await ctx.user("policies-update-dupvin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
 
     const res = await request(app)
@@ -269,7 +269,7 @@ describe("PATCH /policies/:id", () => {
 
   it("returns 409 when patched policyNumber collides with another policy", async () => {
     const user = await ctx.user("policies-update-dupnum")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const existing = await ctx.policy()
     const policy = await ctx.policy()
 
@@ -282,7 +282,7 @@ describe("PATCH /policies/:id", () => {
 
   it("allows adding a driver without a dlNumber", async () => {
     const user = await ctx.user("policies-update-nodl")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const person = await ctx.person()
 
@@ -297,7 +297,7 @@ describe("PATCH /policies/:id", () => {
 
   it("treats a whitespace-only dlNumber as not provided", async () => {
     const user = await ctx.user("policies-update-blankdl")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const person = await ctx.person()
 
@@ -312,7 +312,7 @@ describe("PATCH /policies/:id", () => {
 
   it("returns 400 when an existing driver spec references an unknown person", async () => {
     const user = await ctx.user("policies-update-baddriver")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
 
     const res = await request(app)
@@ -324,7 +324,7 @@ describe("PATCH /policies/:id", () => {
 
   it("returns 404 for an unknown id", async () => {
     const user = await ctx.user("policies-update-404")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     const res = await request(app)
       .patch("/policies/999999999")
@@ -337,7 +337,7 @@ describe("PATCH /policies/:id", () => {
 describe("PATCH /policies/:id change form", () => {
   it("logs the change and uploads a PDF attachment when a field actually changes", async () => {
     const user = await ctx.user("policies-changeform")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy({ status: "pending" })
 
     const res = await request(app)
@@ -367,7 +367,7 @@ describe("PATCH /policies/:id change form", () => {
 
   it("writes no log and no attachment when the request changes nothing effective", async () => {
     const user = await ctx.user("policies-changeform-noop")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy({ status: "active" })
 
     const res = await request(app)
@@ -390,7 +390,7 @@ describe("PATCH /policies/:id change form", () => {
     vi.mocked(putObject).mockRejectedValueOnce(new R2NotConfiguredError("not configured"))
 
     const user = await ctx.user("policies-changeform-nor2")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy({ status: "pending" })
 
     const res = await request(app)
@@ -413,7 +413,7 @@ describe("PATCH /policies/:id change form", () => {
 describe("DELETE /policies/:id", () => {
   it("rejects staff with 403", async () => {
     const user = await ctx.user("policies-del-staff", "staff")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
 
     expect((await request(app).delete(`/policies/${policy.id}`).set("Cookie", cookie)).status).toBe(
@@ -423,7 +423,7 @@ describe("DELETE /policies/:id", () => {
 
   it("allows admins and cascades vehicles", async () => {
     const user = await ctx.user("policies-del-admin", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const vehicle = await ctx.vehicle({ policyId: policy.id })
 
@@ -439,7 +439,7 @@ describe("DELETE /policies/:id", () => {
 describe("GET /policies?q=", () => {
   it("finds a policy by partial policy number", async () => {
     const user = await ctx.user("policies-search")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy({ policyNumber: "UNIQ-SEARCHABLE-77" })
 
     const res = await request(app).get("/policies?q=SEARCHABLE-77").set("Cookie", cookie)
@@ -449,7 +449,7 @@ describe("GET /policies?q=", () => {
 
   it("returns 400 when q is too short", async () => {
     const user = await ctx.user("policies-search-short")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     expect((await request(app).get("/policies?q=a").set("Cookie", cookie)).status).toBe(400)
   })

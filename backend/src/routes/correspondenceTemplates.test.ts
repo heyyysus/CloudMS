@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
 import { CORRESPONDENCE_MERGE_FIELDS } from "../emails"
 import { deleteCorrespondenceTemplate } from "../repositories"
-import { makeSessionCookie, TestContext } from "./testHelpers"
+import { TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 
@@ -17,7 +17,7 @@ afterEach(async () => {
 
 async function adminCookie(prefix: string): Promise<string> {
   const user = await ctx.user(prefix, "admin")
-  return makeSessionCookie(user.id)
+  return ctx.cookie(user.id)
 }
 
 const VALID_BODY = {
@@ -38,7 +38,7 @@ describe("correspondence templates", () => {
     // admin-only.
     it("allows a non-admin user to list templates", async () => {
       const user = await ctx.user("corr-staff", "staff")
-      const cookie = await makeSessionCookie(user.id)
+      const cookie = await ctx.cookie(user.id)
       const res = await request(app).get("/correspondence-templates").set("Cookie", cookie)
       expect(res.status).toBe(200)
       expect(Array.isArray(res.body.templates)).toBe(true)
@@ -98,7 +98,7 @@ describe("correspondence templates", () => {
 
     it("returns 403 for a non-admin user", async () => {
       const user = await ctx.user("corr-create-staff", "staff")
-      const cookie = await makeSessionCookie(user.id)
+      const cookie = await ctx.cookie(user.id)
       const res = await request(app)
         .post("/correspondence-templates")
         .set("Cookie", cookie)
@@ -146,7 +146,7 @@ describe("correspondence templates", () => {
       templateIds.push(created.body.id)
 
       const user = await ctx.user("corr-update-staff", "staff")
-      const cookie = await makeSessionCookie(user.id)
+      const cookie = await ctx.cookie(user.id)
       const res = await request(app)
         .patch(`/correspondence-templates/${created.body.id}`)
         .set("Cookie", cookie)
@@ -201,7 +201,7 @@ describe("correspondence templates", () => {
       templateIds.push(created.body.id)
 
       const user = await ctx.user("corr-delete-staff", "staff")
-      const cookie = await makeSessionCookie(user.id)
+      const cookie = await ctx.cookie(user.id)
       const res = await request(app)
         .delete(`/correspondence-templates/${created.body.id}`)
         .set("Cookie", cookie)

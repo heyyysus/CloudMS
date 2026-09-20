@@ -1,7 +1,7 @@
 import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
-import { makeSessionCookie, TestContext } from "./testHelpers"
+import { TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 afterEach(() => ctx.cleanup())
@@ -13,13 +13,13 @@ describe("GET /search", () => {
 
   it("returns 400 when q is too short", async () => {
     const user = await ctx.user("search-short")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     expect((await request(app).get("/search?q=a").set("Cookie", cookie)).status).toBe(400)
   })
 
   it("returns matching clients and policies grouped together", async () => {
     const user = await ctx.user("search-grouped")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const person = await ctx.person({ firstName: "Search", lastName: "Grouped99" })
     const client = await ctx.client({ namedInsuredId: person.id })
     const policy = await ctx.policy({ clientId: client.id, policyNumber: "GROUPED99-POL" })
@@ -34,7 +34,7 @@ describe("GET /search", () => {
 
   it("matches a client by mailing city split across address fields", async () => {
     const user = await ctx.user("search-client-city")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client({
       mailingAddress1: "1 Test St",
       mailingCity: "Hoosville77",
@@ -49,7 +49,7 @@ describe("GET /search", () => {
 
   it("matches a policy by its city and zip", async () => {
     const user = await ctx.user("search-policy-city")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy({
       policyAddress1: "123 Main St",
       policyCity: "Springvale77",
@@ -66,7 +66,7 @@ describe("GET /search", () => {
 
   it("escapes % and _ so they are not treated as wildcards", async () => {
     const user = await ctx.user("search-escape")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy({ policyNumber: "ESC_98%TEST" })
 
     const literalMatch = await request(app).get("/search?q=ESC_98%25TEST").set("Cookie", cookie)

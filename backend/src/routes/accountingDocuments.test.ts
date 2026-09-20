@@ -2,7 +2,7 @@ import request from "supertest"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
 import { putObject } from "../storage/r2"
-import { makeSessionCookie, TestContext } from "./testHelpers"
+import { TestContext } from "./testHelpers"
 
 // Creating an invoice and recording a payment each upload a generated PDF
 // through storage/r2's putObject. Mocked so tests don't need real R2
@@ -50,7 +50,7 @@ async function makeInvoice(cookie: string, policyId: number, amount = 400) {
 describe("invoice documents", () => {
   it("files a numbered PDF when an invoice is created", async () => {
     const user = await ctx.user("acctdoc-invoice")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
 
     const invoice = await makeInvoice(cookie, policy.id)
@@ -79,7 +79,7 @@ describe("invoice documents", () => {
     vi.mocked(putObject).mockRejectedValueOnce(new Error("no R2"))
 
     const user = await ctx.user("acctdoc-invoice-nor2")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
 
     await makeInvoice(cookie, policy.id)
@@ -90,7 +90,7 @@ describe("invoice documents", () => {
 describe("receipt documents", () => {
   it("files one numbered PDF per payment", async () => {
     const user = await ctx.user("acctdoc-receipt")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
     const invoice = await makeInvoice(cookie, policy.id)
 
@@ -119,9 +119,9 @@ describe("receipt documents", () => {
 
   it("hides the receipt document from staff once the payment is voided", async () => {
     const staff = await ctx.user("acctdoc-void-staff")
-    const staffCookie = await makeSessionCookie(staff.id)
+    const staffCookie = await ctx.cookie(staff.id)
     const admin = await ctx.user("acctdoc-void-admin", "admin")
-    const adminCookie = await makeSessionCookie(admin.id)
+    const adminCookie = await ctx.cookie(admin.id)
     const policy = await ctx.policy()
     const invoice = await makeInvoice(staffCookie, policy.id)
 
@@ -153,9 +153,9 @@ describe("receipt documents", () => {
 
   it("404s the download link for a voided document unless the caller is an admin", async () => {
     const staff = await ctx.user("acctdoc-link-staff")
-    const staffCookie = await makeSessionCookie(staff.id)
+    const staffCookie = await ctx.cookie(staff.id)
     const admin = await ctx.user("acctdoc-link-admin", "admin")
-    const adminCookie = await makeSessionCookie(admin.id)
+    const adminCookie = await ctx.cookie(admin.id)
     const policy = await ctx.policy()
     const invoice = await makeInvoice(staffCookie, policy.id)
 
@@ -193,9 +193,9 @@ describe("receipt documents", () => {
 describe("voiding an invoice", () => {
   it("hides the invoice document from staff", async () => {
     const staff = await ctx.user("acctdoc-void-inv-staff")
-    const staffCookie = await makeSessionCookie(staff.id)
+    const staffCookie = await ctx.cookie(staff.id)
     const admin = await ctx.user("acctdoc-void-inv-admin", "admin")
-    const adminCookie = await makeSessionCookie(admin.id)
+    const adminCookie = await ctx.cookie(admin.id)
     const policy = await ctx.policy()
     const invoice = await makeInvoice(staffCookie, policy.id)
 

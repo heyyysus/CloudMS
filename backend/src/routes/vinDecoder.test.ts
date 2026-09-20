@@ -1,7 +1,7 @@
 import request from "supertest"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
-import { makeSessionCookie, TestContext } from "./testHelpers"
+import { TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 
@@ -14,7 +14,7 @@ const VIN = "1HGCM82633A123456"
 
 async function authed(prefix: string) {
   const user = await ctx.user(prefix)
-  return makeSessionCookie(user.id)
+  return ctx.cookie(user.id)
 }
 
 // The route's only outbound dependency is fetch, so stub it rather than hitting

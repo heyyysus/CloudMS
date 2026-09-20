@@ -12,7 +12,7 @@ import {
   findEmailTemplateByKey,
   listPolicyLogsByPolicyId,
 } from "../repositories"
-import { makeSessionCookie, TestContext } from "./testHelpers"
+import { TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 
@@ -49,7 +49,7 @@ describe("POST /clients/:clientId/send-email", () => {
 
   it("returns 403 for a non-admin user", async () => {
     const user = await ctx.user("mail-staff", "staff")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
 
     const res = await request(app)
@@ -62,7 +62,7 @@ describe("POST /clients/:clientId/send-email", () => {
 
   it("returns 400 for an invalid clientId", async () => {
     const user = await ctx.user("mail-badid", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     const res = await request(app)
       .post("/clients/abc/send-email")
@@ -74,7 +74,7 @@ describe("POST /clients/:clientId/send-email", () => {
 
   it("returns 400 for an empty subject or body", async () => {
     const user = await ctx.user("mail-empty", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
 
     const res = await request(app)
@@ -87,7 +87,7 @@ describe("POST /clients/:clientId/send-email", () => {
 
   it("returns 404 for an unknown client", async () => {
     const user = await ctx.user("mail-404", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
 
     const res = await request(app)
       .post("/clients/999999999/send-email")
@@ -99,7 +99,7 @@ describe("POST /clients/:clientId/send-email", () => {
 
   it("returns 422 when the client has no email on file", async () => {
     const user = await ctx.user("mail-noemail", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
 
     const res = await request(app)
@@ -112,7 +112,7 @@ describe("POST /clients/:clientId/send-email", () => {
 
   it("returns 400 when `to` includes an address not on file for the client", async () => {
     const user = await ctx.user("mail-unknownto", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
     await addEmailToClient(client.id, "onfile@example.com")
 
@@ -127,7 +127,7 @@ describe("POST /clients/:clientId/send-email", () => {
   it("sends to every on-file address when `to` is omitted", async () => {
     configureMail()
     const user = await ctx.user("mail-allon", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
     await addEmailToClient(client.id, "first@example.com")
     await addEmailToClient(client.id, "second@example.com")
@@ -151,7 +151,7 @@ describe("POST /clients/:clientId/send-email", () => {
   it("sends only to the requested `to` addresses, case-insensitively matched", async () => {
     configureMail()
     const user = await ctx.user("mail-subset", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
     await addEmailToClient(client.id, "First@Example.com")
     await addEmailToClient(client.id, "second@example.com")
@@ -170,7 +170,7 @@ describe("POST /clients/:clientId/send-email", () => {
     delete process.env.RESEND_API_KEY
     delete process.env.MAIL_FROM
     const user = await ctx.user("mail-unconfigured", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
     await addEmailToClient(client.id, "onfile@example.com")
 
@@ -185,7 +185,7 @@ describe("POST /clients/:clientId/send-email", () => {
   it("returns 502 when Resend responds with an error status", async () => {
     configureMail()
     const user = await ctx.user("mail-5xx", "admin")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
     await addEmailToClient(client.id, "onfile@example.com")
     stubResend(
@@ -238,7 +238,7 @@ async function makeTemplate(overrides: Partial<typeof TEMPLATE_BODY> = {}) {
 // enough for every merge field to resolve to something assertable.
 async function makeSendFixture(prefix: string, role: "staff" | "admin" = "staff") {
   const user = await ctx.user(prefix, role)
-  const cookie = await makeSessionCookie(user.id)
+  const cookie = await ctx.cookie(user.id)
   const person = await ctx.person({ firstName: "Jane", lastName: "Doe" })
   const client = await ctx.client({ namedInsuredId: person.id })
   await addEmailToClient(client.id, "jane@example.com")
@@ -271,14 +271,14 @@ describe("GET /policies/:policyId/merge-fields", () => {
 
   it("returns 400 for an invalid policyId", async () => {
     const user = await ctx.user("merge-badid")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const res = await request(app).get("/policies/abc/merge-fields").set("Cookie", cookie)
     expect(res.status).toBe(400)
   })
 
   it("returns 404 for an unknown policy", async () => {
     const user = await ctx.user("merge-404")
-    const cookie = await makeSessionCookie(user.id)
+    const cookie = await ctx.cookie(user.id)
     const res = await request(app).get("/policies/999999999/merge-fields").set("Cookie", cookie)
     expect(res.status).toBe(404)
   })

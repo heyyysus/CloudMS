@@ -69,7 +69,7 @@ policyAttachmentsRouter.get(
     // Documents for voided invoices/payments are admin-only.
     res.json(
       await listPolicyAttachmentsByPolicyId(policyId.data, {
-        includeVoided: req.user!.role === "admin",
+        includeVoided: req.membership!.role === "admin",
       })
     )
   }
@@ -91,7 +91,7 @@ policyAttachmentsRouter.get(
     const attachment = await findPolicyAttachmentById(id)
     // A voided document is invisible to staff in the list, so it has to 404
     // here too - otherwise the object is still reachable by guessing an id.
-    if (!attachment || (attachment.isVoided && req.user!.role !== "admin")) {
+    if (!attachment || (attachment.isVoided && req.membership!.role !== "admin")) {
       res.status(404).json({ error: "Attachment not found" })
       return
     }

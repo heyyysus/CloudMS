@@ -51,21 +51,39 @@ export async function seedUsers(
   const values = adminNeedsUserRow
     ? [{ email: adminEmail!, name: "Admin", role: "admin" as const }, ...staff]
     : staff
+  // Built alongside `values` (rather than read back off the inserted rows,
+  // which no longer carry a role) so the membership insert below can zip
+  // each inserted user back up with the role it was meant to get.
+  const roles = values.map((v) => v.role)
 
-  const inserted = values.length > 0 ? await db.insert(users).values(values).returning() : []
+  const inserted =
+    values.length > 0
+      ? await db
+          .insert(users)
+          .values(
+            values.map((v) => {
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const { role, ...rest } = v
+              return rest
+            })
+          )
+          .returning()
+      : []
 
   let orgUsers = inserted
+  let orgUserRoles = roles
   if (includeAdmin && adminEmail && !adminNeedsUserRow) {
     const [existingAdmin] = await db.select().from(users).where(eq(users.email, adminEmail))
     orgUsers = [existingAdmin, ...inserted]
+    orgUserRoles = ["admin", ...roles]
   }
 
   if (orgUsers.length > 0) {
     await db.insert(orgMemberships).values(
-      orgUsers.map((u) => ({
+      orgUsers.map((u, i) => ({
         userId: u.id,
         orgId,
-        role: u.role,
+        role: orgUserRoles[i],
       }))
     )
   }

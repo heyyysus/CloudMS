@@ -1,19 +1,7 @@
-import { and, eq, isNotNull, isNull, ne } from "drizzle-orm"
-import { AUTOMATION_USER_EMAIL } from "../jobs/automationUser"
+import { and, eq, isNotNull, isNull } from "drizzle-orm"
 import { db } from "../db"
 import { users } from "../db/schema"
 import type { NewUser, User } from "../types"
-
-// The automation user is a permanently-disabled system row (see
-// jobs/automationUser.ts) that must never appear as something an admin can
-// edit or delete, so every listing excludes it alongside soft-deleted rows.
-function visibleToAdmin() {
-  return and(isNull(users.deletedAt), ne(users.email, AUTOMATION_USER_EMAIL))
-}
-
-export async function listUsers(): Promise<User[]> {
-  return db.select().from(users).where(visibleToAdmin()).orderBy(users.id)
-}
 
 export async function findUserById(id: number): Promise<User | undefined> {
   const [row] = await db.select().from(users).where(eq(users.id, id))

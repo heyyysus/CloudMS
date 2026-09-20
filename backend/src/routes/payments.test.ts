@@ -422,7 +422,8 @@ describe("wrong-org reads", () => {
       (await request(app).get(`/receipts?policyId=${theirPolicy.id}`).set("Cookie", cookie)).body
     ).toEqual([])
     expect(
-      (await request(app).get(`/trust-ledger?policyId=${theirPolicy.id}`).set("Cookie", cookie)).body
+      (await request(app).get(`/trust-ledger?policyId=${theirPolicy.id}`).set("Cookie", cookie))
+        .body
     ).toEqual([])
     const balance = await request(app)
       .get(`/trust-balance?policyId=${theirPolicy.id}`)
@@ -430,11 +431,8 @@ describe("wrong-org reads", () => {
     expect(balance.body.balance).toBe("0.00")
 
     expect(
-      (
-        await request(app)
-          .get(`/payments/${theirReceipt.body.payment.id}`)
-          .set("Cookie", cookie)
-      ).status
+      (await request(app).get(`/payments/${theirReceipt.body.payment.id}`).set("Cookie", cookie))
+        .status
     ).toBe(404)
     expect(
       (await request(app).get(`/receipts/${theirReceipt.body.id}`).set("Cookie", cookie)).status

@@ -67,9 +67,7 @@ describe("invoice documents", () => {
       sourceId: invoice.id,
     })
     expect(vi.mocked(putObject)).toHaveBeenCalledWith(
-      expect.stringMatching(
-        new RegExp(`^org/${orgId}/policies/${policy.id}/.*-invoice\\.pdf$`)
-      ),
+      expect.stringMatching(new RegExp(`^org/${orgId}/policies/${policy.id}/.*-invoice\\.pdf$`)),
       expect.any(Buffer),
       "application/pdf"
     )
@@ -113,9 +111,7 @@ describe("receipt documents", () => {
     expect(rows).toHaveLength(3)
     const receipts = rows.filter((row) => row.sourceType === "receipt")
     expect(receipts.map((row) => row.fileName).sort()).toEqual(
-      [first.body.receiptNumber, second.body.receiptNumber]
-        .map((n) => `Receipt #${n}.pdf`)
-        .sort()
+      [first.body.receiptNumber, second.body.receiptNumber].map((n) => `Receipt #${n}.pdf`).sort()
     )
     expect(receipts.every((row) => row.description === "Auto-generated receipt")).toBe(true)
   })

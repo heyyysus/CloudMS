@@ -1,9 +1,15 @@
 # Auth & Sessions: Repositories and Tests Explained
 
-This document walks through four files from the Google sign-in / DB-backed
-sessions feature: the two repository modules that back it
-(`repositories/users.ts`, `repositories/sessions.ts`) and the two test files
-that exercise them (`repositories/sessions.test.ts`, `auth/auth.test.ts`).
+This document walks through the Google sign-in / DB-backed sessions feature:
+the repository modules that back it (`repositories/users.ts`,
+`repositories/sessions.ts`, `repositories/orgMemberships.ts`) and the test
+files that exercise them (`repositories/sessions.test.ts`,
+`repositories/orgMemberships.test.ts`, `auth/auth.test.ts`,
+`auth/org.test.ts`). Since sub-issue 3 of the multitenancy rollout (see
+`docs/multitenancy.md`), a session also carries the caller's *active
+organization*: `users.role` is gone, `org_memberships.role` is the only
+source of a user's role, and every route outside `/auth/*` requires an
+active org via `requireAuth`.
 
 For architectural context: this app uses **opaque, DB-backed session
 tokens**, not JWTs. Google is only used for the login handshake — the
@@ -27,8 +33,6 @@ layer above (`auth/middleware.ts`, `auth/routes.ts`).
 
 ### Functions
 
-- **`listUsers()`** — returns every row in `users`. No filtering/pagination;
-  fine for the current admin-only, low-row-count use case.
 - **`findUserById(id)`** — single-row lookup by primary key, used wherever
   a route already has `req.user.id` (or another user's id) and needs the
   full record.
@@ -102,6 +106,16 @@ until this timestamp."
   — it's a building block for a future cleanup cron/job, not active cleanup.
   Until that's wired up, expired rows are simply ignored by `requireAuth`
   (rejected via the `expiresAt` check) rather than physically removed.
+- **`setSessionOrg(sessionId, orgId)`** — binds a session to an organization,
+  used by `POST /auth/org` (and, with `orgId` supplied at creation time
+  instead, by the auto-bind branch of `POST /auth/google`). This is the only
+  place `sessions.org_id` is ever written after the row is created.
+- **`deleteSessionsByUserIdAndOrg(userId, orgId)`** — like
+  `deleteSessionsByUserId`, but scoped to one organization: revokes only the
+  caller's sessions bound to that org, leaving their sessions in any other
+  org (or an org-less session) untouched. `routes/users.ts` calls this
+  instead of `deleteSessionsByUserId` whenever a membership is deactivated,
+  since a membership change in one org must not log the user out of another.
 
 ### Notable design decisions
 
@@ -165,6 +179,29 @@ Integration tests for `sessions.ts`, run against a real Postgres database
   defined). Uses `toBeGreaterThanOrEqual(1)` rather than an exact count
   since other expired rows could theoretically exist from other tests
   running against the same database.
+- **"binds a session to an org"** / **"deletes only a user's sessions bound
+  to the given org"** — cover `setSessionOrg` and
+  `deleteSessionsByUserIdAndOrg`; the latter creates sessions for the same
+  user in two different orgs and confirms deleting "by org" only ever
+  touches the one requested.
+
+---
+
+## `backend/src/repositories/orgMemberships.test.ts`
+
+Same prefix-scoped-email pattern as `sessions.test.ts`, plus a `makeOrg`
+helper (organizations have no natural "throwaway" marker like an email
+prefix, so the test slugs them with the same prefix instead and cleans up by
+`LIKE`-matching `organizations.slug`). Covers `findMembership` /
+`createMembership` / `updateMembership` / `listMembershipsForUser` (all
+pre-existing) plus the four functions this sub-issue added:
+`deactivateMembership` (a thin wrapper that flips `isActive`),
+`findActiveMembership` (like `findMembership` but excludes an inactive row —
+this is what `requireAuth` uses so a revoked membership can't still pass),
+`listActiveMembershipsWithOrg` (only active memberships, joined with the
+org's `name`/`slug` for the `/auth/me` payload), and `listOrgMembers` (an
+org's roster, scoped so one org's members never leak into another's `GET
+/users` response).
 
 ---
 
@@ -196,25 +233,55 @@ function boundary that's trivial to swap out in tests.
 ### Shared test helpers
 
 - **`testEmailPrefix = "auth-test-"`**, `makeUser`, and the `afterEach`
-  cleanup follow the identical pattern from `sessions.test.ts`.
-- **`makeSessionCookie(userId, expiresAt?)`** — bypasses the login flow
-  entirely to directly mint a valid (or, if `expiresAt` is in the past,
-  already-expired) session for a user, returning a `"session=<token>"`
-  string ready to pass as a `Cookie` header. Used by every test that needs
-  an *already logged-in* user, so those tests aren't re-testing the login
-  flow itself.
+  cleanup follow the identical pattern from `sessions.test.ts`, plus a
+  `TestContext` (`ctx`) purely for its `org()` builder — auth tests need
+  organizations and memberships, not the rest of `TestContext`'s fixtures.
+- **`makeSessionCookie(userId, { orgId?, expiresAt? })`** — bypasses the
+  login flow entirely to directly mint a valid (or, if `expiresAt` is in the
+  past, already-expired) session for a user, optionally pre-bound to an org,
+  returning a `"session=<token>"` string ready to pass as a `Cookie` header.
+  Used by every test that needs an *already logged-in* user, so those tests
+  aren't re-testing the login flow itself.
+
+### `requireSession` vs `requireAuth`
+
+`auth/middleware.ts` splits the old single `requireAuth` into two:
+`requireSession` (cookie → session → active user, no org required) and
+`requireAuth` (`requireSession`'s checks, plus the session must carry an
+`orgId` and the caller must have an *active* membership in it — otherwise
+`403 { error: "No active organization", code: "ORG_REQUIRED" }`). Only the
+three `/auth/*` routes use `requireSession`, since the org picker has to be
+reachable before a session is bound to an org; every other router still uses
+`requireAuth`, unchanged at the call site. `requireRole` now reads
+`req.membership!.role` instead of `req.user!.role`.
 
 ### `POST /auth/google` tests
 
-- **"logs in an invited user and sets a session cookie"** — the happy path:
-  a pre-existing user, Google confirms their email, and the response is a
-  200 with the public user shape (`id`, `email`, `name`, `role` — notably
-  *not* `googleSub` or timestamps, since `publicUser()` in `routes.ts`
-  explicitly whitelists fields) plus a `Set-Cookie` header containing
-  `HttpOnly`. It also checks that `findUserByEmail` now shows the user's
-  `googleSub` was persisted — confirming the **first-login binding**
-  behavior in `routes.ts` (a user row created without a `googleSub` gets it
-  filled in on their first successful Google login).
+- **"logs in a user with one active membership and binds the session to
+  it"** — the happy path: a pre-existing user with exactly one active
+  membership, Google confirms their email, and the response is a 200 with
+  `{ user, org, memberships }` (`user` is the public shape — `id`, `email`,
+  `name`, `role` — notably *not* `googleSub` or timestamps, since
+  `publicUser()` in `routes.ts` explicitly whitelists fields) plus a
+  `Set-Cookie` header containing `HttpOnly`. It also checks that
+  `findUserByEmail` now shows the user's `googleSub` was persisted —
+  confirming the **first-login binding** behavior in `routes.ts` (a user row
+  created without a `googleSub` gets it filled in on their first successful
+  Google login) — and reads the session row back by its token hash to
+  confirm `sessions.org_id` was actually persisted as the sole membership's
+  org, not just reflected in the response.
+- **"leaves the session unbound and lists every org when the user has two
+  active memberships"** — with two active memberships, `sessions.org_id`
+  stays `null` (asserted the same way, via the persisted row) and the
+  response's `user.role` is `null` and `org` is `null`; `memberships` lists
+  both. The frontend's org picker (a later sub-issue) is what turns this
+  into a choice.
+- **"rejects a user with no active memberships with 403"** / **"does not
+  count an inactive membership"** — a user can pass every identity check and
+  still be refused if they have no *active* membership anywhere; a
+  deactivated membership doesn't count towards either the zero-memberships
+  or the auto-bind case. Both get the same 403 as the invite-only check
+  below, for the same reason: don't leak account existence.
 - **"rejects a missing idToken with 400"** — validates the Zod schema
   (`loginSchema`) rejects an empty body before ever calling Google.
 - **"rejects an invalid Google token with 401"** — simulates
@@ -239,8 +306,17 @@ function boundary that's trivial to swap out in tests.
 
 ### `GET /auth/me` tests
 
+`GET /auth/me` now uses `requireSession`, not `requireAuth` — it has to
+answer even for a session with no org bound yet, which is exactly the state
+the (future) org picker reads it in. The response is the same
+`{ user, org, memberships }` shape `POST /auth/google` and `POST /auth/org`
+return.
+
 - **"returns the current user with a valid session"** — the happy path
-  through `requireAuth`.
+  through `requireSession`.
+- **"answers on an org-less session, with org: null and no membership
+  required"** — the case `requireAuth` would 403 on; `requireSession` lets
+  it through and `org`/`memberships` reflect the unbound state.
 - **"returns 401 without a cookie"** / **"returns 401 with a garbage
   token"** — both hit the same `requireAuth` branch (no session
   found for the hash of `token`), confirming a missing cookie and a
@@ -266,6 +342,18 @@ function boundary that's trivial to swap out in tests.
   revokes server-side state rather than just clearing the client cookie
   (which wouldn't stop a copy of that cookie from still working elsewhere).
 
+### `requireAuth` tests
+
+- **"returns 403 with code ORG_REQUIRED for an org-less session"** — the
+  acceptance criterion that no route outside `/auth/*` is reachable without
+  an active org, checked against `GET /clients` as a representative
+  non-auth route (any router works, since none of them touch `requireAuth`
+  at the call site — the enforcement is entirely inside the middleware).
+- **"returns 403 with code ORG_REQUIRED once the bound membership is
+  deactivated"** — a membership revoked mid-session is treated exactly like
+  an unbound session, not a stale pass-through: the same request that
+  succeeded before deactivation gets the same `ORG_REQUIRED` 403 after.
+
 ### `requireRole` tests
 
 - Builds a tiny standalone Express app (`adminOnlyApp`) with one route
@@ -273,13 +361,30 @@ function boundary that's trivial to swap out in tests.
   full `app` — keeping the role-check test isolated from all the other
   routes/middleware.
 - **"rejects staff with 403"** / **"allows admins"** — confirms
-  `requireRole`'s admin-bypass behavior from `middleware.ts` (`req.user.role
-  !== role && req.user.role !== "admin"`): a `staff` user is blocked from an
-  `admin`-only route, but an `admin` user is let through even though the
-  route was declared as `requireRole("admin")` and their role literally
-  equals it anyway — this test doesn't actually distinguish "role matches"
-  from "role is admin," since the admin case satisfies both. What it does
-  confirm is that admins are never blocked.
+  `requireRole`'s admin-bypass behavior from `middleware.ts`
+  (`req.membership!.role !== role && req.membership!.role !== "admin"`): a
+  `staff` membership is blocked from an `admin`-only route, but an `admin`
+  membership is let through even though the route was declared as
+  `requireRole("admin")` and the role literally equals it anyway — this test
+  doesn't actually distinguish "role matches" from "role is admin," since
+  the admin case satisfies both. What it does confirm is that admins are
+  never blocked.
+- **"fails a staff membership even when the same user is admin of another
+  org"** — the role check is scoped to `req.membership` (the *active org's*
+  membership), not to "is this user an admin anywhere." A user who is
+  `staff` in the org their session is bound to gets 403 even though the same
+  person is `admin` of a different org.
+
+### `POST /auth/org` tests (`auth/org.test.ts`)
+
+A separate file, since re-binding an existing session to a different org is
+its own small surface: binds to an org the caller is an active member of and
+returns the same `{ user, org, memberships }` shape (persisted, not just
+reflected — confirmed via a follow-up `GET /auth/me` call); 403 for an org
+the caller isn't an active member of, and 403 again if the membership exists
+but is inactive — `findActiveMembership` re-checks membership server-side on
+every call rather than trusting a client-supplied `orgId`; 400 for a
+malformed body; 401 with no cookie (it's still gated by `requireSession`).
 
 ---
 
@@ -359,3 +464,27 @@ Google ID tokens are short-lived (~1 hour) but not single-use, so the same
 token can be reused for a few login attempts while testing — mint a fresh
 one from the HTML page if it expires, or to re-test the "first-login binds
 `googleSub`" vs. "subsequent login" paths in `auth/routes.ts`.
+
+### 5. Testing the multi-org path
+
+If the invited account has an active membership in more than one
+organization (give it a second one via `POST /users/invite` while signed in
+as an admin of a second org, or insert a row into `org_memberships`
+directly), `POST /auth/google` above will respond with `org: null` and a
+`memberships` array listing every org, and `GET /auth/me` will keep
+returning `org: null` until a specific org is picked:
+
+```
+curl -b cookies.txt http://localhost:8000/auth/me
+# { "user": {..., "role": null}, "org": null, "memberships": [...] }
+
+curl -b cookies.txt -X POST http://localhost:8000/auth/org \
+  -H "Content-Type: application/json" \
+  -d '{"orgId": <one of the ids from memberships above>}'
+
+curl -b cookies.txt http://localhost:8000/auth/me
+# org is now that organization, and user.role is that membership's role
+
+curl -b cookies.txt http://localhost:8000/clients
+# would have 403'd with { "code": "ORG_REQUIRED" } before the /auth/org call
+```

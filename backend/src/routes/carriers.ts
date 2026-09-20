@@ -48,7 +48,7 @@ carriersRouter.post(
     try {
       res.status(201).json(await createCarrier(parsed.data))
     } catch (err) {
-      if (isPgUniqueViolation(err, "carriers_naic_unique")) {
+      if (isPgUniqueViolation(err, "carriers_org_id_naic_unique")) {
         res.status(409).json({ error: DUPLICATE_NAIC })
         return
       }
@@ -75,7 +75,7 @@ carriersRouter.patch(
     try {
       carrier = await updateCarrier(id, parsed.data)
     } catch (err) {
-      if (isPgUniqueViolation(err, "carriers_naic_unique")) {
+      if (isPgUniqueViolation(err, "carriers_org_id_naic_unique")) {
         res.status(409).json({ error: DUPLICATE_NAIC })
         return
       }

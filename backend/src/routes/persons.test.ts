@@ -58,9 +58,7 @@ describe("GET /persons/:id", () => {
 
     const list = await request(app).get("/persons").set("Cookie", cookie)
     expect(list.body.some((p: { id: string }) => p.id === person.id)).toBe(false)
-    expect((await request(app).get(`/persons/${person.id}`).set("Cookie", cookie)).status).toBe(
-      404
-    )
+    expect((await request(app).get(`/persons/${person.id}`).set("Cookie", cookie)).status).toBe(404)
     expect(
       (
         await request(app)
@@ -69,9 +67,9 @@ describe("GET /persons/:id", () => {
           .send({ lastName: "X" })
       ).status
     ).toBe(404)
-    expect(
-      (await request(app).delete(`/persons/${person.id}`).set("Cookie", cookie)).status
-    ).toBe(404)
+    expect((await request(app).delete(`/persons/${person.id}`).set("Cookie", cookie)).status).toBe(
+      404
+    )
   })
 })
 

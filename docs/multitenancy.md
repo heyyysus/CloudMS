@@ -54,9 +54,10 @@ are decisions still to be made.
   multiple organizations** via an `org_memberships` table (`user_id`, `org_id`,
   `role`, `is_active`, unique on `(user_id, org_id)`) rather than an `org_id`
   column on `users`. This answers the question this section used to leave
-  **Open**. `users.role` stays the live role and `users.email` stays globally
-  unique until sub-issue 3 retires `users.role` in favor of the per-membership
-  one.
+  **Open**. `users.role` is gone as of sub-issue 3: `org_memberships.role` is
+  the only source of a user's role, and it can differ per organization.
+  `users.email` stays globally unique - one user row, looked up by email at
+  login, with a membership (and role) per organization it belongs to.
 - **Global uniques become per-organization:** `email_templates.key` →
   `(org_id, key)`, and the bootstrap `welcome` template is inserted per
   organization when the organization is created.
@@ -70,9 +71,23 @@ are decisions still to be made.
 
 ## Request scoping
 
-- `requireAuth` already attaches `req.user`; it also attaches the user's
-  organization, and the session is the only source of the tenant. The tenant
-  is never taken from the URL, a header, or the body.
+- **Done (sub-issue 3):** the session is the only source of the tenant - never
+  the URL, a header, or the body. `sessions.org_id` holds it; `POST
+  /auth/google` binds it at sign-in when the user has exactly one active
+  membership (leaves it unbound, and 403s with zero); `POST /auth/org`
+  re-binds an existing session to any org the caller is an active member of.
+  `requireAuth` attaches `req.orgId` and `req.membership` (403ing with
+  `code: "ORG_REQUIRED"` when the session has no org, or the membership was
+  deactivated mid-session) for every route outside `/auth/*`, which use
+  `requireSession` instead since the org picker has to work before a session
+  is bound. `TestContext` gets a per-context organization and org-aware
+  `user()`/`cookie()` helpers.
+- **Not done yet (sub-issues 4-6):** domain repositories and routes
+  (clients, policies, accounting, etc.) still don't take an `orgId` - every
+  domain row lands in one default organization via the temporary `org_id
+  DEFAULT 1` regardless of which org's session created it. The *session's*
+  org and the org domain rows land in are deliberately different things
+  until that lands.
 - **Repositories take an explicit `orgId`.** All of them, so the compiler
   enforces scoping and a forgotten filter is a type error, not a data leak.
   The comment at the top of `backend/src/repositories/index.ts` anticipated
@@ -83,9 +98,6 @@ are decisions still to be made.
   `where`, not the primary mechanism. The non-superuser `app` role already
   exists (the API, the scheduler and the test suite all connect as it) —
   only `SET LOCAL app.org_id` and the policies themselves remain.
-- `TestContext` creates its own organization per context and its cleanup
-  deletes that organization, cascading. That is a better isolation story for
-  concurrent test runs than the current unique-suffix scheme.
 
 ## Organization settings replace environment variables
 
@@ -141,7 +153,11 @@ created automatically by a migration.
 2. `org_memberships` table; `org_id` (temporary default 1) on every domain
    table with foreign keys and indexes; `bootstrap.ts` creates organization 1.
 3. Thread `orgId` through every repository and route; `requireAuth` attaches
-   the organization; `TestContext` gets a per-context organization.
+   the organization; `TestContext` gets a per-context organization. **Auth
+   half done:** the session carries the org and `requireAuth`/`TestContext`
+   enforce and provide it (see *Request scoping* above). **Repository/route
+   half remains** (sub-issues 4-6): domain repositories and routes still
+   don't take an `orgId`.
 4. Per-organization invoice and receipt numbers.
 5. Organization settings columns; move the agency-level environment variables
    onto them; scope the reminder planner per organization.

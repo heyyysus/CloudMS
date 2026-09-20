@@ -91,4 +91,20 @@ describe('loadTabs / saveTabs', () => {
     )
     expect(loadTabs()).toEqual([{ id: '1', label: 'Jane Doe' }])
   })
+
+  // Tabs saved before row ids became opaque strings carry a number id. The
+  // guard drops them, so stale entries self-purge on the next load instead of
+  // needing a storage migration. Worth asserting on its own: if the guard ever
+  // regressed to `typeof id === 'number'`, loadTabs() would return [] for
+  // every real tab, and the string-shaped cases above would still pass.
+  it('drops tabs persisted with the old numeric ids', () => {
+    localStorage.setItem(
+      'cloudms.open-client-tabs',
+      JSON.stringify([
+        { id: 1, label: 'Stale Numeric' },
+        { id: '2', label: 'John Smith' },
+      ]),
+    )
+    expect(loadTabs()).toEqual([{ id: '2', label: 'John Smith' }])
+  })
 })

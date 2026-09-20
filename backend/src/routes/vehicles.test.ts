@@ -42,6 +42,30 @@ describe("GET /vehicles", () => {
       400
     )
   })
+
+  it("does not see a vehicle from another org", async () => {
+    const user = await ctx.user("vehicles-wrongorg")
+    const cookie = await ctx.cookie(user.id)
+    const other = await ctx.org()
+    const vehicle = await ctx.vehicle({ orgId: other.id })
+
+    const list = await request(app).get("/vehicles").set("Cookie", cookie)
+    expect(list.body.some((v: { id: string }) => v.id === vehicle.id)).toBe(false)
+    expect((await request(app).get(`/vehicles/${vehicle.id}`).set("Cookie", cookie)).status).toBe(
+      404
+    )
+    expect(
+      (
+        await request(app)
+          .patch(`/vehicles/${vehicle.id}`)
+          .set("Cookie", cookie)
+          .send({ make: "X" })
+      ).status
+    ).toBe(404)
+    expect(
+      (await request(app).delete(`/vehicles/${vehicle.id}`).set("Cookie", cookie)).status
+    ).toBe(404)
+  })
 })
 
 describe("POST /vehicles", () => {
@@ -109,6 +133,23 @@ describe("PATCH /vehicles/:id", () => {
       .send({ make: "Toyota" })
     expect(res.status).toBe(200)
     expect(res.body.make).toBe("Toyota")
+  })
+
+  it("rejects a PATCH repointing policyId at another org's policy", async () => {
+    const user = await ctx.user("vehicles-crossorg")
+    const cookie = await ctx.cookie(user.id)
+    const mine = await ctx.vehicle()
+    const other = await ctx.org()
+    const theirPolicy = await ctx.policy({ orgId: other.id })
+
+    const res = await request(app)
+      .patch(`/vehicles/${mine.id}`)
+      .set("Cookie", cookie)
+      .send({ policyId: theirPolicy.id })
+    expect(res.status).toBe(409)
+
+    const after = await request(app).get(`/vehicles/${mine.id}`).set("Cookie", cookie)
+    expect(after.body.policyId).toBe(mine.policyId)
   })
 })
 

@@ -117,7 +117,9 @@ describe("orgMemberships repository", () => {
     await deactivateMembership(inactive.id)
 
     const memberships = await listActiveMembershipsWithOrg(user.id)
-    expect(memberships).toEqual([{ orgId: orgA.id, name: orgA.name, slug: orgA.slug, role: "admin" }])
+    expect(memberships).toEqual([
+      { orgId: orgA.id, name: orgA.name, slug: orgA.slug, role: "admin" },
+    ])
   })
 
   it("listOrgMembers returns an org's members and excludes another org's", async () => {

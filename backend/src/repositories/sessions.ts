@@ -46,7 +46,10 @@ export async function deleteSessionsByUserIdAndOrg(userId: number, orgId: number
   return deleted.length
 }
 
-export async function setSessionOrg(sessionId: number, orgId: number): Promise<Session | undefined> {
+export async function setSessionOrg(
+  sessionId: number,
+  orgId: number
+): Promise<Session | undefined> {
   const [row] = await db
     .update(sessions)
     .set({ orgId })

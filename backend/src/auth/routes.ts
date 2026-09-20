@@ -29,7 +29,8 @@ function publicUser(user: User, role: string | null) {
 async function meResponse(user: User, session: Session) {
   const memberships = await listActiveMembershipsWithOrg(user.id)
   const org = session.orgId === null ? null : await findOrganizationById(session.orgId)
-  const role = memberships.find((m: ActiveMembershipWithOrg) => m.orgId === session.orgId)?.role ?? null
+  const role =
+    memberships.find((m: ActiveMembershipWithOrg) => m.orgId === session.orgId)?.role ?? null
   return {
     user: publicUser(user, role),
     org: org ? { id: org.id, name: org.name, slug: org.slug } : null,

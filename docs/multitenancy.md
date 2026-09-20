@@ -60,13 +60,15 @@ are decisions still to be made.
 - **Global uniques become per-organization:** `email_templates.key` →
   `(org_id, key)`, and the bootstrap `welcome` template is inserted per
   organization when the organization is created.
-- **Invoice and receipt numbers.** Today `invoices.id` and `receipts.id`
-  double as the agency-wide sequential number. Under shared tables those
-  serials interleave across agencies, so each agency's numbers would have
-  gaps. Add `invoice_number` and `receipt_number` columns, unique per
-  organization, allocated inside the creating transaction from a counter on
-  the organization row. **Open:** the display format (plain integer vs a
-  per-agency prefix).
+- **Done (#120): invoice and receipt numbers.** `invoices.invoice_number` and
+  `receipts.receipt_number` are plain integers, unique per organization,
+  allocated inside the creating transaction from `organizations.next_invoice_number`
+  / `next_receipt_number` (a row-locking `UPDATE ... RETURNING`, so a rolled-back
+  create does not burn a number). The display format is a plain integer, with
+  no per-agency prefix. Row `id` is unaffected and stays what URLs and query
+  keys use; `invoiceNumber`/`receiptNumber` ride alongside `id` in API
+  responses and are what PDFs and policy-log entries print instead of the
+  opaque row id.
 
 ### Row ids
 
@@ -106,14 +108,22 @@ but landing in the same migration since both touch every table's columns.
   answering exactly as a missing row does. `carriers.naic` and
   `auto_policies.policy_number` are unique per organization rather than
   globally.
-- **Not done yet (#120, #121):** logs, attachments, and accounting documents
-  (#120) and email templates, reminder rules, scheduled emails, the reminder
-  planner/scheduler, and storage keys (#121) still don't take an `orgId` -
-  since #130 dropped `org_id`'s temporary `DEFAULT 1`, every row created
-  through those still-unscoped routes lands with `org_id NULL` regardless of
-  which org's session created it, rather than in a single default
-  organization. The *session's* org and the org those rows land in are
-  deliberately different things until #120/#121 land.
+- **Done (#120), second half:** policy logs, policy attachments,
+  log-attachment links, invoices, payments, receipts, and the trust ledger
+  take an explicit `orgId` and filter every read/write by it, exactly like
+  the #119 half. `policyActivities.ts` resolves the policy through the
+  org-scoped `findAutoPolicyById` before reading `listScheduledEmails`, so
+  the one cross-tenant read there is closed without pulling #121's scope
+  forward. Attachment storage keys are now prefixed `org/<org_id>/policies/...`;
+  attachments uploaded before this change keep their old
+  `policy-attachments/...` key and are not migrated.
+- **Not done yet (#121):** email templates, reminder rules, scheduled emails,
+  the reminder planner/scheduler, and storage keys still don't take an
+  `orgId` - since #130 dropped `org_id`'s temporary `DEFAULT 1`, every row
+  created through those still-unscoped routes lands with `org_id NULL`
+  regardless of which org's session created it, rather than in a single
+  default organization. The *session's* org and the org those rows land in
+  are deliberately different things until #121 lands.
 - **Repositories take an explicit `orgId`.** All of them, so the compiler
   enforces scoping and a forgotten filter is a type error, not a data leak.
   The comment at the top of `backend/src/repositories/index.ts` anticipated
@@ -185,11 +195,11 @@ created automatically by a migration.
 4. Thread `orgId` through every repository and route; `requireAuth` attaches
    the organization; `TestContext` gets a per-context organization. **Auth
    half done:** the session carries the org and `requireAuth`/`TestContext`
-   enforce and provide it (see *Request scoping* above). **Repository/route
-   half, first part done (#119):** people, clients, carriers, policies,
-   vehicles, and search take an explicit `orgId`. **Remains (#120):** logs,
-   attachments, and accounting documents.
-5. Per-organization invoice and receipt numbers (#120).
+   enforce and provide it (see *Request scoping* above). **Done (#119, #120):**
+   people, clients, carriers, policies, vehicles, search, logs, attachments,
+   and accounting documents take an explicit `orgId`. **Remains (#121):**
+   email templates, reminder rules, scheduled emails, and storage keys.
+5. **Done (#120):** per-organization invoice and receipt numbers.
 6. Organization settings columns; move the agency-level environment variables
    onto them; scope the reminder planner per organization.
 7. Organization creation and invite flow; retire `ADMIN_EMAIL`.

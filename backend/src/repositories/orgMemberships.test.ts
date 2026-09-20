@@ -5,8 +5,12 @@ import { organizations, users } from "../db/schema"
 import {
   createMembership,
   createUser,
+  deactivateMembership,
+  findActiveMembership,
   findMembership,
+  listActiveMembershipsWithOrg,
   listMembershipsForUser,
+  listOrgMembers,
   updateMembership,
 } from "./index"
 
@@ -21,7 +25,7 @@ function makeOrg(suffix: string) {
 }
 
 function makeUser(suffix: string) {
-  return createUser({ email: `${testPrefix}${suffix}@example.com`, role: "staff" })
+  return createUser({ email: `${testPrefix}${suffix}@example.com` })
 }
 
 afterEach(async () => {
@@ -82,5 +86,51 @@ describe("orgMemberships repository", () => {
     await expect(
       createMembership({ userId: user.id, orgId: org.id, role: "admin" })
     ).rejects.toThrow()
+  })
+
+  it("deactivateMembership flips isActive to false", async () => {
+    const org = await makeOrg("deactivate")
+    const user = await makeUser("deactivate")
+    const created = await createMembership({ userId: user.id, orgId: org.id, role: "staff" })
+
+    const deactivated = await deactivateMembership(created.id)
+    expect(deactivated?.isActive).toBe(false)
+  })
+
+  it("findActiveMembership excludes an inactive membership", async () => {
+    const org = await makeOrg("find-active")
+    const user = await makeUser("find-active")
+    const created = await createMembership({ userId: user.id, orgId: org.id, role: "staff" })
+
+    expect((await findActiveMembership(user.id, org.id))?.id).toBe(created.id)
+
+    await deactivateMembership(created.id)
+    expect(await findActiveMembership(user.id, org.id)).toBeUndefined()
+  })
+
+  it("listActiveMembershipsWithOrg lists only active orgs, with their org fields", async () => {
+    const orgA = await makeOrg("active-a")
+    const orgB = await makeOrg("active-b")
+    const user = await makeUser("active-list")
+    await createMembership({ userId: user.id, orgId: orgA.id, role: "admin" })
+    const inactive = await createMembership({ userId: user.id, orgId: orgB.id, role: "staff" })
+    await deactivateMembership(inactive.id)
+
+    const memberships = await listActiveMembershipsWithOrg(user.id)
+    expect(memberships).toEqual([{ orgId: orgA.id, name: orgA.name, slug: orgA.slug, role: "admin" }])
+  })
+
+  it("listOrgMembers returns an org's members and excludes another org's", async () => {
+    const orgA = await makeOrg("members-a")
+    const orgB = await makeOrg("members-b")
+    const memberA = await makeUser("members-a-user")
+    const memberB = await makeUser("members-b-user")
+    await createMembership({ userId: memberA.id, orgId: orgA.id, role: "admin" })
+    await createMembership({ userId: memberB.id, orgId: orgB.id, role: "staff" })
+
+    const members = await listOrgMembers(orgA.id)
+    expect(members.map((m) => m.user.id)).toEqual([memberA.id])
+    expect(members[0].role).toBe("admin")
+    expect(members[0].isActive).toBe(true)
   })
 })

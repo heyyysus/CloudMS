@@ -2,20 +2,30 @@ import { like } from "drizzle-orm"
 import { afterEach, describe, expect, it } from "vitest"
 import { hashToken } from "../auth/tokens"
 import { db } from "../db"
-import { users } from "../db/schema"
+import { organizations, users } from "../db/schema"
 import {
   createSession,
   createUser,
   deleteExpiredSessions,
   deleteSessionByTokenHash,
   deleteSessionsByUserId,
+  deleteSessionsByUserIdAndOrg,
   findSessionWithUserByTokenHash,
+  setSessionOrg,
 } from "./index"
 
 const testEmailPrefix = "sessions-repo-test-"
 
 function makeUser(suffix: string) {
-  return createUser({ email: `${testEmailPrefix}${suffix}@example.com`, role: "staff" })
+  return createUser({ email: `${testEmailPrefix}${suffix}@example.com` })
+}
+
+function makeOrg(suffix: string) {
+  return db
+    .insert(organizations)
+    .values({ name: `Sessions Repo Test ${suffix}`, slug: `${testEmailPrefix}${suffix}` })
+    .returning()
+    .then(([row]) => row)
 }
 
 function futureDate() {
@@ -25,6 +35,7 @@ function futureDate() {
 afterEach(async () => {
   // Deleting the user cascades to its sessions.
   await db.delete(users).where(like(users.email, `${testEmailPrefix}%`))
+  await db.delete(organizations).where(like(organizations.slug, `${testEmailPrefix}%`))
 })
 
 describe("sessions repository", () => {
@@ -76,5 +87,40 @@ describe("sessions repository", () => {
     expect(deleted).toBeGreaterThanOrEqual(1)
     expect(await findSessionWithUserByTokenHash(expiredHash)).toBeUndefined()
     expect(await findSessionWithUserByTokenHash(liveHash)).toBeDefined()
+  })
+
+  it("binds a session to an org", async () => {
+    const user = await makeUser("set-org")
+    const org = await makeOrg("set-org")
+    const tokenHash = hashToken("set-org-token")
+    const session = await createSession({ userId: user.id, tokenHash, expiresAt: futureDate() })
+    expect(session.orgId).toBeNull()
+
+    const updated = await setSessionOrg(session.id, org.id)
+    expect(updated?.orgId).toBe(org.id)
+  })
+
+  it("deletes only a user's sessions bound to the given org", async () => {
+    const user = await makeUser("delete-by-org")
+    const orgA = await makeOrg("delete-by-org-a")
+    const orgB = await makeOrg("delete-by-org-b")
+    const hashA = hashToken("delete-by-org-a-token")
+    const hashB = hashToken("delete-by-org-b-token")
+    await createSession({
+      userId: user.id,
+      orgId: orgA.id,
+      tokenHash: hashA,
+      expiresAt: futureDate(),
+    })
+    await createSession({
+      userId: user.id,
+      orgId: orgB.id,
+      tokenHash: hashB,
+      expiresAt: futureDate(),
+    })
+
+    expect(await deleteSessionsByUserIdAndOrg(user.id, orgA.id)).toBe(1)
+    expect(await findSessionWithUserByTokenHash(hashA)).toBeUndefined()
+    expect(await findSessionWithUserByTokenHash(hashB)).toBeDefined()
   })
 })

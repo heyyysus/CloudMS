@@ -24,7 +24,7 @@ const ruleFormSchema = z.object({
     .int('Whole days only')
     .min(-730, 'At most 730 days after expiration')
     .max(730, 'At most 730 days before expiration'),
-  templateId: z.number({ message: 'Pick a template' }).int().positive('Pick a template'),
+  templateId: z.string({ message: 'Pick a template' }).min(1, 'Pick a template'),
 })
 
 type RuleFormValues = z.infer<typeof ruleFormSchema>
@@ -61,7 +61,7 @@ export function ReminderRuleForm({
     defaultValues: {
       name: initial?.name ?? '',
       offsetDays: initial?.offsetDays ?? 30,
-      templateId: initial?.templateId ?? (templates[0]?.id ?? 0),
+      templateId: initial?.templateId ?? (templates[0]?.id ?? ''),
     },
   })
 
@@ -99,7 +99,7 @@ export function ReminderRuleForm({
             render={({ field }) => (
               <Select
                 value={field.value ? String(field.value) : undefined}
-                onValueChange={(next) => field.onChange(Number(next))}
+                onValueChange={(next) => field.onChange(next)}
               >
                 <SelectTrigger id="reminder-rule-template">
                   <SelectValue placeholder="Pick a template" />

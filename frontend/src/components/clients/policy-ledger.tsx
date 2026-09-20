@@ -17,10 +17,10 @@ const LEDGER_GRID =
   'grid grid-cols-[11rem_6rem_7rem_minmax(0,1fr)_6rem_6rem_6rem_3.5rem] items-center gap-x-3 px-2'
 
 interface PolicyLedgerProps {
-  clientId: number
-  policyId: number
-  onPay: (invoiceId: number) => void
-  onSelect: (invoiceId: number) => void
+  clientId: string
+  policyId: string
+  onPay: (invoiceId: string) => void
+  onSelect: (invoiceId: string) => void
   getInvoicesFn?: typeof getInvoices
   getPaymentsFn?: typeof getPaymentsByPolicy
 }

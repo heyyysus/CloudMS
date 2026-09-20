@@ -26,9 +26,9 @@ const LOG_PICKER_GRID = 'grid grid-cols-[2.5rem_9rem_2.75rem_minmax(0,1fr)] item
 
 interface LogPickerProps {
   logs: PolicyLog[]
-  selectedLogId: number | null
-  onSelect: (logId: number) => void
-  currentUserId?: number
+  selectedLogId: string | null
+  onSelect: (logId: string) => void
+  currentUserId?: string
 }
 
 export function LogPicker({ logs, selectedLogId, onSelect, currentUserId }: LogPickerProps) {
@@ -75,13 +75,13 @@ export function LogPicker({ logs, selectedLogId, onSelect, currentUserId }: LogP
 }
 
 interface LinkAttachmentsToLogDialogProps {
-  policyId: number
+  policyId: string
   // The rows ticked in the attachments list. Empty while the dialog is closed.
   attachments: PolicyAttachment[]
   open: boolean
   onOpenChange: (open: boolean) => void
   onLinked: () => void
-  currentUserId?: number
+  currentUserId?: string
   getPolicyLogsFn?: typeof getPolicyLogs
   linkAttachmentsToLogFn?: typeof linkAttachmentsToLog
 }
@@ -101,7 +101,7 @@ export function LinkAttachmentsToLogDialog({
 }: LinkAttachmentsToLogDialogProps) {
   const queryClient = useQueryClient()
   const toast = useToast()
-  const [selectedLogId, setSelectedLogId] = useState<number | null>(null)
+  const [selectedLogId, setSelectedLogId] = useState<string | null>(null)
 
   // Shares the Logs subtab's cache entry, so this usually paints from memory.
   const { data: logs, isPending, isError } = useQuery({
@@ -116,7 +116,7 @@ export function LinkAttachmentsToLogDialog({
   }, [open])
 
   const mutation = useMutation({
-    mutationFn: (logId: number) =>
+    mutationFn: (logId: string) =>
       linkAttachmentsToLogFn({ logId, attachmentIds: attachments.map((a) => a.id) }),
     onSuccess: (_links, logId) => {
       queryClient.invalidateQueries({ queryKey: ['policyLogAttachments', policyId] })

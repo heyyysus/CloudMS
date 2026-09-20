@@ -38,7 +38,7 @@ interface InviteUserFormProps {
   errorMessage?: string | null
   // Bumped by the parent on a successful invite so the form can clear
   // itself; left alone on error so the admin doesn't lose what they typed.
-  resetToken?: number
+  resetToken?: string
 }
 
 export function InviteUserForm({
@@ -132,10 +132,10 @@ interface InviteUserCardProps {
 
 // A 409 from POST /users/invite carries this shape only when the email
 // belonged to a user that was later deleted (see backend/src/routes/users.ts).
-function deletedUserId(error: unknown): number | null {
+function deletedUserId(error: unknown): string | null {
   if (!(error instanceof ApiError) || error.status !== 409) return null
   const id = (error.body as { deletedUserId?: unknown } | null)?.deletedUserId
-  return typeof id === 'number' ? id : null
+  return typeof id === 'string' ? id : null
 }
 
 export function InviteUserCard({
@@ -147,7 +147,7 @@ export function InviteUserCard({
   // Set only when invite hits the deleted-email 409, so the admin can confirm
   // bringing the old account back under its original id instead of the
   // invite silently failing on a row they can no longer see.
-  const [restoreCandidate, setRestoreCandidate] = useState<{ id: number; email: string } | null>(
+  const [restoreCandidate, setRestoreCandidate] = useState<{ id: string; email: string } | null>(
     null
   )
 
@@ -168,7 +168,7 @@ export function InviteUserCard({
   })
 
   const restore = useMutation({
-    mutationFn: (id: number) => restoreUserFn(id),
+    mutationFn: (id: string) => restoreUserFn(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       setRestoreCandidate(null)

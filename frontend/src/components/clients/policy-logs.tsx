@@ -19,9 +19,9 @@ import {
 import { getPolicyLogs, type PolicyLog } from '@/api/policyLogs'
 
 interface PolicyLogsProps {
-  policyId: number
+  policyId: string
   onAddLog: () => void
-  currentUserId?: number
+  currentUserId?: string
   getPolicyLogsFn?: typeof getPolicyLogs
   getPolicyLogAttachmentsFn?: typeof getPolicyLogAttachments
   unlinkPolicyLogAttachmentFn?: typeof unlinkPolicyLogAttachment
@@ -60,7 +60,7 @@ export function PolicyLogs({
   })
 
   const unlink = useMutation({
-    mutationFn: (linkId: number) => unlinkPolicyLogAttachmentFn(linkId),
+    mutationFn: (linkId: string) => unlinkPolicyLogAttachmentFn(linkId),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ['policyLogAttachments', policyId] }),
     onError: (error) => toast.error(error.message),

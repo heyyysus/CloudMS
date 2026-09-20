@@ -75,7 +75,7 @@ export function AddLogForm({ onSubmit, onCancel, isPending, errorMessage }: AddL
 }
 
 interface AddLogDialogProps {
-  policyId: number
+  policyId: string
   open: boolean
   onOpenChange: (open: boolean) => void
   createLogFn?: typeof createPolicyLog

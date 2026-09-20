@@ -170,7 +170,7 @@ function voidConfirmCopy(
 }
 
 interface InvoiceReceiptDialogProps {
-  invoiceId: number | undefined
+  invoiceId: string | undefined
   client: ClientDetail
   policies: AutoPolicy[]
   open: boolean
@@ -188,7 +188,7 @@ interface InvoiceReceiptDialogProps {
 // Which void the confirm step is currently asking about. Voiding the invoice
 // cascades through its active payments first, because the server refuses to
 // void an invoice while any of them are still in effect.
-type VoidTarget = { kind: 'invoice' } | { kind: 'payment'; paymentId: number }
+type VoidTarget = { kind: 'invoice' } | { kind: 'payment'; paymentId: string }
 
 type VoidResult =
   | { kind: 'payment' }

@@ -36,18 +36,27 @@ are decisions still to be made.
 
 - **`organizations`** — `id`, `name`, `slug`, settings columns (below),
   `is_demo` (see *Demo org*), timestamps.
-- **`org_id NOT NULL`** on `users` and on every domain table: persons,
-  drivers, clients, client_phones, client_emails, carriers, auto_policies,
-  vehicles, policy_drivers, policy_logs, policy_attachments,
-  policy_log_attachments, invoices, invoice_items, payments, receipts,
-  trust_ledger, email_templates, email_log, reminder_rules, scheduled_emails.
-  Each gets a foreign key to `organizations` and a composite index led by
-  `org_id`. The backfill migration creates organization 1 and assigns every
-  existing row to it, which keeps the migration additive in the style the
-  repo already uses.
-- **One user belongs to one organization.** `users.email` stays globally
-  unique. **Open:** whether a person will ever need to belong to two
-  agencies; if so this becomes a membership table, but nothing today needs it.
+- **`org_id NOT NULL`** on every domain table: persons, drivers, clients,
+  client_phones, client_emails, carriers, auto_policies, vehicles,
+  policy_drivers, policy_logs, policy_attachments, policy_log_attachments,
+  invoices, invoice_items, payments, receipts, trust_ledger, email_templates,
+  email_log, reminder_rules, scheduled_emails. Each gets a foreign key to
+  `organizations` and a composite index led by `org_id`. #116 replaced
+  migrations with `drizzle-kit push`, so there is no backfill migration:
+  `org_id` carries a temporary column default of `1` (dropped in sub-issue 6),
+  and `bootstrap.ts` creates organization 1 insert-if-absent so `db:push`
+  followed by bootstrap has somewhere for existing rows to point. This means
+  `db:push` against a database that already has rows fails until organization
+  1 exists - fine for the fresh databases this repo's tooling targets, but a
+  production rollout needs organization 1 inserted between two pushes; see
+  #117's PR body.
+- **Multiple users can belong to one organization, and one user can belong to
+  multiple organizations** via an `org_memberships` table (`user_id`, `org_id`,
+  `role`, `is_active`, unique on `(user_id, org_id)`) rather than an `org_id`
+  column on `users`. This answers the question this section used to leave
+  **Open**. `users.role` stays the live role and `users.email` stays globally
+  unique until sub-issue 3 retires `users.role` in favor of the per-membership
+  one.
 - **Global uniques become per-organization:** `email_templates.key` →
   `(org_id, key)`, and the bootstrap `welcome` template is inserted per
   organization when the organization is created.
@@ -128,8 +137,9 @@ created automatically by a migration.
 
 ## Rollout order
 
-1. `organizations` table; `org_id` on `users`; backfill to organization 1.
-2. `org_id` on every domain table with foreign keys and indexes; backfill.
+1. `organizations` table.
+2. `org_memberships` table; `org_id` (temporary default 1) on every domain
+   table with foreign keys and indexes; `bootstrap.ts` creates organization 1.
 3. Thread `orgId` through every repository and route; `requireAuth` attaches
    the organization; `TestContext` gets a per-context organization.
 4. Per-organization invoice and receipt numbers.

@@ -172,3 +172,60 @@ describe("POST /policy-attachments/confirm", () => {
     expect(res.body.error).toBe("Invalid characters in request")
   })
 })
+
+describe("wrong-org", () => {
+  it("does not see another org's attachments, and every by-id/write route 404s", async () => {
+    const user = await ctx.user("attach-wrongorg")
+    const cookie = await ctx.cookie(user.id)
+    const other = await ctx.org()
+    const otherUser = await ctx.user("attach-wrongorg-other", "staff", other.id)
+    const theirPolicy = await ctx.policy({ orgId: other.id })
+    const theirAttachment = await createPolicyAttachment(other.id, {
+      policyId: theirPolicy.id,
+      fileName: "theirs.pdf",
+      storageKey: `${attachmentKeyPrefix(other.id, theirPolicy.id)}theirs.pdf`,
+      mimeType: "application/pdf",
+      sizeBytes: 100,
+      createdBy: otherUser.id,
+    })
+
+    const list = await request(app)
+      .get(`/policy-attachments?policyId=${theirPolicy.id}`)
+      .set("Cookie", cookie)
+    expect(list.status).toBe(200)
+    expect(list.body).toEqual([])
+
+    expect(
+      (
+        await request(app)
+          .get(`/policy-attachments/${theirAttachment.id}/link`)
+          .set("Cookie", cookie)
+      ).status
+    ).toBe(404)
+
+    expect(
+      (
+        await request(app).post("/policy-attachments/presign").set("Cookie", cookie).send({
+          policyId: theirPolicy.id,
+          fileName: "x.pdf",
+          contentType: "application/pdf",
+          sizeBytes: 100,
+        })
+      ).status
+    ).toBe(404)
+
+    vi.mocked(headObject).mockResolvedValue(HEAD)
+    expect(
+      (
+        await request(app)
+          .post("/policy-attachments/confirm")
+          .set("Cookie", cookie)
+          .send({
+            policyId: theirPolicy.id,
+            storageKey: `${attachmentKeyPrefix(other.id, theirPolicy.id)}uuid-x.pdf`,
+            fileName: "x.pdf",
+          })
+      ).status
+    ).toBe(404)
+  })
+})

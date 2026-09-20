@@ -42,6 +42,21 @@ describe("GET /policy-logs", () => {
     expect(res.body[1].logNumber).toBe(1)
     expect(res.body[0].author).toMatchObject({ id: user.id, email: user.email })
   })
+
+  it("does not see logs from another org", async () => {
+    const user = await ctx.user("logs-wrongorg")
+    const cookie = await ctx.cookie(user.id)
+    const other = await ctx.org()
+    const otherUser = await ctx.user("logs-wrongorg-other", "staff", other.id)
+    const theirPolicy = await ctx.policy({ orgId: other.id })
+    await ctx.log(theirPolicy.id, otherUser.id, "Their note", other.id)
+
+    const res = await request(app)
+      .get(`/policy-logs?policyId=${theirPolicy.id}`)
+      .set("Cookie", cookie)
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual([])
+  })
 })
 
 describe("POST /policy-logs", () => {
@@ -141,6 +156,22 @@ describe("POST /policy-logs", () => {
           .post("/policy-logs")
           .set("Cookie", cookie)
           .send({ policyId: MISSING_ROW_ID, body: "x" })
+      ).status
+    ).toBe(404)
+  })
+
+  it("returns 404 for another org's policy", async () => {
+    const user = await ctx.user("logs-create-wrongorg")
+    const cookie = await ctx.cookie(user.id)
+    const other = await ctx.org()
+    const theirPolicy = await ctx.policy({ orgId: other.id })
+
+    expect(
+      (
+        await request(app)
+          .post("/policy-logs")
+          .set("Cookie", cookie)
+          .send({ policyId: theirPolicy.id, body: "x" })
       ).status
     ).toBe(404)
   })

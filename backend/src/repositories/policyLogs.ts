@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm"
+import { and, desc, eq, sql } from "drizzle-orm"
 import { db } from "../db"
 import { autoPolicies, policyLogs } from "../db/schema"
 
@@ -31,9 +31,12 @@ export interface PolicyLogWithAuthor {
   author: { id: string; name: string | null; email: string }
 }
 
-export async function listPolicyLogsByPolicyId(policyId: string): Promise<PolicyLogWithAuthor[]> {
+export async function listPolicyLogsByPolicyId(
+  orgId: string,
+  policyId: string
+): Promise<PolicyLogWithAuthor[]> {
   return db.query.policyLogs.findMany({
-    where: eq(policyLogs.policyId, policyId),
+    where: and(eq(policyLogs.policyId, policyId), eq(policyLogs.orgId, orgId)),
     orderBy: desc(policyLogs.logNumber),
     with: { author: { columns: { id: true, name: true, email: true } } },
   })
@@ -66,6 +69,7 @@ export async function withLogNumberRetry<T>(fn: () => Promise<T>): Promise<T> {
 // the surrounding withLogNumberRetry's job.
 export async function insertPolicyLogInTx(
   tx: Tx,
+  orgId: string,
   input: { policyId: string; authorId: string; body: string }
 ): Promise<string> {
   const [{ nextNumber }] = await tx
@@ -73,11 +77,12 @@ export async function insertPolicyLogInTx(
       nextNumber: sql<number>`coalesce(max(${policyLogs.logNumber}), 0) + 1`,
     })
     .from(policyLogs)
-    .where(eq(policyLogs.policyId, input.policyId))
+    .where(and(eq(policyLogs.policyId, input.policyId), eq(policyLogs.orgId, orgId)))
 
   const [row] = await tx
     .insert(policyLogs)
     .values({
+      orgId,
       policyId: input.policyId,
       authorId: input.authorId,
       body: input.body,
@@ -90,20 +95,23 @@ export async function insertPolicyLogInTx(
 
 // Creates a standalone log (the POST /policy-logs path). Returns undefined
 // when the policy doesn't exist.
-export async function createPolicyLog(input: {
-  policyId: string
-  authorId: string
-  body: string
-}): Promise<PolicyLogWithAuthor | undefined> {
+export async function createPolicyLog(
+  orgId: string,
+  input: {
+    policyId: string
+    authorId: string
+    body: string
+  }
+): Promise<PolicyLogWithAuthor | undefined> {
   const id = await withLogNumberRetry(async () =>
     db.transaction(async (tx) => {
       const [policy] = await tx
         .select({ id: autoPolicies.id })
         .from(autoPolicies)
-        .where(eq(autoPolicies.id, input.policyId))
+        .where(and(eq(autoPolicies.id, input.policyId), eq(autoPolicies.orgId, orgId)))
       if (!policy) return undefined
 
-      return insertPolicyLogInTx(tx, input)
+      return insertPolicyLogInTx(tx, orgId, input)
     })
   )
 

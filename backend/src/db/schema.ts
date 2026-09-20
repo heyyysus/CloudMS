@@ -676,10 +676,10 @@ export const invoices = pgTable(
     // Nullable until #121 restores NOT NULL once every insert passes an
     // explicit org id.
     orgId: rowIdFk("org_id").references(() => organizations.id),
-    // Temporary: auto-allocated globally so existing create paths keep working.
-    // #120 allocates from organizations.next_invoice_number inside the
-    // creating transaction and drops the identity.
-    invoiceNumber: integer("invoice_number").notNull().generatedByDefaultAsIdentity(),
+    // Allocated per organization from organizations.next_invoice_number,
+    // inside the creating transaction (see
+    // repositories/organizations.ts#allocateInvoiceNumberInTx).
+    invoiceNumber: integer("invoice_number").notNull(),
     policyId: rowIdFk("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
@@ -781,10 +781,10 @@ export const receipts = pgTable(
     // Nullable until #121 restores NOT NULL once every insert passes an
     // explicit org id.
     orgId: rowIdFk("org_id").references(() => organizations.id),
-    // Temporary: auto-allocated globally so existing create paths keep working.
-    // #120 allocates from organizations.next_receipt_number inside the
-    // creating transaction and drops the identity.
-    receiptNumber: integer("receipt_number").notNull().generatedByDefaultAsIdentity(),
+    // Allocated per organization from organizations.next_receipt_number,
+    // inside the creating transaction (see
+    // repositories/organizations.ts#allocateReceiptNumberInTx).
+    receiptNumber: integer("receipt_number").notNull(),
     // One receipt per payment.
     paymentId: rowIdFk("payment_id")
       .notNull()

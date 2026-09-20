@@ -1,6 +1,14 @@
 import { and, eq } from "drizzle-orm"
 import { db } from "../db"
-import { autoPolicies, carriers, clients, drivers, persons, policyDrivers, vehicles } from "../db/schema"
+import {
+  autoPolicies,
+  carriers,
+  clients,
+  drivers,
+  persons,
+  policyDrivers,
+  vehicles,
+} from "../db/schema"
 import type { AutoPolicy, DriverRating, NewAutoPolicy, NewPerson, NewVehicle } from "../types"
 import { CrossOrgReferenceError } from "./errors"
 
@@ -256,9 +264,7 @@ export async function updateAutoPolicyWithDetails(
     if (!policy) return false
 
     if (vehicleInputs !== undefined) {
-      await tx
-        .delete(vehicles)
-        .where(and(eq(vehicles.policyId, id), eq(vehicles.orgId, orgId)))
+      await tx.delete(vehicles).where(and(eq(vehicles.policyId, id), eq(vehicles.orgId, orgId)))
       if (vehicleInputs.length > 0) {
         await tx
           .insert(vehicles)

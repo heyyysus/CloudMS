@@ -95,11 +95,7 @@ function handleMailError(err: unknown, req: Request, res: Response): boolean {
 // against them. Shared by the preview GET and the send POST so the values the
 // dialog previews are built by exactly the same code that renders the sent
 // message. Returns undefined when the policy (or its client) is missing.
-async function resolveMergeValues(
-  orgId: string,
-  policyId: string,
-  agent: Express.Request["user"]
-) {
+async function resolveMergeValues(orgId: string, policyId: string, agent: Express.Request["user"]) {
   const policy = await getPolicyWithDetails(orgId, policyId)
   if (!policy) return undefined
   const client = await getClientWithDetails(orgId, policy.clientId)

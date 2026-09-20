@@ -137,6 +137,12 @@ export class TestContext {
     return (await this.org()).id
   }
 
+  // Public accessor over defaultOrg(), for tests that need to name the
+  // session's own org explicitly (e.g. to contrast it with a second ctx.org()).
+  async orgId(): Promise<string> {
+    return this.defaultOrg()
+  }
+
   async user(prefix: string, role: UserRole = "staff", orgId?: string) {
     const u = await makeTestUser(prefix)
     this.userIds.push(u.id)
@@ -152,24 +158,28 @@ export class TestContext {
   }
 
   async person(overrides: Partial<NewPerson> = {}) {
-    const p = await createPerson({
+    const { orgId, ...rest } = overrides
+    const resolvedOrgId = orgId ?? (await this.defaultOrg())
+    const p = await createPerson(resolvedOrgId, {
       firstName: unique("First"),
       lastName: "Test",
       dateOfBirth: "1990-01-01",
       gender: "m",
       relationToInsured: "self",
-      ...overrides,
+      ...rest,
     })
     this.personIds.push(p.id)
     return p
   }
 
   async client(overrides: Partial<NewClient> = {}) {
-    const namedInsuredId = overrides.namedInsuredId ?? (await this.person()).id
-    const c = await createClient({
+    const { orgId, ...rest } = overrides
+    const resolvedOrgId = orgId ?? (await this.defaultOrg())
+    const namedInsuredId = rest.namedInsuredId ?? (await this.person({ orgId: resolvedOrgId })).id
+    const c = await createClient(resolvedOrgId, {
       mailingAddress1: "1 Test St",
       physicalAddress1: "1 Test St",
-      ...overrides,
+      ...rest,
       namedInsuredId,
     })
     this.clientIds.push(c.id)
@@ -177,19 +187,27 @@ export class TestContext {
   }
 
   async carrier(overrides: Partial<NewCarrier> = {}) {
-    const c = await createCarrier({ name: "Test Carrier", naic: uniqueNaic(), ...overrides })
+    const { orgId, ...rest } = overrides
+    const resolvedOrgId = orgId ?? (await this.defaultOrg())
+    const c = await createCarrier(resolvedOrgId, {
+      name: "Test Carrier",
+      naic: uniqueNaic(),
+      ...rest,
+    })
     this.carrierIds.push(c.id)
     return c
   }
 
   async policy(overrides: Partial<NewAutoPolicy> = {}) {
-    const clientId = overrides.clientId ?? (await this.client()).id
-    const carrierId = overrides.carrierId ?? (await this.carrier()).id
-    const p = await createAutoPolicy({
+    const { orgId, ...rest } = overrides
+    const resolvedOrgId = orgId ?? (await this.defaultOrg())
+    const clientId = rest.clientId ?? (await this.client({ orgId: resolvedOrgId })).id
+    const carrierId = rest.carrierId ?? (await this.carrier({ orgId: resolvedOrgId })).id
+    const p = await createAutoPolicy(resolvedOrgId, {
       policyNumber: unique("POL"),
       effectiveDate: "2026-01-01",
       expirationDate: "2027-01-01",
-      ...overrides,
+      ...rest,
       clientId,
       carrierId,
     })
@@ -198,14 +216,16 @@ export class TestContext {
   }
 
   async vehicle(overrides: Partial<NewVehicle> = {}) {
-    const policyId = overrides.policyId ?? (await this.policy()).id
-    const v = await createVehicle({
+    const { orgId, ...rest } = overrides
+    const resolvedOrgId = orgId ?? (await this.defaultOrg())
+    const policyId = rest.policyId ?? (await this.policy({ orgId: resolvedOrgId })).id
+    const v = await createVehicle(resolvedOrgId, {
       vin: uniqueVin(),
       make: "Honda",
       model: "Civic",
       year: 2020,
       garagingZip: "12345",
-      ...overrides,
+      ...rest,
       policyId,
     })
     this.vehicleIds.push(v.id)
@@ -216,9 +236,14 @@ export class TestContext {
   // cascade-delete with their person, and policy_drivers links cascade-delete
   // with either side, so tracking the person is enough for cleanup.
   async driverLink(policyId: string, overrides: Partial<NewPerson> = {}) {
-    const person = await this.person(overrides)
-    const driver = await createDriver({ personId: person.id, dlNumber: unique("DL") })
-    await addDriverToPolicy(policyId, driver.id)
+    const { orgId, ...rest } = overrides
+    const resolvedOrgId = orgId ?? (await this.defaultOrg())
+    const person = await this.person({ orgId: resolvedOrgId, ...rest })
+    const driver = await createDriver(resolvedOrgId, {
+      personId: person.id,
+      dlNumber: unique("DL"),
+    })
+    await addDriverToPolicy(resolvedOrgId, policyId, driver.id)
     return { person, driver }
   }
 
@@ -232,8 +257,8 @@ export class TestContext {
   }
 
   // client_emails cascade-delete with their client, so nothing to track.
-  async clientEmail(clientId: string, email = `${unique("to")}@example.com`) {
-    return addEmailToClient(clientId, email)
+  async clientEmail(clientId: string, email = `${unique("to")}@example.com`, orgId?: string) {
+    return addEmailToClient(orgId ?? (await this.defaultOrg()), clientId, email)
   }
 
   async template(overrides: { name?: string; subject?: string; body?: string } = {}) {

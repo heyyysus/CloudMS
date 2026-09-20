@@ -242,7 +242,7 @@ export async function sendCorrespondenceEmail(input: {
   values: Record<string, string>
   to: string[]
   cc: string[]
-  triggeredBy: number
+  triggeredBy: string
 }): Promise<SendCorrespondenceEmailResult> {
   const { template, values, to, cc, triggeredBy } = input
 

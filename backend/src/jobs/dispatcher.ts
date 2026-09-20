@@ -45,9 +45,9 @@ async function releaseStaleClaims(claimTimeoutMs: number): Promise<number> {
 // ones. The index signature satisfies db.execute's Record<string, unknown>
 // constraint.
 interface ClaimedRow extends Record<string, unknown> {
-  id: number
-  rule_id: number
-  policy_id: number
+  id: string
+  rule_id: string
+  policy_id: string
   attempts: number
 }
 

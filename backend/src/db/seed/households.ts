@@ -140,7 +140,7 @@ function buildDraft(): Draft {
   }
 }
 
-export async function seedHouseholds(count: number, orgId: number): Promise<Household[]> {
+export async function seedHouseholds(count: number, orgId: string): Promise<Household[]> {
   const drafts = Array.from({ length: count }, buildDraft)
 
   const allPersonSpecs = drafts.flatMap((d) => d.personSpecs.map((p) => ({ ...p, orgId })))

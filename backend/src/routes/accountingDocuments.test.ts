@@ -24,10 +24,10 @@ interface AttachmentRow {
   description: string | null
   isVoided: boolean
   sourceType: string
-  sourceId: number | null
+  sourceId: string | null
 }
 
-async function attachments(policyId: number, cookie: string): Promise<AttachmentRow[]> {
+async function attachments(policyId: string, cookie: string): Promise<AttachmentRow[]> {
   const res = await request(app)
     .get(`/policy-attachments?policyId=${policyId}`)
     .set("Cookie", cookie)
@@ -35,7 +35,7 @@ async function attachments(policyId: number, cookie: string): Promise<Attachment
   return res.body
 }
 
-async function makeInvoice(cookie: string, policyId: number, amount = 400) {
+async function makeInvoice(cookie: string, policyId: string, amount = 400) {
   const res = await request(app)
     .post("/invoices")
     .set("Cookie", cookie)
@@ -58,7 +58,7 @@ describe("invoice documents", () => {
     const rows = await attachments(policy.id, cookie)
     expect(rows).toHaveLength(1)
     expect(rows[0]).toMatchObject({
-      fileName: `Invoice #${String(invoice.id).padStart(5, "0")}.pdf`,
+      fileName: `Invoice #${invoice.id}.pdf`,
       mimeType: "application/pdf",
       description: "Auto-generated invoice",
       isVoided: false,
@@ -111,7 +111,7 @@ describe("receipt documents", () => {
     const receipts = rows.filter((row) => row.sourceType === "receipt")
     expect(receipts.map((row) => row.fileName).sort()).toEqual(
       [first.body.id, second.body.id]
-        .map((id) => `Receipt #${String(id).padStart(5, "0")}.pdf`)
+        .map((id) => `Receipt #${id}.pdf`)
         .sort()
     )
     expect(receipts.every((row) => row.description === "Auto-generated receipt")).toBe(true)
@@ -130,7 +130,7 @@ describe("receipt documents", () => {
       .set("Cookie", staffCookie)
       .send({ invoiceId: invoice.id, method: "cash", amount: 400 })
     expect(payment.status).toBe(201)
-    const receiptFileName = `Receipt #${String(payment.body.id).padStart(5, "0")}.pdf`
+    const receiptFileName = `Receipt #${payment.body.id}.pdf`
 
     expect((await attachments(policy.id, staffCookie)).map((r) => r.fileName)).toContain(
       receiptFileName
@@ -168,7 +168,7 @@ describe("receipt documents", () => {
     // Grab the attachment's id while it's still visible.
     const before = await attachments(policy.id, staffCookie)
     const attachmentId = (
-      before as unknown as { id: number; sourceType: string; sourceId: number }[]
+      before as unknown as { id: string; sourceType: string; sourceId: string }[]
     ).find((row) => row.sourceType === "receipt" && row.sourceId === receiptId)!.id
 
     await request(app)

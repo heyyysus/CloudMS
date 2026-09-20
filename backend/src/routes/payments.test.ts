@@ -55,6 +55,7 @@ describe("POST /payments (full payment)", () => {
       .send({ invoiceId: invoice.id, method: "cash", amount: 400, note: "Cash payment #1" })
     expect(res.status).toBe(201)
     // Response is the receipt.
+    expect(res.body.receiptNumber).toBe(1)
     expect(res.body.amountApplied).toBe("400.00")
     expect(res.body.changeGiven).toBe("0.00")
     expect(res.body.amountDueAfter).toBe("0.00")
@@ -175,10 +176,10 @@ describe("accounting activity is written to the policy log", () => {
     expect(logs.map((l) => l.logNumber)).toEqual([3, 2, 1])
     expect(logs.every((l) => l.author.id === user.id)).toBe(true)
     expect(logs[1].body).toBe(
-      `Payment of $150.00 by check on invoice #${invoice.id} — $150.00 applied, $250.00 still due.`
+      `Payment of $150.00 by check on invoice #${invoice.invoiceNumber} — $150.00 applied, $250.00 still due.`
     )
     expect(logs[0].body).toBe(
-      `Payment of $250.00 by cash on invoice #${invoice.id} — $250.00 applied, invoice paid in full and closed.`
+      `Payment of $250.00 by cash on invoice #${invoice.invoiceNumber} — $250.00 applied, invoice paid in full and closed.`
     )
   })
 
@@ -194,7 +195,7 @@ describe("accounting activity is written to the policy log", () => {
 
     const logs = await policyLogs(policy.id, cookie)
     expect(logs[0].body).toBe(
-      `Payment of $500.00 by cash on invoice #${invoice.id} — $400.00 applied, $100.00 change given, invoice paid in full and closed.`
+      `Payment of $500.00 by cash on invoice #${invoice.invoiceNumber} — $400.00 applied, $100.00 change given, invoice paid in full and closed.`
     )
   })
 
@@ -218,7 +219,7 @@ describe("accounting activity is written to the policy log", () => {
     const logs = await policyLogs(policy.id, cookie)
     expect(logs.map((l) => l.logNumber)).toEqual([3, 2, 1])
     expect(logs[0].body).toBe(
-      `Payment #${paymentId} of $400.00 by credit card on invoice #${invoice.id} voided — $400.00 reversed, invoice reopened with $400.00 now due. Reason: card chargeback.`
+      `Payment #${paymentId} of $400.00 by credit card on invoice #${invoice.invoiceNumber} voided — $400.00 reversed, invoice reopened with $400.00 now due. Reason: card chargeback.`
     )
   })
 
@@ -277,6 +278,21 @@ describe("POST /payments (errors)", () => {
       .set("Cookie", cookie)
       .send({ invoiceId: invoice.id, method: "cash", amount: 50 })
     expect(res.status).toBe(409)
+  })
+
+  it("returns 404 for another org's invoice", async () => {
+    const { cookie } = await authed("pay-wrongorg")
+    const other = await ctx.org()
+    const otherUser = await ctx.user("pay-wrongorg-other", "staff", other.id)
+    const otherCookie = await ctx.cookie(otherUser.id, other.id)
+    const theirPolicy = await ctx.policy({ orgId: other.id })
+    const theirInvoice = await makeInvoice(otherCookie, theirPolicy.id)
+
+    const res = await request(app)
+      .post("/payments")
+      .set("Cookie", cookie)
+      .send({ invoiceId: theirInvoice.id, method: "cash", amount: 10 })
+    expect(res.status).toBe(404)
   })
 })
 
@@ -362,6 +378,66 @@ describe("POST /payments/:id/void", () => {
     expect(
       (await request(app).post(`/payments/${MISSING_ROW_ID}/void`).set("Cookie", cookie).send({}))
         .status
+    ).toBe(404)
+  })
+
+  it("returns 404 for another org's payment", async () => {
+    const { cookie } = await authed("pay-void-wrongorg", "admin")
+    const other = await ctx.org()
+    const otherUser = await ctx.user("pay-void-wrongorg-other", "staff", other.id)
+    const otherCookie = await ctx.cookie(otherUser.id, other.id)
+    const theirPolicy = await ctx.policy({ orgId: other.id })
+    const theirInvoice = await makeInvoice(otherCookie, theirPolicy.id)
+    const theirReceipt = await request(app)
+      .post("/payments")
+      .set("Cookie", otherCookie)
+      .send({ invoiceId: theirInvoice.id, method: "cash", amount: 400 })
+
+    const res = await request(app)
+      .post(`/payments/${theirReceipt.body.payment.id}/void`)
+      .set("Cookie", cookie)
+      .send({})
+    expect(res.status).toBe(404)
+  })
+})
+
+describe("wrong-org reads", () => {
+  it("hides another org's payments, receipts and trust ledger, and zeroes the balance", async () => {
+    const { cookie } = await authed("pay-wrongorg-read")
+    const other = await ctx.org()
+    const otherUser = await ctx.user("pay-wrongorg-read-other", "staff", other.id)
+    const otherCookie = await ctx.cookie(otherUser.id, other.id)
+    const theirPolicy = await ctx.policy({ orgId: other.id })
+    const theirInvoice = await makeInvoice(otherCookie, theirPolicy.id)
+    const theirReceipt = await request(app)
+      .post("/payments")
+      .set("Cookie", otherCookie)
+      .send({ invoiceId: theirInvoice.id, method: "cash", amount: 400 })
+    expect(theirReceipt.status).toBe(201)
+
+    expect(
+      (await request(app).get(`/payments?policyId=${theirPolicy.id}`).set("Cookie", cookie)).body
+    ).toEqual([])
+    expect(
+      (await request(app).get(`/receipts?policyId=${theirPolicy.id}`).set("Cookie", cookie)).body
+    ).toEqual([])
+    expect(
+      (await request(app).get(`/trust-ledger?policyId=${theirPolicy.id}`).set("Cookie", cookie)).body
+    ).toEqual([])
+    const balance = await request(app)
+      .get(`/trust-balance?policyId=${theirPolicy.id}`)
+      .set("Cookie", cookie)
+    expect(balance.body.balance).toBe("0.00")
+
+    expect(
+      (
+        await request(app)
+          .get(`/payments/${theirReceipt.body.payment.id}`)
+          .set("Cookie", cookie)
+      ).status
+    ).toBe(404)
+    expect(
+      (await request(app).get(`/receipts/${theirReceipt.body.id}`).set("Cookie", cookie)).status
     ).toBe(404)
   })
 })

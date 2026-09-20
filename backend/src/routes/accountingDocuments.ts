@@ -64,10 +64,10 @@ export async function recordInvoiceDocument(
       generatedAt: new Date(),
       ...header,
     })
-    await storeGeneratedPolicyAttachment({
+    await storeGeneratedPolicyAttachment(req.orgId!, {
       policyId: invoice.policyId,
       pdf,
-      fileName: `Invoice ${formatDocumentNumber(invoice.id)}.pdf`,
+      fileName: `Invoice ${formatDocumentNumber(invoice.invoiceNumber)}.pdf`,
       keySlug: "invoice",
       description: "Auto-generated invoice",
       sourceType: "invoice",
@@ -84,25 +84,25 @@ export async function recordReceiptDocument(
   logId?: string
 ): Promise<void> {
   await bestEffort(req, "record the receipt document", async () => {
-    const receipt = await getReceiptWithDetails(receiptId)
+    const receipt = await getReceiptWithDetails(req.orgId!, receiptId)
     if (!receipt) return
     // The receipt's own `invoice` relation lacks the sibling payments the
     // document lists, so the full invoice detail is fetched separately.
-    const invoice = await getInvoiceWithDetails(receipt.invoiceId)
+    const invoice = await getInvoiceWithDetails(req.orgId!, receipt.invoiceId)
     if (!invoice) return
 
     const header = await documentHeader(req.orgId!, invoice)
     const pdf = await buildAccountingDocumentPdf({
       kind: "receipt",
       invoice,
-      receipt: { id: receipt.id, paymentId: receipt.paymentId },
+      receipt: { id: receipt.id, receiptNumber: receipt.receiptNumber, paymentId: receipt.paymentId },
       generatedAt: new Date(),
       ...header,
     })
-    await storeGeneratedPolicyAttachment({
+    await storeGeneratedPolicyAttachment(req.orgId!, {
       policyId: receipt.policyId,
       pdf,
-      fileName: `Receipt ${formatDocumentNumber(receipt.id)}.pdf`,
+      fileName: `Receipt ${formatDocumentNumber(receipt.receiptNumber)}.pdf`,
       keySlug: "receipt",
       description: "Auto-generated receipt",
       sourceType: "receipt",
@@ -119,6 +119,6 @@ export async function voidAccountingDocument(
   sourceId: string
 ): Promise<void> {
   await bestEffort(req, `void the ${sourceType} document`, () =>
-    markAttachmentsVoidedBySource(sourceType, sourceId)
+    markAttachmentsVoidedBySource(req.orgId!, sourceType, sourceId)
   )
 }

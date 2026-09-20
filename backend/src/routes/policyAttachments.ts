@@ -68,7 +68,7 @@ policyAttachmentsRouter.get(
     }
     // Documents for voided invoices/payments are admin-only.
     res.json(
-      await listPolicyAttachmentsByPolicyId(policyId.data, {
+      await listPolicyAttachmentsByPolicyId(req.orgId!, policyId.data, {
         includeVoided: req.membership!.role === "admin",
       })
     )
@@ -88,7 +88,7 @@ policyAttachmentsRouter.get(
       return
     }
 
-    const attachment = await findPolicyAttachmentById(id)
+    const attachment = await findPolicyAttachmentById(req.orgId!, id)
     // A voided document is invisible to staff in the list, so it has to 404
     // here too - otherwise the object is still reachable by guessing an id.
     if (!attachment || (attachment.isVoided && req.membership!.role !== "admin")) {
@@ -132,13 +132,13 @@ policyAttachmentsRouter.post(
       return
     }
 
-    const uploadedToday = await countAttachmentsCreatedTodayByUser(req.user!.id)
+    const uploadedToday = await countAttachmentsCreatedTodayByUser(req.orgId!, req.user!.id)
     if (uploadedToday >= dailyLimit()) {
       res.status(429).json({ error: "Daily attachment upload limit reached" })
       return
     }
 
-    const storageKey = `${attachmentKeyPrefix(parsed.data.policyId)}${randomUUID()}-${sanitizeFileName(parsed.data.fileName)}`
+    const storageKey = `${attachmentKeyPrefix(req.orgId!, parsed.data.policyId)}${randomUUID()}-${sanitizeFileName(parsed.data.fileName)}`
     try {
       const uploadUrl = await getPresignedUploadUrl(storageKey, parsed.data.contentType)
       res.json({ uploadUrl, storageKey })
@@ -166,9 +166,9 @@ policyAttachmentsRouter.post(
     }
 
     // storageKey is server-generated at presign time and always prefixed with
-    // the policyId, so cross-checking it here rejects a confirm call for an
-    // object that was presigned for a different policy.
-    if (!parsed.data.storageKey.startsWith(attachmentKeyPrefix(parsed.data.policyId))) {
+    // the org and policyId, so cross-checking it here rejects a confirm call
+    // for an object that was presigned for a different policy or org.
+    if (!parsed.data.storageKey.startsWith(attachmentKeyPrefix(req.orgId!, parsed.data.policyId))) {
       res.status(400).json({ error: "storageKey does not match policyId" })
       return
     }
@@ -196,7 +196,7 @@ policyAttachmentsRouter.post(
       return
     }
 
-    const attachment = await createPolicyAttachment({
+    const attachment = await createPolicyAttachment(req.orgId!, {
       policyId: parsed.data.policyId,
       fileName: sanitizeFileName(parsed.data.fileName),
       description: parsed.data.description ?? null,

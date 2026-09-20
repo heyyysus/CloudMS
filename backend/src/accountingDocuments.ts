@@ -19,10 +19,9 @@ import type { getInvoiceWithDetails } from "./repositories"
 
 export type InvoiceDetail = NonNullable<Awaited<ReturnType<typeof getInvoiceWithDetails>>>
 
-// Ids are opaque 22-char uids (see db/ids.ts), so there is nothing to pad -
-// the document number is just the row id.
-export function formatDocumentNumber(id: string): string {
-  return `#${id}`
+// Plain integer, no per-agency prefix or padding.
+export function formatDocumentNumber(n: number): string {
+  return `#${n}`
 }
 
 export interface AccountingDocumentMeta {
@@ -30,7 +29,7 @@ export interface AccountingDocumentMeta {
   // is recorded, and then `receipt` names which payment it acknowledges.
   kind: "invoice" | "receipt"
   invoice: InvoiceDetail
-  receipt?: { id: string; paymentId: string }
+  receipt?: { id: string; receiptNumber: number; paymentId: string }
   clientName: string
   policyNumber: string
   generatedAt: Date
@@ -92,8 +91,8 @@ export function buildAccountingDocumentPdf(meta: AccountingDocumentMeta): Promis
     const { invoice } = meta
     const title =
       meta.kind === "receipt" && meta.receipt
-        ? `Receipt ${formatDocumentNumber(meta.receipt.id)}`
-        : `Invoice ${formatDocumentNumber(invoice.id)}`
+        ? `Receipt ${formatDocumentNumber(meta.receipt.receiptNumber)}`
+        : `Invoice ${formatDocumentNumber(invoice.invoiceNumber)}`
 
     doc.font(PDF_FONT)
 
@@ -111,7 +110,7 @@ export function buildAccountingDocumentPdf(meta: AccountingDocumentMeta): Promis
     doc.moveDown(0.5)
 
     renderAmountRow(
-      `Invoice ${formatDocumentNumber(invoice.id)}`,
+      `Invoice ${formatDocumentNumber(invoice.invoiceNumber)}`,
       INVOICE_STATUS_LABEL[invoice.status],
       true
     )
@@ -139,7 +138,9 @@ export function buildAccountingDocumentPdf(meta: AccountingDocumentMeta): Promis
 
       for (const payment of activePayments) {
         const receipt = invoice.receipts.find((r) => r.paymentId === payment.id)
-        const receiptSuffix = receipt ? ` — Receipt ${formatDocumentNumber(receipt.id)}` : ""
+        const receiptSuffix = receipt
+          ? ` — Receipt ${formatDocumentNumber(receipt.receiptNumber)}`
+          : ""
         // On a receipt document, mark the one payment this receipt covers so
         // the reader can tell it apart from the invoice's other payments.
         const thisOne = meta.receipt?.paymentId === payment.id ? " (this receipt)" : ""

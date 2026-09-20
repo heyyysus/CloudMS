@@ -4,7 +4,7 @@ import { db } from "../db"
 import { organizations, orgMemberships, users } from "../db/schema"
 import type { NewOrgMembership, OrgMembership, User } from "../types"
 
-export async function listMembershipsForUser(userId: number): Promise<OrgMembership[]> {
+export async function listMembershipsForUser(userId: string): Promise<OrgMembership[]> {
   return db
     .select()
     .from(orgMemberships)
@@ -13,8 +13,8 @@ export async function listMembershipsForUser(userId: number): Promise<OrgMembers
 }
 
 export async function findMembership(
-  userId: number,
-  orgId: number
+  userId: string,
+  orgId: string
 ): Promise<OrgMembership | undefined> {
   const [row] = await db
     .select()
@@ -29,7 +29,7 @@ export async function createMembership(input: NewOrgMembership): Promise<OrgMemb
 }
 
 export async function updateMembership(
-  id: number,
+  id: string,
   input: Partial<NewOrgMembership>
 ): Promise<OrgMembership | undefined> {
   const [row] = await db
@@ -40,13 +40,13 @@ export async function updateMembership(
   return row
 }
 
-export async function deactivateMembership(id: number): Promise<OrgMembership | undefined> {
+export async function deactivateMembership(id: string): Promise<OrgMembership | undefined> {
   return updateMembership(id, { isActive: false })
 }
 
 export async function findActiveMembership(
-  userId: number,
-  orgId: number
+  userId: string,
+  orgId: string
 ): Promise<OrgMembership | undefined> {
   const [row] = await db
     .select()
@@ -62,7 +62,7 @@ export async function findActiveMembership(
 }
 
 export interface ActiveMembershipWithOrg {
-  orgId: number
+  orgId: string
   name: string
   slug: string
   role: OrgMembership["role"]
@@ -71,7 +71,7 @@ export interface ActiveMembershipWithOrg {
 // Every active org a user belongs to, with the org's display fields - both
 // the /auth/me `memberships` array and the /auth/google auto-bind input.
 export async function listActiveMembershipsWithOrg(
-  userId: number
+  userId: string
 ): Promise<ActiveMembershipWithOrg[]> {
   return db
     .select({
@@ -96,7 +96,7 @@ export interface OrgMember {
 // membership in orgId, alongside that membership's role/isActive. Lifted out
 // of repositories/users.ts's old visibleToAdmin() predicate, which this
 // replaces - GET /users is now membership-scoped rather than global.
-export async function listOrgMembers(orgId: number): Promise<OrgMember[]> {
+export async function listOrgMembers(orgId: string): Promise<OrgMember[]> {
   const rows = await db
     .select({ user: users, role: orgMemberships.role, isActive: orgMemberships.isActive })
     .from(orgMemberships)
@@ -108,6 +108,6 @@ export async function listOrgMembers(orgId: number): Promise<OrgMember[]> {
         ne(users.email, AUTOMATION_USER_EMAIL)
       )
     )
-    .orderBy(users.id)
+    .orderBy(users.email)
   return rows
 }

@@ -4,7 +4,7 @@ import { CarrierForm } from './carrier-form'
 import type { Carrier } from '@/api/carriers'
 
 const carrier: Carrier = {
-  id: 7,
+  id: '7',
   name: 'Acme Insurance',
   naic: '12345',
   isActive: true,

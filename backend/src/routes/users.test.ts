@@ -5,7 +5,7 @@ import app from "../app"
 import { db } from "../db"
 import { emailLog, users } from "../db/schema"
 import { createMembership, findMembership, softDeleteUser } from "../repositories"
-import { makeTestUser, TestContext } from "./testHelpers"
+import { makeTestUser, MISSING_ROW_ID, TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 
@@ -194,7 +194,7 @@ describe("GET /users", () => {
     const res = await request(app).get("/users").set("Cookie", cookie)
     expect(res.status).toBe(200)
 
-    const row = res.body.find((u: { id: number }) => u.id === admin.id)
+    const row = res.body.find((u: { id: string }) => u.id === admin.id)
     expect(row).toMatchObject({ email: admin.email, role: "admin", isActive: true })
     expect(row.hasSignedIn).toBe(false)
     expect(row).not.toHaveProperty("googleSub")
@@ -209,7 +209,7 @@ describe("GET /users", () => {
 
     const res = await request(app).get("/users").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    const ids = res.body.map((u: { id: number }) => u.id)
+    const ids = res.body.map((u: { id: string }) => u.id)
     expect(ids).toContain(admin.id)
     expect(ids).not.toContain(otherOrgMember.id)
   })
@@ -237,7 +237,7 @@ describe("PATCH /users/:id", () => {
     const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
-      .patch("/users/999999999")
+      .patch(`/users/${MISSING_ROW_ID}`)
       .set("Cookie", cookie)
       .send({ name: "Nobody" })
     expect(res.status).toBe(404)
@@ -439,7 +439,7 @@ describe("POST /users/:id/resend-welcome", () => {
     const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
-      .post("/users/999999999/resend-welcome")
+      .post(`/users/${MISSING_ROW_ID}/resend-welcome`)
       .set("Cookie", cookie)
       .send()
     expect(res.status).toBe(404)
@@ -501,7 +501,7 @@ describe("DELETE /users/:id", () => {
     const admin = await ctx.user("delete-user-404", "admin")
     const cookie = await ctx.cookie(admin.id)
 
-    const res = await request(app).delete("/users/999999999").set("Cookie", cookie)
+    const res = await request(app).delete(`/users/${MISSING_ROW_ID}`).set("Cookie", cookie)
     expect(res.status).toBe(404)
   })
 
@@ -525,7 +525,7 @@ describe("DELETE /users/:id", () => {
 
     // Still listed for the admin, now flagged disabled in this org...
     const list = await request(app).get("/users").set("Cookie", adminCookie)
-    const row = list.body.find((u: { id: number }) => u.id === target.id)
+    const row = list.body.find((u: { id: string }) => u.id === target.id)
     expect(row.isActive).toBe(false)
 
     // ...and logged out immediately...
@@ -659,6 +659,6 @@ describe("POST /users/:id/restore", () => {
     expect(res.body.user).not.toHaveProperty("deletedAt")
 
     const list = await request(app).get("/users").set("Cookie", cookie)
-    expect(list.body.map((u: { id: number }) => u.id)).toContain(target.id)
+    expect(list.body.map((u: { id: string }) => u.id)).toContain(target.id)
   })
 })

@@ -1,7 +1,7 @@
 import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
-import { TestContext } from "./testHelpers"
+import { MISSING_ROW_ID, TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 afterEach(() => ctx.cleanup())
@@ -37,7 +37,7 @@ describe("GET /policy-logs", () => {
     const res = await request(app).get(`/policy-logs?policyId=${policyA.id}`).set("Cookie", cookie)
     expect(res.status).toBe(200)
     expect(res.body).toHaveLength(2)
-    expect(res.body.map((l: { id: number }) => l.id)).toEqual([second.id, first.id])
+    expect(res.body.map((l: { id: string }) => l.id)).toEqual([second.id, first.id])
     expect(res.body[0].logNumber).toBe(2)
     expect(res.body[1].logNumber).toBe(1)
     expect(res.body[0].author).toMatchObject({ id: user.id, email: user.email })
@@ -46,9 +46,9 @@ describe("GET /policy-logs", () => {
 
 describe("POST /policy-logs", () => {
   it("returns 401 without a cookie", async () => {
-    expect((await request(app).post("/policy-logs").send({ policyId: 1, body: "x" })).status).toBe(
-      401
-    )
+    expect(
+      (await request(app).post("/policy-logs").send({ policyId: "1", body: "x" })).status
+    ).toBe(401)
   })
 
   it("creates a log, starting log numbers at 1 and stamping the session user as author", async () => {
@@ -140,7 +140,7 @@ describe("POST /policy-logs", () => {
         await request(app)
           .post("/policy-logs")
           .set("Cookie", cookie)
-          .send({ policyId: 999999999, body: "x" })
+          .send({ policyId: MISSING_ROW_ID, body: "x" })
       ).status
     ).toBe(404)
   })

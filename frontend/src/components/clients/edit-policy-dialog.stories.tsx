@@ -8,8 +8,8 @@ import type { Carrier } from '@/api/carriers'
 import type { PolicyDetail } from '@/api/policies'
 
 const client: ClientDetail = {
-  id: 155,
-  namedInsuredId: 229,
+  id: '155',
+  namedInsuredId: '229',
   secondNamedInsuredId: null,
   mailingAddress1: '42 Wallaby Way, Sydney',
   mailingAddress2: null,
@@ -24,7 +24,7 @@ const client: ClientDetail = {
   createdAt: '2026-07-14T17:48:07.653Z',
   updatedAt: '2026-07-14T17:48:07.653Z',
   namedInsured: {
-    id: 229,
+    id: '229',
     firstName: 'Jane',
     lastName: 'Doe',
     dateOfBirth: '1987-07-22',
@@ -42,7 +42,7 @@ const client: ClientDetail = {
 
 const carriers: Carrier[] = [
   {
-    id: 7,
+    id: '7',
     name: 'Acme Insurance',
     naic: '12345',
     isActive: true,
@@ -57,9 +57,9 @@ const carriers: Carrier[] = [
 ]
 
 const policy: PolicyDetail = {
-  id: 900,
-  clientId: 155,
-  carrierId: 7,
+  id: '900',
+  clientId: '155',
+  carrierId: '7',
   policyNumber: 'POL-123',
   policyAddress1: '1 Ocean Ave, Sydney',
   policyAddress2: null,
@@ -72,8 +72,8 @@ const policy: PolicyDetail = {
   createdAt: '2026-01-14T17:48:07.653Z',
   updatedAt: '2026-01-14T17:48:07.653Z',
   client: {
-    id: 155,
-    namedInsuredId: 229,
+    id: '155',
+    namedInsuredId: '229',
     secondNamedInsuredId: null,
     mailingAddress1: '42 Wallaby Way, Sydney',
     mailingAddress2: null,
@@ -91,8 +91,8 @@ const policy: PolicyDetail = {
   carrier: carriers[0],
   vehicles: [
     {
-      id: 40,
-      policyId: 900,
+      id: '40',
+      policyId: '900',
       vin: '1HGCM82633A004352',
       make: 'Honda',
       model: 'Accord',
@@ -114,13 +114,13 @@ const policy: PolicyDetail = {
   ],
   policyDrivers: [
     {
-      id: 60,
-      policyId: 900,
-      driverId: 61,
+      id: '60',
+      policyId: '900',
+      driverId: '61',
       createdAt: '2026-01-14T17:48:07.653Z',
       driver: {
-        id: 61,
-        personId: 229,
+        id: '61',
+        personId: '229',
         dlNumber: 'D1234567',
         rating: 'rated',
         sr22: false,
@@ -144,7 +144,7 @@ const meta = {
     client,
     policy,
     existingVehicles: [],
-    existingDrivers: [{ personId: 229, person: client.namedInsured, driver: policy.policyDrivers[0].driver }],
+    existingDrivers: [{ personId: '229', person: client.namedInsured, driver: policy.policyDrivers[0].driver }],
     getCarriersFn: fn(async () => carriers),
   },
   decorators: [
@@ -214,14 +214,14 @@ export const SubmitSavesAndCloses: Story = {
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
     await expect(args.updatePolicyFn).toHaveBeenCalledWith(
-      900,
+      '900',
       expect.objectContaining({
         policyNumber: 'POL-123',
         vehicles: expect.arrayContaining([
           expect.objectContaining({ vin: policy.vehicles[0].vin }),
         ]),
         drivers: expect.arrayContaining([
-          expect.objectContaining({ kind: 'existing', personId: 229 }),
+          expect.objectContaining({ kind: 'existing', personId: '229' }),
         ]),
       })
     )

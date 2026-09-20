@@ -1,10 +1,8 @@
 import "dotenv/config"
-import { and, eq, sql } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { adminDb as db } from "./index"
 import { emailTemplates, organizations, orgMemberships, users } from "./schema"
 import { AUTOMATION_USER_EMAIL } from "../jobs/automationUser"
-
-const DEFAULT_ORG_ID = 1
 
 // Runs at container start (see Dockerfile CMD), after db:push and roles.ts,
 // before the server boots. Unlike db:seed this is safe against live data:
@@ -13,14 +11,13 @@ const DEFAULT_ORG_ID = 1
 async function main() {
   await db
     .insert(organizations)
-    .values({ id: DEFAULT_ORG_ID, name: "default org", slug: "default-org" })
-    .onConflictDoNothing({ target: organizations.id })
-  // The serial sequence only advances on inserts that don't supply an
-  // explicit id, so the id: 1 insert above leaves it at 0 and the next
-  // id-less insert would collide on 1.
-  await db.execute(
-    sql`SELECT setval('organizations_id_seq', GREATEST((SELECT max(id) FROM organizations), 1), true)`
-  )
+    .values({ name: "default org", slug: "default-org" })
+    .onConflictDoNothing({ target: organizations.slug })
+  const [defaultOrg] = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(eq(organizations.slug, "default-org"))
+  const defaultOrgId = defaultOrg.id
   console.log("Ensured default organization exists")
 
   const adminEmail = process.env.ADMIN_EMAIL
@@ -53,7 +50,7 @@ async function main() {
       .where(eq(users.email, adminEmail.toLowerCase()))
     await db
       .insert(orgMemberships)
-      .values({ userId: adminUser.id, orgId: DEFAULT_ORG_ID, role: "admin" })
+      .values({ userId: adminUser.id, orgId: defaultOrgId, role: "admin" })
       .onConflictDoNothing({ target: [orgMemberships.userId, orgMemberships.orgId] })
   }
   const [automationUser] = await db
@@ -62,14 +59,14 @@ async function main() {
     .where(eq(users.email, AUTOMATION_USER_EMAIL))
   await db
     .insert(orgMemberships)
-    .values({ userId: automationUser.id, orgId: DEFAULT_ORG_ID, role: "staff" })
+    .values({ userId: automationUser.id, orgId: defaultOrgId, role: "staff" })
     .onConflictDoNothing({ target: [orgMemberships.userId, orgMemberships.orgId] })
   console.log("Ensured default-org memberships exist")
 
   await db
     .insert(emailTemplates)
     .values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: defaultOrgId,
       key: "welcome",
       kind: "welcome",
       subject: "Welcome to CloudMS, {{name}}",
@@ -85,7 +82,7 @@ Sign in with your Google account ({{email}}) at {{appUrl}} - no password needed,
   await db
     .update(emailTemplates)
     .set({ kind: "welcome" })
-    .where(and(eq(emailTemplates.orgId, DEFAULT_ORG_ID), eq(emailTemplates.key, "welcome")))
+    .where(and(eq(emailTemplates.orgId, defaultOrgId), eq(emailTemplates.key, "welcome")))
   console.log('Ensured "welcome" email template exists')
 
   process.exit(0)

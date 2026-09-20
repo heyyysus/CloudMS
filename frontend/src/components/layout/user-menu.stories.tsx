@@ -20,12 +20,12 @@ type Story = StoryObj<typeof meta>
 
 export const Admin: Story = {
   args: {
-    user: { id: 1, email: 'jesus@cloudms.dev', name: 'Jesus Velarde', role: 'admin' },
+    user: { id: '1', email: 'jesus@cloudms.dev', name: 'Jesus Velarde', role: 'admin' },
   },
 }
 
 export const StaffNoName: Story = {
   args: {
-    user: { id: 2, email: 'staff@cloudms.dev', name: null, role: 'staff' },
+    user: { id: '2', email: 'staff@cloudms.dev', name: null, role: 'staff' },
   },
 }

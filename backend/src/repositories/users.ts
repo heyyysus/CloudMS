@@ -3,7 +3,7 @@ import { db } from "../db"
 import { users } from "../db/schema"
 import type { NewUser, User } from "../types"
 
-export async function findUserById(id: number): Promise<User | undefined> {
+export async function findUserById(id: string): Promise<User | undefined> {
   const [row] = await db.select().from(users).where(eq(users.id, id))
   return row
 }
@@ -30,7 +30,7 @@ export async function createUser(input: NewUser): Promise<User> {
   return row
 }
 
-export async function updateUser(id: number, input: Partial<NewUser>): Promise<User | undefined> {
+export async function updateUser(id: string, input: Partial<NewUser>): Promise<User | undefined> {
   const [row] = await db
     .update(users)
     .set({ ...input, updatedAt: new Date() })
@@ -44,7 +44,7 @@ export async function updateUser(id: number, input: Partial<NewUser>): Promise<U
 // so removing the row would either fail or destroy history. Distinct from
 // isActive - this is meant to look permanent to an admin, not to be toggled
 // back from the same menu.
-export async function softDeleteUser(id: number, actorId: number): Promise<User | undefined> {
+export async function softDeleteUser(id: string, actorId: string): Promise<User | undefined> {
   const [row] = await db
     .update(users)
     .set({ deletedAt: new Date(), deletedBy: actorId, isActive: false, updatedAt: new Date() })
@@ -56,7 +56,7 @@ export async function softDeleteUser(id: number, actorId: number): Promise<User 
 // Only reachable by re-inviting a deleted user's email; see POST
 // /users/invite. Re-activates the account under its original id so existing
 // history stays attributed to the same row.
-export async function restoreUser(id: number): Promise<User | undefined> {
+export async function restoreUser(id: string): Promise<User | undefined> {
   const [row] = await db
     .update(users)
     .set({ deletedAt: null, deletedBy: null, isActive: true, updatedAt: new Date() })

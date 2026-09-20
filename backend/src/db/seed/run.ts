@@ -37,7 +37,7 @@ const WELCOME_TEMPLATE_BODY = `Hi {{name}},
 
 Sign in with your Google account ({{email}}) at {{appUrl}} - no password needed, access is already set up for this address.`
 
-async function seedWelcomeTemplate(orgId: number): Promise<void> {
+async function seedWelcomeTemplate(orgId: string): Promise<void> {
   await db.insert(emailTemplates).values({
     orgId,
     key: "welcome",
@@ -51,7 +51,7 @@ async function seedWelcomeTemplate(orgId: number): Promise<void> {
 // sub-issue, so the second org's policies land in org 1 via the column
 // default and need moving afterwards. Temporary until sub-issue 4 threads
 // orgId through the policy repositories directly.
-async function reassignPoliciesToOrg(orgId: number, policyIds: number[]): Promise<void> {
+async function reassignPoliciesToOrg(orgId: string, policyIds: string[]): Promise<void> {
   if (policyIds.length === 0) return
   await db.update(autoPolicies).set({ orgId }).where(inArray(autoPolicies.id, policyIds))
   await db.update(vehicles).set({ orgId }).where(inArray(vehicles.policyId, policyIds))

@@ -6,7 +6,7 @@ import type { ReminderRule } from '@/api/reminders'
 
 const templates: CorrespondenceTemplate[] = [
   {
-    id: 3,
+    id: '3',
     key: 'correspondence-renewal-reminder-ab12cd34',
     name: 'Renewal Notice',
     subject: 'Your policy {{policyNumber}} is renewing',
@@ -14,7 +14,7 @@ const templates: CorrespondenceTemplate[] = [
     updatedAt: '2026-08-01T00:00:00.000Z',
   },
   {
-    id: 4,
+    id: '4',
     key: 'correspondence-documents-needed-ff99aa00',
     name: 'Documents Needed',
     subject: 'We need a document',
@@ -24,14 +24,14 @@ const templates: CorrespondenceTemplate[] = [
 ]
 
 const existing: ReminderRule = {
-  id: 1,
+  id: '1',
   name: '30-day renewal reminder',
   trigger: 'policy_expiration',
   offsetDays: 30,
-  templateId: 4,
+  templateId: '4',
   enabled: true,
   updatedAt: '2026-08-01T00:00:00.000Z',
-  template: { id: 4, key: templates[1].key, name: 'Documents Needed', subject: 'y' },
+  template: { id: '4', key: templates[1].key, name: 'Documents Needed', subject: 'y' },
 }
 
 const meta = {
@@ -132,7 +132,7 @@ export const SubmitsTheRule: Story = {
     await expect(args.onSubmit).toHaveBeenCalledWith({
       name: '14-day nudge',
       offsetDays: 14,
-      templateId: 3,
+      templateId: '3',
     })
   },
 }
@@ -152,7 +152,7 @@ export const PicksADifferentTemplate: Story = {
     await expect(args.onSubmit).toHaveBeenCalledWith({
       name: 'Docs chase',
       offsetDays: 30,
-      templateId: 4,
+      templateId: '4',
     })
   },
 }

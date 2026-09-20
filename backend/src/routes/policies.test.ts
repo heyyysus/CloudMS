@@ -2,7 +2,7 @@ import request from "supertest"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
 import { R2NotConfiguredError, putObject } from "../storage/r2"
-import { TestContext } from "./testHelpers"
+import { MISSING_ROW_ID, TestContext } from "./testHelpers"
 
 // The policy change form (PATCH /policies/:id's auto-generated log +
 // attachment) uploads its PDF through storage/r2's putObject. Mocked here so
@@ -31,7 +31,7 @@ describe("GET /policies", () => {
 
     const res = await request(app).get("/policies").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.some((p: { id: number }) => p.id === policy.id)).toBe(true)
+    expect(res.body.some((p: { id: string }) => p.id === policy.id)).toBe(true)
   })
 
   it("filters by clientId", async () => {
@@ -43,7 +43,7 @@ describe("GET /policies", () => {
 
     const res = await request(app).get(`/policies?clientId=${client.id}`).set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.map((p: { id: number }) => p.id)).toEqual([policyA.id])
+    expect(res.body.map((p: { id: string }) => p.id)).toEqual([policyA.id])
   })
 })
 
@@ -64,7 +64,9 @@ describe("GET /policies/:id", () => {
   it("returns 404 for an unknown id", async () => {
     const user = await ctx.user("policies-404")
     const cookie = await ctx.cookie(user.id)
-    expect((await request(app).get("/policies/999999999").set("Cookie", cookie)).status).toBe(404)
+    expect(
+      (await request(app).get(`/policies/${MISSING_ROW_ID}`).set("Cookie", cookie)).status
+    ).toBe(404)
   })
 })
 
@@ -318,7 +320,7 @@ describe("PATCH /policies/:id", () => {
     const res = await request(app)
       .patch(`/policies/${policy.id}`)
       .set("Cookie", cookie)
-      .send({ drivers: [{ kind: "existing", personId: 999999999 }] })
+      .send({ drivers: [{ kind: "existing", personId: MISSING_ROW_ID }] })
     expect(res.status).toBe(400)
   })
 
@@ -327,7 +329,7 @@ describe("PATCH /policies/:id", () => {
     const cookie = await ctx.cookie(user.id)
 
     const res = await request(app)
-      .patch("/policies/999999999")
+      .patch(`/policies/${MISSING_ROW_ID}`)
       .set("Cookie", cookie)
       .send({ status: "active" })
     expect(res.status).toBe(404)
@@ -444,7 +446,7 @@ describe("GET /policies?q=", () => {
 
     const res = await request(app).get("/policies?q=SEARCHABLE-77").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.some((p: { id: number }) => p.id === policy.id)).toBe(true)
+    expect(res.body.some((p: { id: string }) => p.id === policy.id)).toBe(true)
   })
 
   it("returns 400 when q is too short", async () => {

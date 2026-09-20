@@ -30,8 +30,8 @@ function CopyLogBodyButton({ body }: { body: string }) {
 interface LinkedAttachmentsProps {
   links: PolicyLogAttachment[]
   onPreviewAttachment: (attachment: PolicyAttachment) => void
-  onUnlink: (linkId: number) => void
-  unlinkingId?: number
+  onUnlink: (linkId: string) => void
+  unlinkingId?: string
 }
 
 // Documents filed under this log - either linked by hand from the Attachments
@@ -95,14 +95,14 @@ function LinkedAttachments({
 
 interface LogDetailDialogProps {
   log: PolicyLog | null
-  currentUserId?: number
+  currentUserId?: string
   onOpenChange: (open: boolean) => void
   // Attachments filed under this log. The parent owns the query and the
   // unlink mutation, keeping this component renderable from a story.
   links?: PolicyLogAttachment[]
   onPreviewAttachment?: (attachment: PolicyAttachment) => void
-  onUnlink?: (linkId: number) => void
-  unlinkingId?: number
+  onUnlink?: (linkId: string) => void
+  unlinkingId?: string
 }
 
 // Presentational: takes the selected log as a prop rather than owning its

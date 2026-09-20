@@ -43,21 +43,21 @@ describe('displayStatus', () => {
 describe('sortPoliciesByCreatedAt', () => {
   it('sorts oldest first without mutating the input', () => {
     const policies = [
-      { id: 3, createdAt: '2026-03-01T00:00:00.000Z' },
-      { id: 1, createdAt: '2026-01-01T00:00:00.000Z' },
-      { id: 2, createdAt: '2026-02-01T00:00:00.000Z' },
+      { id: '3', createdAt: '2026-03-01T00:00:00.000Z' },
+      { id: '1', createdAt: '2026-01-01T00:00:00.000Z' },
+      { id: '2', createdAt: '2026-02-01T00:00:00.000Z' },
     ]
     const sorted = sortPoliciesByCreatedAt(policies)
-    expect(sorted.map((p) => p.id)).toEqual([1, 2, 3])
-    expect(policies.map((p) => p.id)).toEqual([3, 1, 2])
+    expect(sorted.map((p) => p.id)).toEqual(['1', '2', '3'])
+    expect(policies.map((p) => p.id)).toEqual(['3', '1', '2'])
   })
 
   it('breaks createdAt ties by id', () => {
     const createdAt = '2026-01-01T00:00:00.000Z'
     const sorted = sortPoliciesByCreatedAt([
-      { id: 20, createdAt },
-      { id: 10, createdAt },
+      { id: '20', createdAt },
+      { id: '10', createdAt },
     ])
-    expect(sorted.map((p) => p.id)).toEqual([10, 20])
+    expect(sorted.map((p) => p.id)).toEqual(['10', '20'])
   })
 })

@@ -52,7 +52,7 @@ async function recordPolicyChangeFormUnsafe(
   // Held across both try blocks so the change form filed below can attach
   // itself to the log describing the same edit. Stays undefined if the log
   // write failed, in which case the attachment is simply filed unlinked.
-  let changeLogId: number | undefined
+  let changeLogId: string | undefined
   try {
     const log = await createPolicyLog({
       policyId: after.id,

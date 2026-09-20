@@ -3,12 +3,12 @@ import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
 import { CORRESPONDENCE_MERGE_FIELDS } from "../emails"
 import { deleteCorrespondenceTemplate } from "../repositories"
-import { TestContext } from "./testHelpers"
+import { MISSING_ROW_ID, TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 
 // Templates aren't tracked by TestContext; remove any created here directly.
-const templateIds: number[] = []
+const templateIds: string[] = []
 
 afterEach(async () => {
   for (const id of templateIds.splice(0)) await deleteCorrespondenceTemplate(id)
@@ -56,7 +56,7 @@ describe("correspondence templates", () => {
 
       expect(res.status).toBe(200)
       expect(res.body.mergeFields).toEqual(expect.arrayContaining([...CORRESPONDENCE_MERGE_FIELDS]))
-      expect(res.body.templates.map((t: { id: number }) => t.id)).toContain(created.body.id)
+      expect(res.body.templates.map((t: { id: string }) => t.id)).toContain(created.body.id)
     })
   })
 
@@ -129,7 +129,7 @@ describe("correspondence templates", () => {
     it("returns 404 for a missing id", async () => {
       const cookie = await adminCookie("corr-update-404")
       const res = await request(app)
-        .patch("/correspondence-templates/99999999")
+        .patch(`/correspondence-templates/${MISSING_ROW_ID}`)
         .set("Cookie", cookie)
         .send(VALID_BODY)
 
@@ -181,13 +181,13 @@ describe("correspondence templates", () => {
       expect(res.status).toBe(204)
 
       const after = await request(app).get("/correspondence-templates").set("Cookie", cookie)
-      expect(after.body.templates.map((t: { id: number }) => t.id)).not.toContain(created.body.id)
+      expect(after.body.templates.map((t: { id: string }) => t.id)).not.toContain(created.body.id)
     })
 
     it("returns 404 for a missing id", async () => {
       const cookie = await adminCookie("corr-delete-404")
       const res = await request(app)
-        .delete("/correspondence-templates/99999999")
+        .delete(`/correspondence-templates/${MISSING_ROW_ID}`)
         .set("Cookie", cookie)
       expect(res.status).toBe(404)
     })

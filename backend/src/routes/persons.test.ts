@@ -1,7 +1,8 @@
 import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
-import { TestContext } from "./testHelpers"
+import { ROW_ID_PATTERN } from "../db/ids"
+import { MISSING_ROW_ID, TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 afterEach(() => ctx.cleanup())
@@ -18,7 +19,7 @@ describe("GET /persons", () => {
 
     const res = await request(app).get("/persons").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.some((p: { id: number }) => p.id === person.id)).toBe(true)
+    expect(res.body.some((p: { id: string }) => p.id === person.id)).toBe(true)
   })
 })
 
@@ -37,14 +38,16 @@ describe("GET /persons/:id", () => {
     const user = await ctx.user("persons-404")
     const cookie = await ctx.cookie(user.id)
 
-    expect((await request(app).get("/persons/999999999").set("Cookie", cookie)).status).toBe(404)
+    expect(
+      (await request(app).get(`/persons/${MISSING_ROW_ID}`).set("Cookie", cookie)).status
+    ).toBe(404)
   })
 
-  it("returns 400 for a non-numeric id", async () => {
+  it("returns 404 for a malformed id", async () => {
     const user = await ctx.user("persons-badid")
     const cookie = await ctx.cookie(user.id)
 
-    expect((await request(app).get("/persons/abc").set("Cookie", cookie)).status).toBe(400)
+    expect((await request(app).get("/persons/abc").set("Cookie", cookie)).status).toBe(404)
   })
 })
 
@@ -61,7 +64,7 @@ describe("POST /persons", () => {
       relationToInsured: "self",
     })
     expect(res.status).toBe(201)
-    expect(res.body.id).toBeTypeOf("number")
+    expect(res.body.id).toMatch(ROW_ID_PATTERN)
     ctx.track("person", res.body.id)
   })
 

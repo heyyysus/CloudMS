@@ -8,8 +8,8 @@ import type { PolicyAttachment } from '@/api/policyAttachments'
 import type { PolicyLog } from '@/api/policyLogs'
 
 const uploaded: PolicyAttachment = {
-  id: 1,
-  policyId: 900,
+  id: '1',
+  policyId: '900',
   fileName: 'declarations-page.pdf',
   description: 'Declarations page from carrier',
   mimeType: 'application/pdf',
@@ -18,12 +18,12 @@ const uploaded: PolicyAttachment = {
   sourceType: 'upload',
   sourceId: null,
   createdAt: '2026-03-02T14:31:00',
-  uploadedBy: { id: 1, name: 'Jane Staff', email: 'jane@example.com' },
+  uploadedBy: { id: '1', name: 'Jane Staff', email: 'jane@example.com' },
 }
 
 const idCard: PolicyAttachment = {
   ...uploaded,
-  id: 2,
+  id: '2',
   fileName: 'id-card.png',
   description: null,
   mimeType: 'image/png',
@@ -31,39 +31,39 @@ const idCard: PolicyAttachment = {
 
 const receipt: PolicyAttachment = {
   ...uploaded,
-  id: 3,
+  id: '3',
   fileName: 'Receipt #00001.pdf',
   description: 'Auto-generated receipt',
   sourceType: 'receipt',
-  sourceId: 1,
+  sourceId: '1',
 }
 
 // Only an admin ever receives a voided row; the server filters them out for
 // staff.
 const voidedReceipt: PolicyAttachment = {
   ...receipt,
-  id: 4,
+  id: '4',
   fileName: 'Receipt #00002.pdf',
   isVoided: true,
-  sourceId: 2,
+  sourceId: '2',
 }
 
 const logs: PolicyLog[] = [
   {
-    id: 2,
-    policyId: 900,
+    id: '2',
+    policyId: '900',
     logNumber: 2,
     body: 'Insured called in to inquire about the renewal offer.',
     createdAt: '2026-03-02T14:31:00',
-    author: { id: 1, name: 'Jane Staff', email: 'jane@example.com' },
+    author: { id: '1', name: 'Jane Staff', email: 'jane@example.com' },
   },
   {
-    id: 1,
-    policyId: 900,
+    id: '1',
+    policyId: '900',
     logNumber: 1,
     body: 'Called the client to confirm garaging address.',
     createdAt: '2026-07-14T17:48:07',
-    author: { id: 2, name: 'Tom Reyes', email: 'tom@example.com' },
+    author: { id: '2', name: 'Tom Reyes', email: 'tom@example.com' },
   },
 ]
 
@@ -76,8 +76,8 @@ const meta = {
   component: PolicyAttachments,
   tags: ['autodocs'],
   args: {
-    policyId: 900,
-    currentUserId: 1,
+    policyId: '900',
+    currentUserId: '1',
     onAddAttachment: fn(),
     getPolicyLogsFn: fn(async () => logs),
     linkAttachmentsToLogFn: fn(async () => []),
@@ -221,8 +221,8 @@ export const LinksSelectionToALog: Story = {
     await userEvent.click(dialog.getByRole('button', { name: 'Link' }))
 
     await expect(args.linkAttachmentsToLogFn).toHaveBeenCalledWith({
-      logId: 2,
-      attachmentIds: [1, 2],
+      logId: '2',
+      attachmentIds: ['1', '2'],
     })
   },
 }

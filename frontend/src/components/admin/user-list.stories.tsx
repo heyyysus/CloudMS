@@ -11,7 +11,7 @@ function createTestQueryClient() {
 
 const users: AdminUser[] = [
   {
-    id: 1,
+    id: '1',
     email: 'owner@example.com',
     name: 'Ada Owner',
     role: 'admin',
@@ -21,7 +21,7 @@ const users: AdminUser[] = [
     updatedAt: '2026-01-04T00:00:00.000Z',
   },
   {
-    id: 2,
+    id: '2',
     email: 'staffer@example.com',
     name: 'Blake Staffer',
     role: 'staff',
@@ -31,7 +31,7 @@ const users: AdminUser[] = [
     updatedAt: '2026-02-10T00:00:00.000Z',
   },
   {
-    id: 3,
+    id: '3',
     email: 'invited@example.com',
     name: null,
     role: 'staff',
@@ -41,7 +41,7 @@ const users: AdminUser[] = [
     updatedAt: '2026-08-01T00:00:00.000Z',
   },
   {
-    id: 4,
+    id: '4',
     email: 'former@example.com',
     name: 'Casey Former',
     role: 'staff',
@@ -57,9 +57,9 @@ const meta = {
   component: ManageUsersCard,
   tags: ['autodocs'],
   args: {
-    currentUserId: 1,
+    currentUserId: '1',
     getUsersFn: fn(async () => users),
-    updateUserFn: fn(async (id: number) => ({
+    updateUserFn: fn(async (id: string) => ({
       ...users.find((u) => u.id === id)!,
       name: 'Updated',
     })),
@@ -99,7 +99,7 @@ export const PromotesAStaffUser: Story = {
     await userEvent.click(canvas.getByRole('button', { name: /actions for blake staffer/i }))
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Make admin' }))
 
-    await expect(args.updateUserFn).toHaveBeenCalledWith(2, { role: 'admin' })
+    await expect(args.updateUserFn).toHaveBeenCalledWith('2', { role: 'admin' })
   },
 }
 
@@ -111,7 +111,7 @@ export const DisablesAUser: Story = {
     await userEvent.click(canvas.getByRole('button', { name: /actions for blake staffer/i }))
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Disable account' }))
 
-    await expect(args.updateUserFn).toHaveBeenCalledWith(2, { isActive: false })
+    await expect(args.updateUserFn).toHaveBeenCalledWith('2', { isActive: false })
   },
 }
 
@@ -147,7 +147,7 @@ export const ResendsTheWelcomeEmail: Story = {
     await userEvent.click(canvas.getByRole('button', { name: /actions for blake staffer/i }))
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Resend welcome email' }))
 
-    await expect(args.resendWelcomeFn).toHaveBeenCalledWith(2)
+    await expect(args.resendWelcomeFn).toHaveBeenCalledWith('2')
   },
 }
 
@@ -163,7 +163,7 @@ export const DeletesAUser: Story = {
     await expect(dialog).toHaveTextContent('Blake Staffer')
 
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
-    await expect(args.deleteUserFn).toHaveBeenCalledWith(2)
+    await expect(args.deleteUserFn).toHaveBeenCalledWith('2')
   },
 }
 

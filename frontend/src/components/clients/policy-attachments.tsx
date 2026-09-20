@@ -21,9 +21,9 @@ import { linkAttachmentsToLog } from '@/api/policyLogAttachments'
 import { getPolicyLogs } from '@/api/policyLogs'
 
 interface PolicyAttachmentsProps {
-  policyId: number
+  policyId: string
   onAddAttachment: () => void
-  currentUserId?: number
+  currentUserId?: string
   getPolicyAttachmentsFn?: typeof getPolicyAttachments
   getPolicyAttachmentLinkFn?: typeof getPolicyAttachmentLink
   getPolicyLogsFn?: typeof getPolicyLogs
@@ -72,7 +72,7 @@ export function PolicyAttachments({
   const [selected, setSelected] = useState<PolicyAttachment | null>(null)
   // null means "not selecting" - distinct from an empty set, which is
   // selection mode with nothing picked yet.
-  const [selectedIds, setSelectedIds] = useState<Set<number> | null>(
+  const [selectedIds, setSelectedIds] = useState<Set<string> | null>(
     initialSelecting ? new Set() : null
   )
   const [linkDialogOpen, setLinkDialogOpen] = useState(false)
@@ -85,7 +85,7 @@ export function PolicyAttachments({
   const selecting = selectedIds !== null
   const selectedAttachments = attachments?.filter((a) => selectedIds?.has(a.id)) ?? []
 
-  function toggle(id: number) {
+  function toggle(id: string) {
     setSelectedIds((current) => {
       const next = new Set(current)
       if (next.has(id)) next.delete(id)

@@ -5,8 +5,8 @@ import { AttachmentPreviewDialog } from './attachment-preview-dialog'
 import type { PolicyAttachment } from '@/api/policyAttachments'
 
 const pdfAttachment: PolicyAttachment = {
-  id: 1,
-  policyId: 900,
+  id: '1',
+  policyId: '900',
   fileName: 'declarations-page.pdf',
   description: 'Declarations page from carrier',
   mimeType: 'application/pdf',
@@ -15,12 +15,12 @@ const pdfAttachment: PolicyAttachment = {
   sourceType: 'upload',
   sourceId: null,
   createdAt: '2026-03-02T14:31:00',
-  uploadedBy: { id: 1, name: 'Jane Staff', email: 'jane@example.com' },
+  uploadedBy: { id: '1', name: 'Jane Staff', email: 'jane@example.com' },
 }
 
 const imageAttachment: PolicyAttachment = {
   ...pdfAttachment,
-  id: 2,
+  id: '2',
   fileName: 'id-card.png',
   description: null,
   mimeType: 'image/png',
@@ -28,7 +28,7 @@ const imageAttachment: PolicyAttachment = {
 
 const textAttachment: PolicyAttachment = {
   ...pdfAttachment,
-  id: 3,
+  id: '3',
   fileName: 'notes.txt',
   description: null,
   mimeType: 'text/plain',

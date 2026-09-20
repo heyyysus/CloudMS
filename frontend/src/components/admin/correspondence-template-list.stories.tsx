@@ -24,7 +24,7 @@ const MERGE_FIELDS = [
 
 const templates: CorrespondenceTemplate[] = [
   {
-    id: 3,
+    id: '3',
     key: 'correspondence-renewal-reminder-ab12cd34',
     name: 'Renewal Reminder',
     subject: 'Your policy {{policyNumber}} is renewing',
@@ -32,7 +32,7 @@ const templates: CorrespondenceTemplate[] = [
     updatedAt: '2026-08-01T00:00:00.000Z',
   },
   {
-    id: 4,
+    id: '4',
     key: 'correspondence-payment-received-ff99aa00',
     name: 'Payment Received',
     subject: 'We received your payment',
@@ -50,7 +50,7 @@ const meta = {
   args: {
     getCorrespondenceTemplatesFn: fn(async () => response),
     createCorrespondenceTemplateFn: fn(async () => templates[0]),
-    updateCorrespondenceTemplateFn: fn(async (id: number) => templates.find((t) => t.id === id)!),
+    updateCorrespondenceTemplateFn: fn(async (id: string) => templates.find((t) => t.id === id)!),
     deleteCorrespondenceTemplateFn: fn(async () => undefined),
   },
   decorators: [
@@ -139,7 +139,7 @@ export const DeletesATemplate: Story = {
 
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
 
-    await expect(args.deleteCorrespondenceTemplateFn).toHaveBeenCalledWith(3)
+    await expect(args.deleteCorrespondenceTemplateFn).toHaveBeenCalledWith('3')
   },
 }
 

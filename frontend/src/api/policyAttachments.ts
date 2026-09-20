@@ -7,8 +7,8 @@ import { request } from './client'
 export type AttachmentSourceType = 'upload' | 'policy_change' | 'invoice' | 'receipt'
 
 export interface PolicyAttachment {
-  id: number
-  policyId: number
+  id: string
+  policyId: string
   fileName: string
   description: string | null
   mimeType: string
@@ -17,17 +17,17 @@ export interface PolicyAttachment {
   // never receive these rows at all; admins do, and the list marks them.
   isVoided: boolean
   sourceType: AttachmentSourceType
-  sourceId: number | null
+  sourceId: string | null
   createdAt: string
   uploadedBy: {
-    id: number
+    id: string
     name: string | null
     email: string
   }
 }
 
 export function getPolicyAttachments(
-  policyId: number,
+  policyId: string,
   signal?: AbortSignal
 ): Promise<PolicyAttachment[]> {
   return request(`/policy-attachments?policyId=${policyId}`, { signal })
@@ -39,7 +39,7 @@ export interface GetPolicyAttachmentLinkOptions {
 }
 
 export function getPolicyAttachmentLink(
-  id: number,
+  id: string,
   options?: GetPolicyAttachmentLinkOptions
 ): Promise<{ url: string }> {
   const query = options?.disposition ? `?disposition=${options.disposition}` : ''
@@ -47,7 +47,7 @@ export function getPolicyAttachmentLink(
 }
 
 export interface PresignAttachmentUploadBody {
-  policyId: number
+  policyId: string
   fileName: string
   contentType: string
   sizeBytes: number
@@ -65,7 +65,7 @@ export function presignPolicyAttachmentUpload(
 }
 
 export interface ConfirmAttachmentUploadBody {
-  policyId: number
+  policyId: string
   storageKey: string
   fileName: string
   description?: string | null

@@ -19,7 +19,7 @@ import { db } from "../db"
 import { emailLog, reminderRules, scheduledEmails } from "../db/schema"
 import { WELCOME_TEMPLATE_KEY } from "../emails"
 import { findEmailTemplateByKey, listPolicyLogsByPolicyId } from "../repositories"
-import { isoDaysFromToday, TestContext } from "../routes/testHelpers"
+import { isoDaysFromToday, MISSING_ROW_ID, TestContext } from "../routes/testHelpers"
 import { AUTOMATION_USER_EMAIL, resetAutomationUserCache } from "./automationUser"
 import { dispatchReminders } from "./dispatcher"
 import { PLANNER_LOCK_KEY, planDueReminders, planReminders } from "./planner"
@@ -43,7 +43,7 @@ afterEach(async () => {
   process.env = { ...ORIGINAL_ENV }
 })
 
-async function rowsFor(policyId: number) {
+async function rowsFor(policyId: string) {
   return db.select().from(scheduledEmails).where(eq(scheduledEmails.policyId, policyId))
 }
 
@@ -336,7 +336,7 @@ function sendTo(
   return call as [string, RequestInit]
 }
 
-async function rowFor(policyId: number) {
+async function rowFor(policyId: string) {
   const [row] = await db
     .select()
     .from(scheduledEmails)
@@ -559,7 +559,7 @@ describe("reminder rules", () => {
 
       const res = await request(app).get("/reminder-rules").set("Cookie", cookie)
 
-      const found = res.body.rules.find((r: { id: number }) => r.id === rule.id)
+      const found = res.body.rules.find((r: { id: string }) => r.id === rule.id)
       expect(found.template.name).toBe("Renewal Notice")
     })
   })
@@ -663,7 +663,7 @@ describe("reminder rules", () => {
     it("404s for an unknown rule", async () => {
       const cookie = await cookieFor("rr-missing")
       const res = await request(app)
-        .patch("/reminder-rules/99999999")
+        .patch(`/reminder-rules/${MISSING_ROW_ID}`)
         .set("Cookie", cookie)
         .send({ enabled: true })
       expect(res.status).toBe(404)
@@ -756,7 +756,9 @@ describe("policy activities", () => {
 
   it("empties out for an unknown policy rather than erroring", async () => {
     const cookie = await cookieFor("act-unknown")
-    const res = await request(app).get("/policies/99999999/activities").set("Cookie", cookie)
+    const res = await request(app)
+      .get(`/policies/${MISSING_ROW_ID}/activities`)
+      .set("Cookie", cookie)
     expect(res.status).toBe(200)
     expect(res.body.activities).toEqual([])
   })
@@ -785,7 +787,7 @@ describe("scheduled emails", () => {
     const res = await request(app).get("/scheduled-emails?status=pending").set("Cookie", cookie)
 
     expect(res.status).toBe(200)
-    const found = res.body.scheduled.find((s: { policyId: number }) => s.policyId === policy.id)
+    const found = res.body.scheduled.find((s: { policyId: string }) => s.policyId === policy.id)
     expect(found.policyNumber).toBe(policy.policyNumber)
     expect(found.clientName).toBeTruthy()
   })
@@ -828,7 +830,7 @@ describe("scheduled emails", () => {
   it("404s for an unknown reminder", async () => {
     const cookie = await cookieFor("sched-404", "staff")
     const res = await request(app)
-      .post("/scheduled-emails/99999999/cancel")
+      .post(`/scheduled-emails/${MISSING_ROW_ID}/cancel`)
       .set("Cookie", cookie)
       .send({})
     expect(res.status).toBe(404)

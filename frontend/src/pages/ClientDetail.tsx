@@ -35,8 +35,11 @@ import { sortPoliciesByCreatedAt } from '@/lib/policy-status'
 
 function ClientDetail() {
   const params = useParams<{ clientId: string }>()
-  const clientId = Number(params.clientId)
-  const isValidId = Number.isFinite(clientId)
+  const clientId = params.clientId ?? ''
+  // Row ids are opaque strings now, so there is nothing to parse - just don't
+  // fire the query on an empty segment. A malformed-but-present id reaches the
+  // API and comes back 404, which the effect below already handles.
+  const isValidId = clientId.length > 0
   const { openTab, removeTab } = useClientTabs()
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -94,7 +97,7 @@ function ClientDetail() {
 
   // Selection defaults to the newest policy; a newly created policy becomes
   // the newest and re-takes the selection (render-phase adjust, no effect).
-  const [userSelectedId, setUserSelectedId] = useState<number | null>(null)
+  const [userSelectedId, setUserSelectedId] = useState<string | null>(null)
   const [prevNewestId, setPrevNewestId] = useState(newestPolicyId)
   if (newestPolicyId !== prevNewestId) {
     setPrevNewestId(newestPolicyId)
@@ -158,15 +161,15 @@ function ClientDetail() {
   })
 
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false)
-  const [invoiceDialogTargetId, setInvoiceDialogTargetId] = useState<number | undefined>(undefined)
-  function openInvoiceDialog(invoiceId?: number) {
+  const [invoiceDialogTargetId, setInvoiceDialogTargetId] = useState<string | undefined>(undefined)
+  function openInvoiceDialog(invoiceId?: string) {
     setInvoiceDialogTargetId(invoiceId)
     setInvoiceDialogOpen(true)
   }
 
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false)
-  const [receiptInvoiceId, setReceiptInvoiceId] = useState<number | undefined>(undefined)
-  function openReceiptDialog(invoiceId: number) {
+  const [receiptInvoiceId, setReceiptInvoiceId] = useState<string | undefined>(undefined)
+  function openReceiptDialog(invoiceId: string) {
     setReceiptInvoiceId(invoiceId)
     setReceiptDialogOpen(true)
   }
@@ -184,7 +187,7 @@ function ClientDetail() {
   }
   const existingVehicles = [...vehiclesByVin.values()]
 
-  const driversByPersonId = new Map<number, ExistingDriverOption>()
+  const driversByPersonId = new Map<string, ExistingDriverOption>()
   if (client) {
     driversByPersonId.set(client.namedInsuredId, {
       personId: client.namedInsuredId,

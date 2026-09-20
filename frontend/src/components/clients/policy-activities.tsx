@@ -14,16 +14,16 @@ import { getPolicyActivities, type PolicyActivity } from '@/api/activities'
 import { cancelScheduledEmail } from '@/api/reminders'
 
 interface PolicyActivitiesProps {
-  policyId: number
+  policyId: string
   getPolicyActivitiesFn?: typeof getPolicyActivities
   cancelScheduledEmailFn?: typeof cancelScheduledEmail
 }
 
-// The numeric id the cancel route wants, recovered from the namespaced id the
-// API returns. Only reminders are cancellable today; a future "task:7" row
+// The row id the cancel route wants, recovered from the namespaced id the
+// API returns. Only reminders are cancellable today; a future "task:<id>" row
 // would route its own way.
-function scheduledEmailId(activity: PolicyActivity): number {
-  return Number(activity.id.split(':')[1])
+function scheduledEmailId(activity: PolicyActivity): string {
+  return activity.id.split(':')[1]
 }
 
 // What is scheduled to happen on this policy. Read-only apart from cancelling
@@ -43,7 +43,7 @@ export function PolicyActivities({
   })
 
   const cancel = useMutation({
-    mutationFn: (id: number) => cancelScheduledEmailFn(id),
+    mutationFn: (id: string) => cancelScheduledEmailFn(id),
     onSuccess: () => {
       toast.success('Reminder cancelled')
       return queryClient.invalidateQueries({ queryKey: ['policyActivities', policyId] })

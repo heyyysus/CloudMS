@@ -8,22 +8,22 @@ const receiptDetailWith = {
   createdByUser: { columns: { id: true, name: true, email: true } },
 } as const
 
-export async function getReceiptWithDetails(id: number) {
+export async function getReceiptWithDetails(id: string) {
   return db.query.receipts.findFirst({ where: eq(receipts.id, id), with: receiptDetailWith })
 }
 
-export async function listReceiptsByPolicyId(policyId: number) {
+export async function listReceiptsByPolicyId(policyId: string) {
   return db.query.receipts.findMany({
     where: eq(receipts.policyId, policyId),
-    orderBy: desc(receipts.id),
+    orderBy: [desc(receipts.createdAt), desc(receipts.id)],
     with: { payment: true },
   })
 }
 
-export async function listReceiptsByClientId(clientId: number) {
+export async function listReceiptsByClientId(clientId: string) {
   return db.query.receipts.findMany({
     where: eq(receipts.clientId, clientId),
-    orderBy: desc(receipts.id),
+    orderBy: [desc(receipts.createdAt), desc(receipts.id)],
     with: { payment: true },
   })
 }

@@ -1,7 +1,7 @@
 import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
-import { TestContext } from "./testHelpers"
+import { MISSING_ROW_ID, TestContext } from "./testHelpers"
 import type { UserRole } from "../types"
 
 const ctx = new TestContext()
@@ -16,12 +16,12 @@ async function authed(prefix: string, role: UserRole = "staff") {
 interface LogRow {
   logNumber: number
   body: string
-  author: { id: number }
+  author: { id: string }
 }
 
 // Accounting writes are auto-logged to the policy, so several tests below read
 // the log back. Newest first (logNumber descending), per GET /policy-logs.
-async function policyLogs(policyId: number, cookie: string): Promise<LogRow[]> {
+async function policyLogs(policyId: string, cookie: string): Promise<LogRow[]> {
   const res = await request(app).get(`/policy-logs?policyId=${policyId}`).set("Cookie", cookie)
   expect(res.status).toBe(200)
   return res.body
@@ -29,7 +29,9 @@ async function policyLogs(policyId: number, cookie: string): Promise<LogRow[]> {
 
 describe("POST /invoices", () => {
   it("returns 401 without a cookie", async () => {
-    expect((await request(app).post("/invoices").send({ policyId: 1, items: [] })).status).toBe(401)
+    expect((await request(app).post("/invoices").send({ policyId: "1", items: [] })).status).toBe(
+      401
+    )
   })
 
   it("creates an open invoice, defaulting a sweep item's carrier to the policy's carrier", async () => {
@@ -89,7 +91,7 @@ describe("POST /invoices", () => {
       .post("/invoices")
       .set("Cookie", cookie)
       .send({
-        policyId: 999999999,
+        policyId: MISSING_ROW_ID,
         items: [{ category: "agency", type: "new_business_fee", amount: 10 }],
       })
     expect(res.status).toBe(404)
@@ -201,7 +203,7 @@ describe("GET /invoices", () => {
     const policyB = await ctx.policy({ clientId: client.id })
     const otherPolicy = await ctx.policy()
 
-    const mk = (policyId: number) =>
+    const mk = (policyId: string) =>
       request(app)
         .post("/invoices")
         .set("Cookie", cookie)
@@ -213,7 +215,7 @@ describe("GET /invoices", () => {
 
     const byClient = await request(app).get(`/invoices?clientId=${client.id}`).set("Cookie", cookie)
     expect(byClient.status).toBe(200)
-    expect(byClient.body.map((i: { id: number }) => i.id)).toEqual([second.body.id, first.body.id])
+    expect(byClient.body.map((i: { id: string }) => i.id)).toEqual([second.body.id, first.body.id])
 
     const byPolicy = await request(app)
       .get(`/invoices?policyId=${policyA.id}`)
@@ -229,7 +231,9 @@ describe("GET /invoices", () => {
 
   it("returns 404 for a missing invoice", async () => {
     const { cookie } = await authed("inv-get-404")
-    expect((await request(app).get("/invoices/999999999").set("Cookie", cookie)).status).toBe(404)
+    expect(
+      (await request(app).get(`/invoices/${MISSING_ROW_ID}`).set("Cookie", cookie)).status
+    ).toBe(404)
   })
 })
 

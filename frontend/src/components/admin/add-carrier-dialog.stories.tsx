@@ -10,7 +10,7 @@ function createTestQueryClient() {
 }
 
 const created: Carrier = {
-  id: 9,
+  id: '9',
   name: 'New Mutual',
   naic: '99887',
   isActive: true,

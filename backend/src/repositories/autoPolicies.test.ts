@@ -2,6 +2,7 @@ import { eq, inArray, like } from "drizzle-orm"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { db } from "../db"
 import { autoPolicies, carriers, clients, drivers, persons } from "../db/schema"
+import { MISSING_ROW_ID } from "../routes/testHelpers"
 import type { Carrier, Client, Person } from "../types"
 import {
   createAutoPolicyWithDetails,
@@ -22,7 +23,7 @@ function personValues(firstName: string) {
   } as const
 }
 
-function policyValues(carrierId: number, clientId: number, suffix: string) {
+function policyValues(carrierId: string, clientId: string, suffix: string) {
   return {
     clientId,
     carrierId,
@@ -125,7 +126,7 @@ describe("createAutoPolicyWithDetails", () => {
     await expect(
       createAutoPolicyWithDetails({
         ...policyValues(carrier.id, client.id, "NOPERSON"),
-        drivers: [{ kind: "existing", personId: 999999999, dlNumber: "D-APRT-X" }],
+        drivers: [{ kind: "existing", personId: MISSING_ROW_ID, dlNumber: "D-APRT-X" }],
       })
     ).rejects.toThrow(PolicyWriteError)
   })
@@ -260,7 +261,7 @@ describe("updateAutoPolicyWithDetails", () => {
     await expect(
       updateAutoPolicyWithDetails(original.id, {
         vehicles: [vehicleValues("APRTVIN0000000402")],
-        drivers: [{ kind: "existing", personId: 999999999, dlNumber: "D-APRT-X" }],
+        drivers: [{ kind: "existing", personId: MISSING_ROW_ID, dlNumber: "D-APRT-X" }],
       })
     ).rejects.toThrow(PolicyWriteError)
 
@@ -271,7 +272,7 @@ describe("updateAutoPolicyWithDetails", () => {
   })
 
   it("returns undefined for an unknown policy id", async () => {
-    const result = await updateAutoPolicyWithDetails(999999999, { status: "active" })
+    const result = await updateAutoPolicyWithDetails(MISSING_ROW_ID, { status: "active" })
     expect(result).toBeUndefined()
   })
 })

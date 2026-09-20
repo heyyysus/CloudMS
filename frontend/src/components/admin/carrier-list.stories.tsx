@@ -11,7 +11,7 @@ function createTestQueryClient() {
 
 const carriers: Carrier[] = [
   {
-    id: 7,
+    id: '7',
     name: 'Acme Insurance',
     naic: '12345',
     isActive: true,
@@ -24,7 +24,7 @@ const carriers: Carrier[] = [
     updatedAt: '2026-07-14T17:48:07.653Z',
   },
   {
-    id: 8,
+    id: '8',
     name: 'Old Mutual',
     naic: '67890',
     isActive: false,
@@ -45,7 +45,7 @@ const meta = {
   args: {
     getCarriersFn: fn(async () => carriers),
     createCarrierFn: fn(async () => carriers[0]),
-    updateCarrierFn: fn(async (id: number) => carriers.find((c) => c.id === id)!),
+    updateCarrierFn: fn(async (id: string) => carriers.find((c) => c.id === id)!),
   },
   decorators: [
     (Story) => (
@@ -77,7 +77,7 @@ export const DeactivatesACarrier: Story = {
     await userEvent.click(canvas.getByRole('button', { name: /actions for acme insurance/i }))
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Deactivate' }))
 
-    await expect(args.updateCarrierFn).toHaveBeenCalledWith(7, { isActive: false })
+    await expect(args.updateCarrierFn).toHaveBeenCalledWith('7', { isActive: false })
   },
 }
 
@@ -90,7 +90,7 @@ export const ActivatesARetiredCarrier: Story = {
     await userEvent.click(canvas.getByRole('button', { name: /actions for old mutual/i }))
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Activate' }))
 
-    await expect(args.updateCarrierFn).toHaveBeenCalledWith(8, { isActive: true })
+    await expect(args.updateCarrierFn).toHaveBeenCalledWith('8', { isActive: true })
   },
 }
 

@@ -27,7 +27,7 @@ export function EditCarrierDialog({
   const toast = useToast()
 
   const mutation = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: Parameters<typeof updateCarrier>[1] }) =>
+    mutationFn: ({ id, body }: { id: string; body: Parameters<typeof updateCarrier>[1] }) =>
       updateCarrierFn(id, body),
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ['carriers'] })

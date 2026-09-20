@@ -12,7 +12,7 @@ import {
   findEmailTemplateByKey,
   listPolicyLogsByPolicyId,
 } from "../repositories"
-import { TestContext } from "./testHelpers"
+import { MISSING_ROW_ID, TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 
@@ -60,7 +60,7 @@ describe("POST /clients/:clientId/send-email", () => {
     expect(res.status).toBe(403)
   })
 
-  it("returns 400 for an invalid clientId", async () => {
+  it("returns 404 for a malformed clientId", async () => {
     const user = await ctx.user("mail-badid", "admin")
     const cookie = await ctx.cookie(user.id)
 
@@ -69,7 +69,7 @@ describe("POST /clients/:clientId/send-email", () => {
       .set("Cookie", cookie)
       .send({ subject: "Hi", body: "Hello" })
 
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(404)
   })
 
   it("returns 400 for an empty subject or body", async () => {
@@ -90,7 +90,7 @@ describe("POST /clients/:clientId/send-email", () => {
     const cookie = await ctx.cookie(user.id)
 
     const res = await request(app)
-      .post("/clients/999999999/send-email")
+      .post(`/clients/${MISSING_ROW_ID}/send-email`)
       .set("Cookie", cookie)
       .send({ subject: "Hi", body: "Hello" })
 
@@ -213,7 +213,7 @@ const TEMPLATE_BODY = {
 
 // Templates aren't tracked by TestContext (they're global, not client-scoped),
 // so each test that creates one registers its id here for teardown.
-const templateIds: number[] = []
+const templateIds: string[] = []
 
 afterEach(async () => {
   if (templateIds.length) {
@@ -269,17 +269,19 @@ describe("GET /policies/:policyId/merge-fields", () => {
     expect(res.body.values.agentEmail).toBe(user.email)
   })
 
-  it("returns 400 for an invalid policyId", async () => {
+  it("returns 404 for a malformed policyId", async () => {
     const user = await ctx.user("merge-badid")
     const cookie = await ctx.cookie(user.id)
     const res = await request(app).get("/policies/abc/merge-fields").set("Cookie", cookie)
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(404)
   })
 
   it("returns 404 for an unknown policy", async () => {
     const user = await ctx.user("merge-404")
     const cookie = await ctx.cookie(user.id)
-    const res = await request(app).get("/policies/999999999/merge-fields").set("Cookie", cookie)
+    const res = await request(app)
+      .get(`/policies/${MISSING_ROW_ID}/merge-fields`)
+      .set("Cookie", cookie)
     expect(res.status).toBe(404)
   })
 })
@@ -288,7 +290,7 @@ describe("POST /policies/:policyId/send-correspondence", () => {
   it("returns 401 without a cookie", async () => {
     const res = await request(app)
       .post("/policies/1/send-correspondence")
-      .send({ templateId: 1, to: ["a@example.com"] })
+      .send({ templateId: "1", to: ["a@example.com"] })
     expect(res.status).toBe(401)
   })
 
@@ -407,7 +409,7 @@ describe("POST /policies/:policyId/send-correspondence", () => {
     const template = await makeTemplate()
 
     const res = await request(app)
-      .post("/policies/999999999/send-correspondence")
+      .post(`/policies/${MISSING_ROW_ID}/send-correspondence`)
       .set("Cookie", cookie)
       .send({ templateId: template.id, to: ["jane@example.com"] })
 
@@ -420,7 +422,7 @@ describe("POST /policies/:policyId/send-correspondence", () => {
     const res = await request(app)
       .post(`/policies/${policy.id}/send-correspondence`)
       .set("Cookie", cookie)
-      .send({ templateId: 999999999, to: ["jane@example.com"] })
+      .send({ templateId: MISSING_ROW_ID, to: ["jane@example.com"] })
 
     expect(res.status).toBe(404)
   })

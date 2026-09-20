@@ -1,7 +1,7 @@
 import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
-import { TestContext } from "./testHelpers"
+import { MISSING_ROW_ID, TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 afterEach(() => ctx.cleanup())
@@ -18,7 +18,7 @@ describe("GET /clients", () => {
 
     const res = await request(app).get("/clients").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.some((c: { id: number }) => c.id === client.id)).toBe(true)
+    expect(res.body.some((c: { id: string }) => c.id === client.id)).toBe(true)
   })
 })
 
@@ -39,7 +39,9 @@ describe("GET /clients/:id", () => {
   it("returns 404 for an unknown id", async () => {
     const user = await ctx.user("clients-404")
     const cookie = await ctx.cookie(user.id)
-    expect((await request(app).get("/clients/999999999").set("Cookie", cookie)).status).toBe(404)
+    expect(
+      (await request(app).get(`/clients/${MISSING_ROW_ID}`).set("Cookie", cookie)).status
+    ).toBe(404)
   })
 })
 
@@ -175,7 +177,7 @@ describe("GET /clients?q=", () => {
 
     const res = await request(app).get("/clients?q=555-9876").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.some((c: { id: number }) => c.id === client.id)).toBe(true)
+    expect(res.body.some((c: { id: string }) => c.id === client.id)).toBe(true)
   })
 
   it("finds a client by cross-column full name", async () => {
@@ -186,7 +188,7 @@ describe("GET /clients?q=", () => {
 
     const res = await request(app).get("/clients?q=marisol alva").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.some((c: { id: number }) => c.id === client.id)).toBe(true)
+    expect(res.body.some((c: { id: string }) => c.id === client.id)).toBe(true)
   })
 
   it("returns 400 when q is too short", async () => {

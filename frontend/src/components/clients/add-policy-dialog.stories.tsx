@@ -8,8 +8,8 @@ import type { Carrier } from '@/api/carriers'
 import type { PolicyDetail } from '@/api/policies'
 
 const client: ClientDetail = {
-  id: 155,
-  namedInsuredId: 229,
+  id: '155',
+  namedInsuredId: '229',
   secondNamedInsuredId: null,
   mailingAddress1: '42 Wallaby Way, Sydney',
   mailingAddress2: null,
@@ -24,7 +24,7 @@ const client: ClientDetail = {
   createdAt: '2026-07-14T17:48:07.653Z',
   updatedAt: '2026-07-14T17:48:07.653Z',
   namedInsured: {
-    id: 229,
+    id: '229',
     firstName: 'Jane',
     lastName: 'Doe',
     dateOfBirth: '1987-07-22',
@@ -42,7 +42,7 @@ const client: ClientDetail = {
 
 const carriers: Carrier[] = [
   {
-    id: 7,
+    id: '7',
     name: 'Acme Insurance',
     naic: '12345',
     isActive: true,
@@ -57,9 +57,9 @@ const carriers: Carrier[] = [
 ]
 
 const createdPolicy: PolicyDetail = {
-  id: 900,
-  clientId: 155,
-  carrierId: 7,
+  id: '900',
+  clientId: '155',
+  carrierId: '7',
   policyNumber: 'POL-123',
   policyAddress1: '1 Ocean Ave, Sydney',
   policyAddress2: null,
@@ -72,8 +72,8 @@ const createdPolicy: PolicyDetail = {
   createdAt: '2026-07-14T17:48:07.653Z',
   updatedAt: '2026-07-14T17:48:07.653Z',
   client: {
-    id: 155,
-    namedInsuredId: 229,
+    id: '155',
+    namedInsuredId: '229',
     secondNamedInsuredId: null,
     mailingAddress1: '42 Wallaby Way, Sydney',
     mailingAddress2: null,
@@ -105,7 +105,7 @@ const meta = {
     client,
     existingVehicles: [],
     existingDrivers: [
-      { personId: 229, person: client.namedInsured },
+      { personId: '229', person: client.namedInsured },
     ],
     getCarriersFn: fn(async () => carriers),
   },
@@ -154,8 +154,8 @@ export const SubmitSavesAndCloses: Story = {
 
     await expect(args.createPolicyFn).toHaveBeenCalledWith(
       expect.objectContaining({
-        clientId: 155,
-        carrierId: 7,
+        clientId: '155',
+        carrierId: '7',
         policyNumber: 'POL-123',
         status: 'pending',
         policyAddress1: '1 Ocean Ave, Sydney',

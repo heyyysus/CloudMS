@@ -11,8 +11,8 @@ import {
 interface ClientTabsContextValue {
   tabs: ClientTab[]
   openTab: (tab: ClientTab) => void
-  closeTab: (id: number) => void
-  removeTab: (id: number) => void
+  closeTab: (id: string) => void
+  removeTab: (id: string) => void
 }
 
 const ClientTabsContext = createContext<ClientTabsContextValue | null>(null)
@@ -40,11 +40,11 @@ export function ClientTabsProvider({ children }: { children: ReactNode }) {
     setTabs((prev) => upsertTab(prev, tab))
   }
 
-  function removeTab(id: number) {
+  function removeTab(id: string) {
     setTabs((prev) => removeTabById(prev, id))
   }
 
-  function closeTab(id: number) {
+  function closeTab(id: string) {
     const wasActive = location.pathname === `/clients/${id}`
     const closedIndex = tabs.findIndex((t) => t.id === id)
     const next = removeTabById(tabs, id)

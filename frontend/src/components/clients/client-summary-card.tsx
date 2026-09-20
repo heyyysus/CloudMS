@@ -15,7 +15,7 @@ interface ClientSummaryCardProps {
   action?: ReactNode
 }
 
-function ClientIdCopyButton({ id }: { id: number }) {
+function ClientIdCopyButton({ id }: { id: string }) {
   const { copied, copy } = useCopyToClipboard()
 
   return (

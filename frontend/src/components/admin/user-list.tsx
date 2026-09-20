@@ -28,7 +28,7 @@ interface ManageUsersCardProps {
   // The signed-in admin's id, so their own row can be marked and its
   // self-guarded actions hidden. Passed in rather than read from AuthContext
   // so this renders standalone in Storybook.
-  currentUserId?: number
+  currentUserId?: string
   getUsersFn?: typeof getUsers
   updateUserFn?: typeof updateUser
   resendWelcomeFn?: typeof resendWelcome
@@ -60,7 +60,7 @@ export function ManageUsersCard({
   // One mutation drives both the dialog and the per-row quick actions; the
   // list is small enough that a refetch is cheaper than reconciling by hand.
   const update = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: UpdateUserBody }) => updateUserFn(id, body),
+    mutationFn: ({ id, body }: { id: string; body: UpdateUserBody }) => updateUserFn(id, body),
     onSuccess: (user) => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       setEditing(null)
@@ -70,7 +70,7 @@ export function ManageUsersCard({
   })
 
   const resend = useMutation({
-    mutationFn: (id: number) => resendWelcomeFn(id),
+    mutationFn: (id: string) => resendWelcomeFn(id),
     onSuccess: (result) => {
       if (result.email.status === 'sent') toast.success('Welcome email sent')
       else toast.error(`Welcome email failed${result.email.error ? `: ${result.email.error}` : ''}`)

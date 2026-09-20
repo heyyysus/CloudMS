@@ -24,7 +24,7 @@ export interface LedgerRow {
   chargeCents: number
   creditCents: number
   balanceCents: number
-  invoiceId: number
+  invoiceId: string
   isVoid: boolean
   voidReason?: string | null
 }
@@ -42,7 +42,7 @@ function invoiceDescription(invoice: Invoice): string {
 
 interface SortableRow {
   at: string
-  id: number
+  id: string
   row: Omit<LedgerRow, 'balanceCents'>
 }
 
@@ -134,10 +134,11 @@ export function buildPolicyLedger(invoices: Invoice[], payments: InvoicePayment[
 
   // Both list endpoints return newest first; the running balance needs
   // oldest-first. Ties (same timestamp, e.g. an invoice paid off instantly)
-  // break on the underlying entity id.
+  // break on the underlying entity id, compared lexicographically since row
+  // ids are opaque strings - stable, but no longer implying insertion order.
   sortable.sort((a, b) => {
     if (a.at !== b.at) return a.at < b.at ? -1 : 1
-    return a.id - b.id
+    return a.id.localeCompare(b.id)
   })
 
   let balanceCents = 0

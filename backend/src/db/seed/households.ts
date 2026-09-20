@@ -6,7 +6,7 @@ import { chunk, faker, toDateString } from "./rng"
 export interface Household {
   client: Client
   // Person ids of every household member old enough to plausibly drive.
-  driverPersonIds: number[]
+  driverPersonIds: string[]
   zip: string
 }
 
@@ -140,7 +140,7 @@ function buildDraft(): Draft {
   }
 }
 
-export async function seedHouseholds(count: number, orgId: number): Promise<Household[]> {
+export async function seedHouseholds(count: number, orgId: string): Promise<Household[]> {
   const drafts = Array.from({ length: count }, buildDraft)
 
   const allPersonSpecs = drafts.flatMap((d) => d.personSpecs.map((p) => ({ ...p, orgId })))

@@ -14,7 +14,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "db:push": "drizzle-kit push --force && ts-node src/db/roles.ts",
+    "db:push": "ts-node src/db/extensions.ts && drizzle-kit push --force && ts-node src/db/roles.ts",
     "db:bootstrap": "ts-node src/db/bootstrap.ts",
     "db:studio": "drizzle-kit studio",
     "db:seed": "ts-node src/db/seed.ts",

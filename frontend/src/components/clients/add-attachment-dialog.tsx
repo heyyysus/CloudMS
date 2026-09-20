@@ -149,7 +149,7 @@ export function AddAttachmentForm({
 }
 
 interface AddAttachmentDialogProps {
-  policyId: number
+  policyId: string
   open: boolean
   onOpenChange: (open: boolean) => void
   initialFile?: File

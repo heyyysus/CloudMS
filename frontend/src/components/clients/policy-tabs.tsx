@@ -10,8 +10,8 @@ const POLICY_TAB_PREFIX = 'AUTOP'
 
 interface PolicyTabsProps {
   policies: AutoPolicy[]
-  selectedId: number
-  onSelect: (policyId: number) => void
+  selectedId: string
+  onSelect: (policyId: string) => void
   // Rendered at the right end of the tab row (e.g. the Add Policy dialog trigger).
   action?: ReactNode
   children: (policy: AutoPolicy) => ReactNode
@@ -29,8 +29,8 @@ export function PolicyTabs({ policies, selectedId, onSelect, action, children }:
 
   return (
     <Tabs
-      value={String(selectedId)}
-      onValueChange={(value) => onSelect(Number(value))}
+      value={selectedId}
+      onValueChange={(value) => onSelect(value)}
       className="gap-3"
     >
       <div className="flex items-end justify-between gap-2 border-b">

@@ -1,7 +1,7 @@
 import { request } from './client'
 
 export interface User {
-  id: number
+  id: string
   email: string
   name: string | null
   role: 'admin' | 'staff'

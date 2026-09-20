@@ -7,7 +7,7 @@ export async function listPersons(): Promise<Person[]> {
   return db.select().from(persons)
 }
 
-export async function findPersonById(id: number): Promise<Person | undefined> {
+export async function findPersonById(id: string): Promise<Person | undefined> {
   const [row] = await db.select().from(persons).where(eq(persons.id, id))
   return row
 }
@@ -18,7 +18,7 @@ export async function createPerson(input: NewPerson): Promise<Person> {
 }
 
 export async function updatePerson(
-  id: number,
+  id: string,
   input: Partial<NewPerson>
 ): Promise<Person | undefined> {
   const [row] = await db
@@ -29,7 +29,7 @@ export async function updatePerson(
   return row
 }
 
-export async function deletePerson(id: number): Promise<boolean> {
+export async function deletePerson(id: string): Promise<boolean> {
   const deleted = await db.delete(persons).where(eq(persons.id, id)).returning({ id: persons.id })
   return deleted.length > 0
 }

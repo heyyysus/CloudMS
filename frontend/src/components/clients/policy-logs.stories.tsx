@@ -11,44 +11,44 @@ import type { PolicyLog } from '@/api/policyLogs'
 
 const logs: PolicyLog[] = [
   {
-    id: 2,
-    policyId: 900,
+    id: '2',
+    policyId: '900',
     logNumber: 2,
     body: 'Insured called in to inquire about renewal offer and whether the multi-policy discount still applies to the new term.',
     createdAt: '2026-03-02T14:31:00',
-    author: { id: 1, name: 'Jane Staff', email: 'jane@example.com' },
+    author: { id: '1', name: 'Jane Staff', email: 'jane@example.com' },
   },
   {
-    id: 1,
-    policyId: 900,
+    id: '1',
+    policyId: '900',
     logNumber: 1,
     body: 'Called the client to confirm garaging address.',
     createdAt: '2026-07-14T17:48:07',
-    author: { id: 2, name: 'Tom Reyes', email: 'tom@example.com' },
+    author: { id: '2', name: 'Tom Reyes', email: 'tom@example.com' },
   },
 ]
 
 const changeForm: PolicyAttachment = {
-  id: 11,
-  policyId: 900,
+  id: '11',
+  policyId: '900',
   fileName: 'Policy Change Form.pdf',
   description: 'Auto-generated summary of this edit',
   mimeType: 'application/pdf',
   sizeBytes: 42_000,
   isVoided: false,
   sourceType: 'policy_change',
-  sourceId: 900,
+  sourceId: '900',
   createdAt: '2026-03-02T14:31:00',
-  uploadedBy: { id: 2, name: 'Tom Reyes', email: 'tom@example.com' },
+  uploadedBy: { id: '2', name: 'Tom Reyes', email: 'tom@example.com' },
 }
 
 // Linked to log 2 only, so the paperclip appears on one row and not the other.
 const links: PolicyLogAttachment[] = [
   {
-    id: 501,
-    logId: 2,
+    id: '501',
+    logId: '2',
     createdAt: '2026-03-02T14:32:00',
-    linkedBy: { id: 2, name: 'Tom Reyes', email: 'tom@example.com' },
+    linkedBy: { id: '2', name: 'Tom Reyes', email: 'tom@example.com' },
     attachment: changeForm,
   },
 ]
@@ -62,9 +62,9 @@ const meta = {
   component: PolicyLogs,
   tags: ['autodocs'],
   args: {
-    policyId: 900,
+    policyId: '900',
     onAddLog: fn(),
-    currentUserId: 1,
+    currentUserId: '1',
     // Most stories are about the log list itself, so links default to empty
     // and the ones that care override it.
     getPolicyLogAttachmentsFn: fn(async () => []),
@@ -230,6 +230,6 @@ export const UnlinksAnAttachment: Story = {
 
     const dialog = within(await screen.findByRole('dialog'))
     await userEvent.click(dialog.getByRole('button', { name: 'Unlink Policy Change Form' }))
-    await expect(args.unlinkPolicyLogAttachmentFn).toHaveBeenCalledWith(501)
+    await expect(args.unlinkPolicyLogAttachmentFn).toHaveBeenCalledWith('501')
   },
 }

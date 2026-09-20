@@ -28,7 +28,7 @@ export function DeleteReminderRuleDialog({
   const toast = useToast()
 
   const mutation = useMutation({
-    mutationFn: (id: number) => deleteReminderRuleFn(id),
+    mutationFn: (id: string) => deleteReminderRuleFn(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reminderRules'] })
       queryClient.invalidateQueries({ queryKey: ['scheduledEmails'] })

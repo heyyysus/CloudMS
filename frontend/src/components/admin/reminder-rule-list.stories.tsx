@@ -12,7 +12,7 @@ function createTestQueryClient() {
 
 const templates: CorrespondenceTemplate[] = [
   {
-    id: 3,
+    id: '3',
     key: 'correspondence-renewal-reminder-ab12cd34',
     name: 'Renewal Notice',
     subject: 'Your policy {{policyNumber}} is renewing',
@@ -20,7 +20,7 @@ const templates: CorrespondenceTemplate[] = [
     updatedAt: '2026-08-01T00:00:00.000Z',
   },
   {
-    id: 4,
+    id: '4',
     key: 'correspondence-documents-needed-ff99aa00',
     name: 'Documents Needed',
     subject: 'We need a document',
@@ -31,24 +31,24 @@ const templates: CorrespondenceTemplate[] = [
 
 const rules: ReminderRule[] = [
   {
-    id: 1,
+    id: '1',
     name: '30-day renewal reminder',
     trigger: 'policy_expiration',
     offsetDays: 30,
-    templateId: 3,
+    templateId: '3',
     enabled: true,
     updatedAt: '2026-08-01T00:00:00.000Z',
-    template: { id: 3, key: templates[0].key, name: 'Renewal Notice', subject: 'x' },
+    template: { id: '3', key: templates[0].key, name: 'Renewal Notice', subject: 'x' },
   },
   {
-    id: 2,
+    id: '2',
     name: '7-day final notice',
     trigger: 'policy_expiration',
     offsetDays: 7,
-    templateId: 4,
+    templateId: '4',
     enabled: false,
     updatedAt: '2026-08-02T00:00:00.000Z',
-    template: { id: 4, key: templates[1].key, name: 'Documents Needed', subject: 'y' },
+    template: { id: '4', key: templates[1].key, name: 'Documents Needed', subject: 'y' },
   },
 ]
 
@@ -135,7 +135,7 @@ export const TogglesARule: Story = {
 
     await userEvent.click(canvas.getByRole('button', { name: 'Turn on' }))
 
-    await expect(args.updateReminderRuleFn).toHaveBeenCalledWith(2, { enabled: true })
+    await expect(args.updateReminderRuleFn).toHaveBeenCalledWith('2', { enabled: true })
   },
 }
 
@@ -155,7 +155,7 @@ export const CreatesARule: Story = {
     await userEvent.click(screen.getByRole('button', { name: /create rule/i }))
 
     await expect(args.createReminderRuleFn).toHaveBeenCalledWith(
-      { name: '14-day nudge', offsetDays: 14, templateId: 3 },
+      { name: '14-day nudge', offsetDays: 14, templateId: '3' },
       expect.anything()
     )
   },
@@ -193,6 +193,6 @@ export const DeleteWarnsAboutQueuedReminders: Story = {
     await expect(dialog).toHaveTextContent('queued but not yet sent are dropped')
 
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
-    await expect(args.deleteReminderRuleFn).toHaveBeenCalledWith(1)
+    await expect(args.deleteReminderRuleFn).toHaveBeenCalledWith('1')
   },
 }

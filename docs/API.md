@@ -39,6 +39,14 @@ depth — this doc assumes that context and focuses on the resource routes.
   - `409` — a Postgres constraint would be violated (duplicate unique value,
     or a foreign key still referencing the row being deleted)
   - `500` — unexpected error (logged server-side, no detail leaked to the client)
+- **Row ids**: every id and foreign key, in every route's params/body/
+  response, is an opaque 22-character base64url string
+  (`^[A-Za-z0-9_-]{22}$`), not a sequential integer — see
+  [`multitenancy.md`](./multitenancy.md#row-ids) for why. A `:id` route param
+  that doesn't match that pattern gets **404**, the same as a well-formed id
+  with no matching row: the two are made indistinguishable on purpose so a
+  malformed guess can't be told apart from an absent row (unlike the `400`
+  a malformed *body* field gets).
 
 ## Auth for frontend clients
 
@@ -257,7 +265,7 @@ Both POST and PATCH additionally accept:
 - `vehicles` (optional array): vehicle objects as in the [Vehicles](#vehicles)
   body fields, minus `policyId` (injected server-side).
 - `drivers` (optional array): each entry is either
-  `{ "kind": "existing", "personId": number, "dlNumber"?: string, "rating"?: "rated"|"excluded", "sr22"?: boolean }`
+  `{ "kind": "existing", "personId": string, "dlNumber"?: string, "rating"?: "rated"|"excluded", "sr22"?: boolean }`
   — reusing that person's `drivers` row if one already exists (in which case
   `dlNumber`/`rating`/`sr22` are ignored) — or
   `{ "kind": "new", "person": {...Person body fields...}, "dlNumber"?: string, "rating"?: ..., "sr22"?: ... }`,
@@ -415,8 +423,8 @@ voided is withheld from staff and returned to admins.
 | POST | `/policy-log-attachments` | any | body validated against `linkPolicyLogAttachmentsBody`; returns 201 with the created links |
 | DELETE | `/policy-log-attachments/:id` | any | `:id` is the **link's** id, not the attachment's; 204, or 404 if unknown |
 
-POST body: `logId` (required), `attachmentIds` (required, 1-50 positive
-integers). Many attachments to one log — the shape of the selection UI.
+POST body: `logId` (required), `attachmentIds` (required, 1-50 row ids). Many
+attachments to one log — the shape of the selection UI.
 Re-linking a pair that is already linked is a no-op rather than a conflict,
 so a double submit is safe. Returns 404 for an unknown `logId` or
 `attachmentId`, and 400 when an attachment belongs to a different policy than

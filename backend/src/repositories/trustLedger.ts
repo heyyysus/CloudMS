@@ -6,18 +6,18 @@ import type { TrustLedgerEntry } from "../types"
 
 const withCarrier = { carrier: { columns: { id: true, name: true } } } as const
 
-export async function listTrustLedgerByPolicyId(policyId: number) {
+export async function listTrustLedgerByPolicyId(policyId: string) {
   return db.query.trustLedger.findMany({
     where: eq(trustLedger.policyId, policyId),
-    orderBy: desc(trustLedger.id),
+    orderBy: [desc(trustLedger.createdAt), desc(trustLedger.id)],
     with: withCarrier,
   })
 }
 
-export async function listTrustLedgerByClientId(clientId: number) {
+export async function listTrustLedgerByClientId(clientId: string) {
   return db.query.trustLedger.findMany({
     where: eq(trustLedger.clientId, clientId),
-    orderBy: desc(trustLedger.id),
+    orderBy: [desc(trustLedger.createdAt), desc(trustLedger.id)],
     with: withCarrier,
   })
 }
@@ -32,7 +32,7 @@ function balanceOf(entries: Pick<TrustLedgerEntry, "direction" | "amount">[]): s
   return centsToAmount(cents)
 }
 
-export async function getTrustBalanceByPolicyId(policyId: number): Promise<string> {
+export async function getTrustBalanceByPolicyId(policyId: string): Promise<string> {
   const rows = await db
     .select({ direction: trustLedger.direction, amount: trustLedger.amount })
     .from(trustLedger)
@@ -40,7 +40,7 @@ export async function getTrustBalanceByPolicyId(policyId: number): Promise<strin
   return balanceOf(rows)
 }
 
-export async function getTrustBalanceByClientId(clientId: number): Promise<string> {
+export async function getTrustBalanceByClientId(clientId: string): Promise<string> {
   const rows = await db
     .select({ direction: trustLedger.direction, amount: trustLedger.amount })
     .from(trustLedger)

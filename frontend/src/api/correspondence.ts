@@ -8,7 +8,7 @@ export interface PolicyMergeValues {
 }
 
 export interface SendCorrespondenceBody {
-  templateId: number
+  templateId: string
   to: string[]
   cc?: string[]
 }
@@ -21,14 +21,14 @@ export interface SendCorrespondenceResult {
 }
 
 export function getPolicyMergeValues(
-  policyId: number,
+  policyId: string,
   signal?: AbortSignal
 ): Promise<PolicyMergeValues> {
   return request(`/policies/${policyId}/merge-fields`, { signal })
 }
 
 export function sendPolicyCorrespondence(
-  policyId: number,
+  policyId: string,
   body: SendCorrespondenceBody
 ): Promise<SendCorrespondenceResult> {
   return request(`/policies/${policyId}/send-correspondence`, {

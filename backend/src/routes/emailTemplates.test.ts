@@ -65,6 +65,7 @@ describe("GET/PUT /email-templates/:key", () => {
           subject: saved.subject,
           body: saved.body,
           updatedBy: saved.updatedBy,
+          orgId: saved.orgId!,
         })
       }
     })

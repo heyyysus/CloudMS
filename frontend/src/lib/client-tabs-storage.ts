@@ -1,5 +1,5 @@
 export interface ClientTab {
-  id: number
+  id: string
   label: string
 }
 
@@ -9,7 +9,7 @@ function isClientTab(value: unknown): value is ClientTab {
   return (
     typeof value === 'object' &&
     value !== null &&
-    typeof (value as ClientTab).id === 'number' &&
+    typeof (value as ClientTab).id === 'string' &&
     typeof (value as ClientTab).label === 'string'
   )
 }
@@ -45,6 +45,6 @@ export function upsertTab(tabs: ClientTab[], tab: ClientTab): ClientTab[] {
   return [...tabs, tab]
 }
 
-export function removeTabById(tabs: ClientTab[], id: number): ClientTab[] {
+export function removeTabById(tabs: ClientTab[], id: string): ClientTab[] {
   return tabs.filter((t) => t.id !== id)
 }

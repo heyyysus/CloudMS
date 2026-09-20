@@ -79,7 +79,7 @@ import {
 // A person the client is already associated with (named insured, co-insured,
 // or a driver on another policy), offered as a checkable driver row.
 export interface ExistingDriverOption {
-  personId: number
+  personId: string
   person: Person
   driver?: { dlNumber: string | null; rating: string; sr22: boolean }
 }
@@ -183,7 +183,7 @@ const addPolicySchema = z
     existingDrivers: z.array(
       z.object({
         checked: z.boolean(),
-        personId: z.number(),
+        personId: z.string(),
         label: z.string(),
         hasDriverRow: z.boolean(),
         dlNumber: z.string(),
@@ -345,7 +345,7 @@ function toFormValues({ client, existingDrivers, initial }: ToFormValuesArgs): A
   }
 }
 
-function toBody(values: AddPolicyFormValues, clientId: number): CreatePolicyBody {
+function toBody(values: AddPolicyFormValues, clientId: string): CreatePolicyBody {
   const nullableTrim = (value: string) => {
     const trimmed = value.trim()
     return trimmed === '' ? null : trimmed
@@ -386,7 +386,7 @@ function toBody(values: AddPolicyFormValues, clientId: number): CreatePolicyBody
 
   return {
     clientId,
-    carrierId: Number(values.carrierId),
+    carrierId: values.carrierId,
     policyNumber: values.policyNumber.trim(),
     ...flattenAddress('policy', toNullableAddress(values.policyAddress)),
     endorsementEffectiveDate: values.endorsementEffectiveDate,
@@ -484,7 +484,7 @@ const EMPTY_VEHICLE_ROW = {
 }
 
 interface AddPolicyFormProps {
-  clientId: number
+  clientId: string
   client: ClientAddressFields
   carriers: Carrier[]
   carriersLoading?: boolean

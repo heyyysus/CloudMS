@@ -43,7 +43,7 @@ const adminItem = {
 
 interface AppSidebarProps {
   openTabs?: ClientTab[]
-  onCloseTab?: (id: number) => void
+  onCloseTab?: (id: string) => void
   isAdmin?: boolean
 }
 

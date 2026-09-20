@@ -36,20 +36,19 @@ are decisions still to be made.
 
 - **`organizations`** — `id`, `name`, `slug`, settings columns (below),
   `is_demo` (see *Demo org*), timestamps.
-- **`org_id NOT NULL`** on every domain table: persons, drivers, clients,
+- **`org_id`** on every domain table: persons, drivers, clients,
   client_phones, client_emails, carriers, auto_policies, vehicles,
   policy_drivers, policy_logs, policy_attachments, policy_log_attachments,
   invoices, invoice_items, payments, receipts, trust_ledger, email_templates,
   email_log, reminder_rules, scheduled_emails. Each gets a foreign key to
   `organizations` and a composite index led by `org_id`. #116 replaced
-  migrations with `drizzle-kit push`, so there is no backfill migration:
-  `org_id` carries a temporary column default of `1` (dropped in sub-issue 6),
-  and `bootstrap.ts` creates organization 1 insert-if-absent so `db:push`
-  followed by bootstrap has somewhere for existing rows to point. This means
-  `db:push` against a database that already has rows fails until organization
-  1 exists - fine for the fresh databases this repo's tooling targets, but a
-  production rollout needs organization 1 inserted between two pushes; see
-  #117's PR body.
+  migrations with `drizzle-kit push`, so there is no backfill migration.
+  #130 dropped the column's temporary `NOT NULL DEFAULT 1` (a leftover from
+  when ids were sequential integers and `1` meant something) in favor of a
+  plain nullable `varchar(22)`, with no backfill; #121 restores `NOT NULL`
+  once every insert path passes an explicit `orgId`. Until then, `db:push`
+  against a database that already has rows needs no organization to exist
+  first - the column is nullable, not defaulted.
 - **Multiple users can belong to one organization, and one user can belong to
   multiple organizations** via an `org_memberships` table (`user_id`, `org_id`,
   `role`, `is_active`, unique on `(user_id, org_id)`) rather than an `org_id`
@@ -69,6 +68,25 @@ are decisions still to be made.
   the organization row. **Open:** the display format (plain integer vs a
   per-agency prefix).
 
+### Row ids
+
+**Done (#130):** every table's primary key and every foreign key is an
+opaque 22-character base64url string (`^[A-Za-z0-9_-]{22}$`), replacing
+sequential `serial` ids. A sequential id leaks volume (agency size, growth
+rate) to anyone who can see one, and once rows from multiple organizations
+share the same tables, it also leaks relative signup order across tenants -
+exactly the kind of cross-tenant inference this rollout exists to close.
+Generation is belt-and-braces: a Postgres column `DEFAULT` (pgcrypto's
+`gen_random_bytes(16)`, base64url-encoded) so a raw `INSERT` from any path
+still gets a valid id, plus a Drizzle `$defaultFn` (Node's
+`randomBytes(16).toString("base64url")`) so an id is already present on the
+in-memory row before `.returning()` completes. A flat random id was chosen
+over a composite `<org>-<sequence>` key: the latter still leaks per-org
+volume to anyone in that org and adds a second read (or a cached counter) on
+every insert for no benefit once the id is opaque anyway. `org_id` itself is
+nullable until #121 (see *Data model* above) - unrelated to the id format,
+but landing in the same migration since both touch every table's columns.
+
 ## Request scoping
 
 - **Done (sub-issue 3):** the session is the only source of the tenant - never
@@ -82,12 +100,13 @@ are decisions still to be made.
   `requireSession` instead since the org picker has to work before a session
   is bound. `TestContext` gets a per-context organization and org-aware
   `user()`/`cookie()` helpers.
-- **Not done yet (sub-issues 4-6):** domain repositories and routes
-  (clients, policies, accounting, etc.) still don't take an `orgId` - every
-  domain row lands in one default organization via the temporary `org_id
-  DEFAULT 1` regardless of which org's session created it. The *session's*
-  org and the org domain rows land in are deliberately different things
-  until that lands.
+- **Not done yet (#119, #120, #121):** domain repositories and routes
+  (clients, policies, accounting, etc.) still don't take an `orgId` - since
+  #130 dropped `org_id`'s temporary `DEFAULT 1`, every domain row created
+  through today's routes lands with `org_id NULL` regardless of which org's
+  session created it, rather than in a single default organization. The
+  *session's* org and the org domain rows land in are deliberately different
+  things until #119 lands.
 - **Repositories take an explicit `orgId`.** All of them, so the compiler
   enforces scoping and a forgotten filter is a type error, not a data leak.
   The comment at the top of `backend/src/repositories/index.ts` anticipated
@@ -150,20 +169,24 @@ created automatically by a migration.
 ## Rollout order
 
 1. `organizations` table.
-2. `org_memberships` table; `org_id` (temporary default 1) on every domain
-   table with foreign keys and indexes; `bootstrap.ts` creates organization 1.
-3. Thread `orgId` through every repository and route; `requireAuth` attaches
+2. `org_memberships` table; `org_id` on every domain table with foreign keys
+   and indexes; `bootstrap.ts` creates a default organization.
+3. **Done (#130):** opaque 22-character row ids on every table, replacing
+   sequential `serial` ids, and `org_id` dropped to nullable (no default) -
+   see *Row ids* above. Runs before the next step so repositories, tests and
+   the frontend are rewritten for the new id type once, not twice.
+4. Thread `orgId` through every repository and route; `requireAuth` attaches
    the organization; `TestContext` gets a per-context organization. **Auth
    half done:** the session carries the org and `requireAuth`/`TestContext`
    enforce and provide it (see *Request scoping* above). **Repository/route
-   half remains** (sub-issues 4-6): domain repositories and routes still
-   don't take an `orgId`.
-4. Per-organization invoice and receipt numbers.
-5. Organization settings columns; move the agency-level environment variables
+   half remains** (#119): domain repositories and routes still don't take an
+   `orgId`.
+5. Per-organization invoice and receipt numbers (#120).
+6. Organization settings columns; move the agency-level environment variables
    onto them; scope the reminder planner per organization.
-6. Organization creation and invite flow; retire `ADMIN_EMAIL`.
-7. Demo org: flag, demo sign-in, org-scoped reseed, guardrail settings, banner.
-8. Row-level security backstop.
+7. Organization creation and invite flow; retire `ADMIN_EMAIL`.
+8. Demo org: flag, demo sign-in, org-scoped reseed, guardrail settings, banner.
+9. Row-level security backstop (#122).
 
 ## History
 

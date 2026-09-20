@@ -6,13 +6,13 @@ import type { PolicyAttachment } from './policyAttachments'
 // list - and so a link keeps working for admins even when the document is
 // voided and has dropped out of that list.
 export interface PolicyLogAttachment {
-  id: number
-  logId: number
+  id: string
+  logId: string
   createdAt: string
   // Who made the link, which the log dialog credits. Not the uploader, who
   // lives on `attachment.uploadedBy`.
   linkedBy: {
-    id: number
+    id: string
     name: string | null
     email: string
   }
@@ -22,15 +22,15 @@ export interface PolicyLogAttachment {
 // Fetched once per policy rather than per log: the logs list badges every row
 // that has attachments, and the detail dialog then filters this by logId.
 export function getPolicyLogAttachments(
-  policyId: number,
+  policyId: string,
   signal?: AbortSignal
 ): Promise<PolicyLogAttachment[]> {
   return request(`/policy-log-attachments?policyId=${policyId}`, { signal })
 }
 
 export interface LinkAttachmentsToLogBody {
-  logId: number
-  attachmentIds: number[]
+  logId: string
+  attachmentIds: string[]
 }
 
 // Many attachments, one log - the shape of the Attachments subtab's selection
@@ -42,6 +42,6 @@ export function linkAttachmentsToLog(
 }
 
 // Takes the link's id, not the attachment's. Anyone may remove any link.
-export function unlinkPolicyLogAttachment(id: number): Promise<void> {
+export function unlinkPolicyLogAttachment(id: string): Promise<void> {
   return request(`/policy-log-attachments/${id}`, { method: 'DELETE' })
 }

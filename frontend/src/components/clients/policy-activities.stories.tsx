@@ -55,7 +55,7 @@ const meta = {
   component: PolicyActivities,
   tags: ['autodocs'],
   args: {
-    policyId: 7,
+    policyId: '7',
     getPolicyActivitiesFn: fn(async () => ({ activities: [pending, sent] })),
     cancelScheduledEmailFn: fn(async () => ({}) as never),
   },
@@ -121,7 +121,7 @@ export const ShowsAFailure: Story = {
   },
 }
 
-// Only a pending reminder can be stopped, and the numeric id has to be
+// Only a pending reminder can be stopped, and the row id has to be
 // recovered from the namespaced one the API returns.
 export const CancelsAPendingReminder: Story = {
   play: async ({ canvasElement, args }) => {
@@ -134,7 +134,7 @@ export const CancelsAPendingReminder: Story = {
     await userEvent.click(cancelButtons[0])
 
     // The mutationFn wraps this rather than being it, so react-query's
-    // context object is not passed through - just the recovered numeric id.
-    await expect(args.cancelScheduledEmailFn).toHaveBeenCalledWith(42)
+    // context object is not passed through - just the recovered row id.
+    await expect(args.cancelScheduledEmailFn).toHaveBeenCalledWith('42')
   },
 }

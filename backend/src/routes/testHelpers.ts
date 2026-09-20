@@ -69,6 +69,12 @@ function uniqueVin(): string {
   return randomDigits(17)
 }
 
+// A well-formed row id that was never inserted, for tests that need "no row
+// has this id" rather than "this isn't a valid id" (see routes/helpers.ts's
+// parseId - the two are answered identically, 404, but tests exercising the
+// not-found path should use this rather than a malformed string).
+export const MISSING_ROW_ID = "AAAAAAAAAAAAAAAAAAAAAA"
+
 // An ISO date `days` from today, for lining a policy's expiration up with a
 // rule's offset so the planner matches it.
 export function isoDaysFromToday(days: number): string {
@@ -84,7 +90,7 @@ export async function makeTestUser(prefix: string): Promise<User> {
 // orgId is required here (unlike TestContext.cookie(), which defaults to the
 // context's org) since this module-level helper has no context to default
 // from.
-export async function makeSessionCookie(userId: number, orgId: number): Promise<string> {
+export async function makeSessionCookie(userId: string, orgId: string): Promise<string> {
   const token = generateSessionToken()
   await createSession({
     userId,
@@ -99,19 +105,19 @@ export async function makeSessionCookie(userId: number, orgId: number): Promise<
 // up in FK-safe order, since most of these tables have no single column
 // (like `users.email`) that a LIKE-prefix cleanup could key off of.
 export class TestContext {
-  private userIds: number[] = []
-  private personIds: number[] = []
-  private clientIds: number[] = []
-  private carrierIds: number[] = []
-  private policyIds: number[] = []
-  private vehicleIds: number[] = []
-  private templateIds: number[] = []
-  private ruleIds: number[] = []
-  private orgIds: number[] = []
+  private userIds: string[] = []
+  private personIds: string[] = []
+  private clientIds: string[] = []
+  private carrierIds: string[] = []
+  private policyIds: string[] = []
+  private vehicleIds: string[] = []
+  private templateIds: string[] = []
+  private ruleIds: string[] = []
+  private orgIds: string[] = []
   // Set the first time org()/user() mints one, so repeated ctx.user() calls
   // with no explicit orgId land in the same org rather than each getting
   // their own - most tests need an actor and a target in one org together.
-  private defaultOrgId?: number
+  private defaultOrgId?: string
 
   // Always inserts a fresh organization - the way to get a second, distinct
   // org for a cross-org test. The very first call also becomes the context's
@@ -126,12 +132,12 @@ export class TestContext {
     return o
   }
 
-  private async defaultOrg(): Promise<number> {
+  private async defaultOrg(): Promise<string> {
     if (this.defaultOrgId !== undefined) return this.defaultOrgId
     return (await this.org()).id
   }
 
-  async user(prefix: string, role: UserRole = "staff", orgId?: number) {
+  async user(prefix: string, role: UserRole = "staff", orgId?: string) {
     const u = await makeTestUser(prefix)
     this.userIds.push(u.id)
     await createMembership({ userId: u.id, orgId: orgId ?? (await this.defaultOrg()), role })
@@ -141,7 +147,7 @@ export class TestContext {
   // The mechanical replacement for a bare makeSessionCookie(userId) call:
   // defaults to the context's org instead of requiring every call site to
   // pass one.
-  async cookie(userId: number, orgId?: number): Promise<string> {
+  async cookie(userId: string, orgId?: string): Promise<string> {
     return makeSessionCookie(userId, orgId ?? (await this.defaultOrg()))
   }
 
@@ -209,7 +215,7 @@ export class TestContext {
   // Creates a person + drivers row and links it to policyId. Driver rows
   // cascade-delete with their person, and policy_drivers links cascade-delete
   // with either side, so tracking the person is enough for cleanup.
-  async driverLink(policyId: number, overrides: Partial<NewPerson> = {}) {
+  async driverLink(policyId: string, overrides: Partial<NewPerson> = {}) {
     const person = await this.person(overrides)
     const driver = await createDriver({ personId: person.id, dlNumber: unique("DL") })
     await addDriverToPolicy(policyId, driver.id)
@@ -219,14 +225,14 @@ export class TestContext {
   // policy_logs cascade-deletes with its policy, so no separate tracking
   // array is needed here - as long as the policy is tracked, cleanup() below
   // removes its logs before it removes the author's user row.
-  async log(policyId: number, authorId: number, body = "Test log") {
+  async log(policyId: string, authorId: string, body = "Test log") {
     const l = await createPolicyLog({ policyId, authorId, body })
     if (!l) throw new Error(`Could not create log for policy ${policyId}`)
     return l
   }
 
   // client_emails cascade-delete with their client, so nothing to track.
-  async clientEmail(clientId: number, email = `${unique("to")}@example.com`) {
+  async clientEmail(clientId: string, email = `${unique("to")}@example.com`) {
     return addEmailToClient(clientId, email)
   }
 
@@ -250,7 +256,7 @@ export class TestContext {
   // that need the planner to match pass an offset and then build the policy
   // with isoDaysFromToday(offset), which lines the two up.
   async reminderRule(
-    overrides: { offsetDays?: number; templateId?: number; enabled?: boolean; name?: string } = {}
+    overrides: { offsetDays?: number; templateId?: string; enabled?: boolean; name?: string } = {}
   ): Promise<ReminderRule> {
     const templateId = overrides.templateId ?? (await this.template()).id
     const rule = await createReminderRule({
@@ -270,7 +276,7 @@ export class TestContext {
   // removes it.
   track(
     kind: "person" | "client" | "carrier" | "policy" | "vehicle" | "user" | "rule" | "template",
-    id: number
+    id: string
   ) {
     switch (kind) {
       case "person":
@@ -332,6 +338,11 @@ export class TestContext {
     // organizations, so it needs neither side deleted first, but everything
     // above (sessions, users) that references an org must already be gone.
     if (this.orgIds.length) {
+      // upsertEmailTemplate can mint a row scoped to a tracked org (e.g. the
+      // welcome-template PUT route) without going through template(), so it
+      // is never in templateIds. Sweep by org here too, or the FK from
+      // email_templates.org_id blocks the delete below.
+      await db.delete(emailTemplates).where(inArray(emailTemplates.orgId, this.orgIds))
       await db.delete(organizations).where(inArray(organizations.id, this.orgIds))
       this.orgIds = []
     }

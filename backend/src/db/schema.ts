@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm"
+import { rowIdFk, rowIdPk } from "./ids"
 import {
   type AnyPgColumn,
   boolean,
@@ -8,7 +9,6 @@ import {
   numeric,
   pgEnum,
   pgTable,
-  serial,
   text,
   timestamp,
   unique,
@@ -49,7 +49,7 @@ export const userRoleEnum = pgEnum("user_role", ["admin", "staff"])
 // A tenant. Declared before `users` so every table below can reference
 // `organizations.id` without a forward-reference workaround.
 export const organizations = pgTable("organizations", {
-  id: serial("id").primaryKey(),
+  id: rowIdPk(),
   name: varchar("name", { length: 150 }).notNull(),
   slug: varchar("slug", { length: 64 }).notNull().unique(),
   nextInvoiceNumber: integer("next_invoice_number").notNull().default(1),
@@ -59,7 +59,7 @@ export const organizations = pgTable("organizations", {
 })
 
 export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
+  id: rowIdPk(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 150 }),
   googleSub: varchar("google_sub", { length: 64 }).unique(),
@@ -69,7 +69,7 @@ export const users = pgTable("users", {
   // at it, so the audit trail would break if the row went away. Distinct
   // from isActive, which is a reversible "disable" the admin can see and undo.
   deletedAt: timestamp("deleted_at"),
-  deletedBy: integer("deleted_by").references((): AnyPgColumn => users.id),
+  deletedBy: rowIdFk("deleted_by").references((): AnyPgColumn => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 })
@@ -79,11 +79,11 @@ export const users = pgTable("users", {
 export const orgMemberships = pgTable(
   "org_memberships",
   {
-    id: serial("id").primaryKey(),
-    userId: integer("user_id")
+    id: rowIdPk(),
+    userId: rowIdFk("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    orgId: integer("org_id")
+    orgId: rowIdFk("org_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     role: userRoleEnum("role").notNull().default("staff"),
@@ -100,13 +100,13 @@ export const orgMemberships = pgTable(
 export const sessions = pgTable(
   "sessions",
   {
-    id: serial("id").primaryKey(),
-    userId: integer("user_id")
+    id: rowIdPk(),
+    userId: rowIdFk("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     // Nullable: a session with multiple candidate orgs starts unbound until
     // POST /auth/org picks one. Sub-issue 3 attaches this at sign-in.
-    orgId: integer("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id").references(() => organizations.id),
     tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
     expiresAt: timestamp("expires_at").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -122,20 +122,17 @@ export const emailTemplateKindEnum = pgEnum("email_template_kind", ["welcome", "
 export const emailTemplates = pgTable(
   "email_templates",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
     key: varchar("key", { length: 64 }).notNull(),
     // Admin-facing label for correspondence templates; null for the welcome row.
     name: varchar("name", { length: 120 }),
     kind: emailTemplateKindEnum("kind").notNull().default("correspondence"),
     subject: varchar("subject", { length: 200 }).notNull(),
     body: text("body").notNull(),
-    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: rowIdFk("updated_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -150,13 +147,10 @@ export const emailLogStatusEnum = pgEnum("email_log_status", ["sent", "failed"])
 export const emailLog = pgTable(
   "email_log",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
     recipient: varchar("recipient", { length: 255 }).notNull(),
     // Plain varchar, not an FK to email_templates.key - the log must survive
     // template renames/deletes.
@@ -167,7 +161,7 @@ export const emailLog = pgTable(
     resendId: varchar("resend_id", { length: 64 }), // null when the send failed
     status: emailLogStatusEnum("status").notNull(),
     error: text("error"), // failure detail, null on success
-    triggeredBy: integer("triggered_by").references(() => users.id, { onDelete: "set null" }),
+    triggeredBy: rowIdFk("triggered_by").references(() => users.id, { onDelete: "set null" }),
     sentAt: timestamp("sent_at").defaultNow().notNull(),
   },
   (table) => [
@@ -184,26 +178,23 @@ export const reminderTriggerEnum = pgEnum("reminder_trigger", ["policy_expiratio
 export const reminderRules = pgTable(
   "reminder_rules",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
     name: varchar("name", { length: 120 }).notNull(),
     trigger: reminderTriggerEnum("trigger").notNull(),
     // Days before the trigger date. A negative value sends after it (-7 is a
     // week past expiration), which is why this is a plain integer rather than
     // a positive-only check.
     offsetDays: integer("offset_days").notNull(),
-    templateId: integer("template_id")
+    templateId: rowIdFk("template_id")
       .notNull()
       .references(() => emailTemplates.id),
     // Defaults to false so a newly-created rule can never send before an
     // admin has read it back and turned it on deliberately.
     enabled: boolean("enabled").notNull().default(false),
-    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: rowIdFk("updated_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -228,17 +219,14 @@ export const scheduledEmailStatusEnum = pgEnum("scheduled_email_status", [
 export const scheduledEmails = pgTable(
   "scheduled_emails",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
-    ruleId: integer("rule_id")
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
+    ruleId: rowIdFk("rule_id")
       .notNull()
       .references(() => reminderRules.id, { onDelete: "cascade" }),
-    policyId: integer("policy_id")
+    policyId: rowIdFk("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
     // The trigger date this row is for - the policy's expiration_date as of
@@ -275,13 +263,10 @@ export const scheduledEmails = pgTable(
 export const persons = pgTable(
   "persons",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
     firstName: varchar("first_name", { length: 100 }).notNull(),
     lastName: varchar("last_name", { length: 100 }).notNull(),
     dateOfBirth: date("date_of_birth").notNull(),
@@ -305,14 +290,11 @@ export const persons = pgTable(
 export const drivers = pgTable(
   "drivers",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
-    personId: integer("person_id")
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
+    personId: rowIdFk("person_id")
       .notNull()
       .unique()
       .references(() => persons.id, { onDelete: "cascade" }),
@@ -328,17 +310,14 @@ export const drivers = pgTable(
 export const clients = pgTable(
   "clients",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
-    namedInsuredId: integer("named_insured_id")
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
+    namedInsuredId: rowIdFk("named_insured_id")
       .notNull()
       .references(() => persons.id),
-    secondNamedInsuredId: integer("second_named_insured_id").references(() => persons.id),
+    secondNamedInsuredId: rowIdFk("second_named_insured_id").references(() => persons.id),
     mailingAddress1: text("mailing_address1"),
     mailingAddress2: text("mailing_address2"),
     mailingCity: varchar("mailing_city", { length: 100 }),
@@ -368,14 +347,11 @@ export const clients = pgTable(
 export const clientPhones = pgTable(
   "client_phones",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
-    clientId: integer("client_id")
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
+    clientId: rowIdFk("client_id")
       .notNull()
       .references(() => clients.id, { onDelete: "cascade" }),
     phoneNumber: varchar("phone_number", { length: 20 }).notNull(),
@@ -391,14 +367,11 @@ export const clientPhones = pgTable(
 export const clientEmails = pgTable(
   "client_emails",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
-    clientId: integer("client_id")
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
+    clientId: rowIdFk("client_id")
       .notNull()
       .references(() => clients.id, { onDelete: "cascade" }),
     email: varchar("email", { length: 255 }).notNull(),
@@ -417,13 +390,10 @@ export const clientEmails = pgTable(
 export const carriers = pgTable(
   "carriers",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
     name: varchar("name", { length: 150 }).notNull(),
     naic: varchar("naic", { length: 10 }).notNull().unique(),
     isActive: boolean("is_active").notNull().default(true),
@@ -441,17 +411,14 @@ export const carriers = pgTable(
 export const autoPolicies = pgTable(
   "auto_policies",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
-    clientId: integer("client_id")
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
+    clientId: rowIdFk("client_id")
       .notNull()
       .references(() => clients.id),
-    carrierId: integer("carrier_id")
+    carrierId: rowIdFk("carrier_id")
       .notNull()
       .references(() => carriers.id),
     policyNumber: varchar("policy_number", { length: 50 }).notNull().unique(),
@@ -483,14 +450,11 @@ export const autoPolicies = pgTable(
 export const vehicles = pgTable(
   "vehicles",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
-    policyId: integer("policy_id")
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
+    policyId: rowIdFk("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
     vin: varchar("vin", { length: 17 }).notNull(),
@@ -521,17 +485,14 @@ export const vehicles = pgTable(
 export const policyDrivers = pgTable(
   "policy_drivers",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
-    policyId: integer("policy_id")
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
+    policyId: rowIdFk("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
-    driverId: integer("driver_id")
+    driverId: rowIdFk("driver_id")
       .notNull()
       .references(() => drivers.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -550,18 +511,15 @@ export const policyDrivers = pgTable(
 export const policyLogs = pgTable(
   "policy_logs",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
-    policyId: integer("policy_id")
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
+    policyId: rowIdFk("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
     logNumber: integer("log_number").notNull(),
-    authorId: integer("author_id")
+    authorId: rowIdFk("author_id")
       .notNull()
       .references(() => users.id),
     body: text("body").notNull(),
@@ -592,14 +550,11 @@ export const attachmentSourceTypeEnum = pgEnum("attachment_source_type", [
 export const policyAttachments = pgTable(
   "policy_attachments",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
-    policyId: integer("policy_id")
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
+    policyId: rowIdFk("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
     fileName: varchar("file_name", { length: 255 }).notNull(),
@@ -613,8 +568,8 @@ export const policyAttachments = pgTable(
     isVoided: boolean("is_voided").notNull().default(false),
     sourceType: attachmentSourceTypeEnum("source_type").notNull().default("upload"),
     // Null for uploads; otherwise the id of the policy/invoice/receipt.
-    sourceId: integer("source_id"),
-    createdBy: integer("created_by")
+    sourceId: rowIdFk("source_id"),
+    createdBy: rowIdFk("created_by")
       .notNull()
       .references(() => users.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -635,22 +590,19 @@ export const policyAttachments = pgTable(
 export const policyLogAttachments = pgTable(
   "policy_log_attachments",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
-    logId: integer("log_id")
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
+    logId: rowIdFk("log_id")
       .notNull()
       .references(() => policyLogs.id, { onDelete: "cascade" }),
-    attachmentId: integer("attachment_id")
+    attachmentId: rowIdFk("attachment_id")
       .notNull()
       .references(() => policyAttachments.id, { onDelete: "cascade" }),
     // Who made the association, which the log's dialog credits. Not the same
     // as the attachment's own uploader.
-    linkedBy: integer("linked_by")
+    linkedBy: rowIdFk("linked_by")
       .notNull()
       .references(() => users.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -716,27 +668,23 @@ export const trustLedgerDirectionEnum = pgEnum("trust_ledger_direction", ["in", 
 export const invoices = pgTable(
   "invoices",
   {
-    // id doubles as the agency-wide sequential invoice number.
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
     // Temporary: auto-allocated globally so existing create paths keep working.
-    // Sub-issue 5 allocates from organizations.next_invoice_number inside the
+    // #120 allocates from organizations.next_invoice_number inside the
     // creating transaction and drops the identity.
     invoiceNumber: integer("invoice_number").notNull().generatedByDefaultAsIdentity(),
-    policyId: integer("policy_id")
+    policyId: rowIdFk("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
     // Denormalized from the policy so invoices are directly filterable by
     // client without a join.
-    clientId: integer("client_id")
+    clientId: rowIdFk("client_id")
       .notNull()
       .references(() => clients.id),
-    createdBy: integer("created_by")
+    createdBy: rowIdFk("created_by")
       .notNull()
       .references(() => users.id),
     status: invoiceStatusEnum("status").notNull().default("open"),
@@ -744,7 +692,7 @@ export const invoices = pgTable(
     amountPaid: numeric("amount_paid", { precision: 12, scale: 2 }).notNull().default("0"),
     note: text("note"),
     voidedAt: timestamp("voided_at"),
-    voidedBy: integer("voided_by").references(() => users.id),
+    voidedBy: rowIdFk("voided_by").references(() => users.id),
     voidReason: text("void_reason"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -760,21 +708,18 @@ export const invoices = pgTable(
 export const invoiceItems = pgTable(
   "invoice_items",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
-    invoiceId: integer("invoice_id")
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
+    invoiceId: rowIdFk("invoice_id")
       .notNull()
       .references(() => invoices.id, { onDelete: "cascade" }),
     category: invoiceItemCategoryEnum("category").notNull(),
     type: invoiceItemTypeEnum("type").notNull(),
     // Required for "sweep" items (which carrier the money goes to), null for
     // "agency" items. Enforced in the repository/validation layer.
-    carrierId: integer("carrier_id").references(() => carriers.id),
+    carrierId: rowIdFk("carrier_id").references(() => carriers.id),
     description: text("description"),
     amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -788,20 +733,17 @@ export const invoiceItems = pgTable(
 export const payments = pgTable(
   "payments",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
-    invoiceId: integer("invoice_id")
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
+    invoiceId: rowIdFk("invoice_id")
       .notNull()
       .references(() => invoices.id, { onDelete: "cascade" }),
-    policyId: integer("policy_id")
+    policyId: rowIdFk("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
-    clientId: integer("client_id")
+    clientId: rowIdFk("client_id")
       .notNull()
       .references(() => clients.id),
     method: paymentMethodEnum("method").notNull(),
@@ -812,11 +754,11 @@ export const payments = pgTable(
     amountApplied: numeric("amount_applied", { precision: 12, scale: 2 }).notNull(),
     changeGiven: numeric("change_given", { precision: 12, scale: 2 }).notNull().default("0"),
     note: text("note"),
-    createdBy: integer("created_by")
+    createdBy: rowIdFk("created_by")
       .notNull()
       .references(() => users.id),
     voidedAt: timestamp("voided_at"),
-    voidedBy: integer("voided_by").references(() => users.id),
+    voidedBy: rowIdFk("voided_by").references(() => users.id),
     voidReason: text("void_reason"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
@@ -831,33 +773,29 @@ export const payments = pgTable(
 export const receipts = pgTable(
   "receipts",
   {
-    // id doubles as the agency-wide sequential receipt number.
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
     // Temporary: auto-allocated globally so existing create paths keep working.
-    // Sub-issue 5 allocates from organizations.next_receipt_number inside the
+    // #120 allocates from organizations.next_receipt_number inside the
     // creating transaction and drops the identity.
     receiptNumber: integer("receipt_number").notNull().generatedByDefaultAsIdentity(),
     // One receipt per payment.
-    paymentId: integer("payment_id")
+    paymentId: rowIdFk("payment_id")
       .notNull()
       .unique()
       .references(() => payments.id, { onDelete: "cascade" }),
-    invoiceId: integer("invoice_id")
+    invoiceId: rowIdFk("invoice_id")
       .notNull()
       .references(() => invoices.id, { onDelete: "cascade" }),
-    policyId: integer("policy_id")
+    policyId: rowIdFk("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
-    clientId: integer("client_id")
+    clientId: rowIdFk("client_id")
       .notNull()
       .references(() => clients.id),
-    createdBy: integer("created_by")
+    createdBy: rowIdFk("created_by")
       .notNull()
       .references(() => users.id),
     // Snapshot of the payment's effect on the invoice at receipt time.
@@ -867,7 +805,7 @@ export const receipts = pgTable(
     invoiceClosed: boolean("invoice_closed").notNull(),
     note: text("note"),
     voidedAt: timestamp("voided_at"),
-    voidedBy: integer("voided_by").references(() => users.id),
+    voidedBy: rowIdFk("voided_by").references(() => users.id),
     voidReason: text("void_reason"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
@@ -883,31 +821,28 @@ export const receipts = pgTable(
 export const trustLedger = pgTable(
   "trust_ledger",
   {
-    id: serial("id").primaryKey(),
-    // Temporary default 1: existing inserts don't supply org_id yet. Removed in
-    // sub-issue 6 once every insert passes one explicitly.
-    orgId: integer("org_id")
-      .notNull()
-      .default(1)
-      .references(() => organizations.id),
-    policyId: integer("policy_id")
+    id: rowIdPk(),
+    // Nullable until #121 restores NOT NULL once every insert passes an
+    // explicit org id.
+    orgId: rowIdFk("org_id").references(() => organizations.id),
+    policyId: rowIdFk("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
-    clientId: integer("client_id")
+    clientId: rowIdFk("client_id")
       .notNull()
       .references(() => clients.id),
-    invoiceId: integer("invoice_id").references(() => invoices.id, { onDelete: "cascade" }),
-    paymentId: integer("payment_id").references(() => payments.id, { onDelete: "cascade" }),
-    invoiceItemId: integer("invoice_item_id").references(() => invoiceItems.id, {
+    invoiceId: rowIdFk("invoice_id").references(() => invoices.id, { onDelete: "cascade" }),
+    paymentId: rowIdFk("payment_id").references(() => payments.id, { onDelete: "cascade" }),
+    invoiceItemId: rowIdFk("invoice_item_id").references(() => invoiceItems.id, {
       onDelete: "cascade",
     }),
     // Set on carrier_sweep entries (which carrier the money went to).
-    carrierId: integer("carrier_id").references(() => carriers.id),
+    carrierId: rowIdFk("carrier_id").references(() => carriers.id),
     entryType: trustLedgerEntryTypeEnum("entry_type").notNull(),
     direction: trustLedgerDirectionEnum("direction").notNull(),
     amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
     // References another trust_ledger row this one reverses (void path).
-    reversalOfId: integer("reversal_of_id"),
+    reversalOfId: rowIdFk("reversal_of_id"),
     note: text("note"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },

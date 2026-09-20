@@ -8,9 +8,9 @@ import type { AutoPolicy } from '@/api/clients'
 
 function policyFixture(overrides: Partial<AutoPolicy>): AutoPolicy {
   return {
-    id: 1,
-    clientId: 155,
-    carrierId: 140,
+    id: '1',
+    clientId: '155',
+    carrierId: '140',
     policyNumber: 'POL-000001',
     policyAddress1: null,
     policyAddress2: null,
@@ -31,19 +31,19 @@ function policyFixture(overrides: Partial<AutoPolicy>): AutoPolicy {
 // one, so the stories never rot as real time passes.
 const policies: AutoPolicy[] = [
   policyFixture({
-    id: 30,
+    id: '30',
     policyNumber: 'POL-NEWEST',
     status: 'active',
     createdAt: '2026-03-01T00:00:00.000Z',
   }),
   policyFixture({
-    id: 10,
+    id: '10',
     policyNumber: 'POL-OLDEST',
     status: 'cancelled',
     createdAt: '2026-01-01T00:00:00.000Z',
   }),
   policyFixture({
-    id: 20,
+    id: '20',
     policyNumber: 'POL-MIDDLE',
     status: 'pending',
     createdAt: '2026-02-01T00:00:00.000Z',
@@ -54,7 +54,7 @@ const policies: AutoPolicy[] = [
 const dateExpiredPolicies: AutoPolicy[] = [
   ...policies,
   policyFixture({
-    id: 40,
+    id: '40',
     policyNumber: 'POL-DATE-EXPIRED',
     status: 'active',
     expirationDate: '2020-01-01',
@@ -68,8 +68,8 @@ function StatefulPolicyTabs({
   onSelect,
 }: {
   policies: AutoPolicy[]
-  initialSelectedId: number
-  onSelect?: (policyId: number) => void
+  initialSelectedId: string
+  onSelect?: (policyId: string) => void
 }) {
   const [selectedId, setSelectedId] = useState(initialSelectedId)
   return (
@@ -93,7 +93,7 @@ const meta = {
   tags: ['autodocs'],
   args: {
     policies,
-    initialSelectedId: 30,
+    initialSelectedId: '30',
     onSelect: fn(),
   },
 } satisfies Meta<typeof StatefulPolicyTabs>
@@ -122,14 +122,14 @@ export const SelectOlderTab: Story = {
       'true'
     )
     await expect(canvas.getByText('POL-OLDEST')).toBeInTheDocument()
-    await expect(args.onSelect).toHaveBeenCalledWith(10)
+    await expect(args.onSelect).toHaveBeenCalledWith('10')
   },
 }
 
 export const DerivedExpired: Story = {
   args: {
     policies: dateExpiredPolicies,
-    initialSelectedId: 40,
+    initialSelectedId: '40',
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)

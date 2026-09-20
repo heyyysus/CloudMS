@@ -33,11 +33,12 @@ async function bestEffort(req: Request, what: string, fn: () => Promise<void>): 
 
 // The header fields the PDF needs that aren't on the invoice row itself.
 async function documentHeader(
+  orgId: string,
   invoice: InvoiceDetail
 ): Promise<{ clientName: string; policyNumber: string }> {
   const [client, policy] = await Promise.all([
-    getClientWithDetails(invoice.clientId),
-    findAutoPolicyById(invoice.policyId),
+    getClientWithDetails(orgId, invoice.clientId),
+    findAutoPolicyById(orgId, invoice.policyId),
   ])
   return {
     clientName: client
@@ -56,7 +57,7 @@ export async function recordInvoiceDocument(
   logId?: string
 ): Promise<void> {
   await bestEffort(req, "record the invoice document", async () => {
-    const header = await documentHeader(invoice)
+    const header = await documentHeader(req.orgId!, invoice)
     const pdf = await buildAccountingDocumentPdf({
       kind: "invoice",
       invoice,
@@ -90,7 +91,7 @@ export async function recordReceiptDocument(
     const invoice = await getInvoiceWithDetails(receipt.invoiceId)
     if (!invoice) return
 
-    const header = await documentHeader(invoice)
+    const header = await documentHeader(req.orgId!, invoice)
     const pdf = await buildAccountingDocumentPdf({
       kind: "receipt",
       invoice,

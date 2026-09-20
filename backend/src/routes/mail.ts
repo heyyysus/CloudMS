@@ -39,13 +39,13 @@ mailRouter.post(
       return
     }
 
-    const client = await findClientById(clientId)
+    const client = await findClientById(req.orgId!, clientId)
     if (!client) {
       res.status(404).json({ error: "Client not found" })
       return
     }
 
-    const onFile = await listEmailsByClientId(clientId)
+    const onFile = await listEmailsByClientId(req.orgId!, clientId)
     if (onFile.length === 0) {
       res.status(422).json({ error: "Client has no email address on file" })
       return
@@ -95,10 +95,14 @@ function handleMailError(err: unknown, req: Request, res: Response): boolean {
 // against them. Shared by the preview GET and the send POST so the values the
 // dialog previews are built by exactly the same code that renders the sent
 // message. Returns undefined when the policy (or its client) is missing.
-async function resolveMergeValues(policyId: string, agent: Express.Request["user"]) {
-  const policy = await getPolicyWithDetails(policyId)
+async function resolveMergeValues(
+  orgId: string,
+  policyId: string,
+  agent: Express.Request["user"]
+) {
+  const policy = await getPolicyWithDetails(orgId, policyId)
   if (!policy) return undefined
-  const client = await getClientWithDetails(policy.clientId)
+  const client = await getClientWithDetails(orgId, policy.clientId)
   if (!client) return undefined
   return {
     policy,
@@ -116,7 +120,7 @@ mailRouter.get(
     const policyId = parseId(req.params.policyId, res)
     if (policyId === undefined) return
 
-    const resolved = await resolveMergeValues(policyId, req.user)
+    const resolved = await resolveMergeValues(req.orgId!, policyId, req.user)
     if (!resolved) {
       res.status(404).json({ error: "Policy not found" })
       return
@@ -164,7 +168,7 @@ mailRouter.post(
       return
     }
 
-    const resolved = await resolveMergeValues(policyId, req.user)
+    const resolved = await resolveMergeValues(req.orgId!, policyId, req.user)
     if (!resolved) {
       res.status(404).json({ error: "Policy not found" })
       return

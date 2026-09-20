@@ -48,6 +48,7 @@ interface ClaimedRow extends Record<string, unknown> {
   id: string
   rule_id: string
   policy_id: string
+  org_id: string | null
   attempts: number
 }
 
@@ -72,7 +73,7 @@ async function claimBatch(batchSize: number): Promise<ClaimedRow[]> {
       for update skip locked
       limit ${batchSize}
     )
-    returning id, rule_id, policy_id, attempts
+    returning id, rule_id, policy_id, org_id, attempts
   `)
   return [...claimed.rows]
 }
@@ -83,6 +84,12 @@ async function claimBatch(batchSize: number): Promise<ClaimedRow[]> {
 class UnsendableError extends Error {}
 
 async function sendOne(row: ClaimedRow): Promise<void> {
+  // scheduled_emails.org_id is nullable until #121; a null here means the row
+  // predates org scoping and cannot be resolved against an org-scoped policy
+  // repository, so it is skipped rather than guessed at.
+  if (row.org_id === null) throw new UnsendableError("Scheduled email has no organization")
+  const orgId = row.org_id
+
   const automation = await getAutomationUser()
 
   const rule = await db.query.reminderRules.findFirst({
@@ -93,15 +100,15 @@ async function sendOne(row: ClaimedRow): Promise<void> {
   const template = await findCorrespondenceTemplateById(rule.templateId)
   if (!template) throw new UnsendableError("Correspondence template no longer exists")
 
-  const policy = await getPolicyWithDetails(row.policy_id)
+  const policy = await getPolicyWithDetails(orgId, row.policy_id)
   if (!policy) throw new UnsendableError("Policy no longer exists")
 
-  const client = await getClientWithDetails(policy.clientId)
+  const client = await getClientWithDetails(orgId, policy.clientId)
   if (!client) throw new UnsendableError("Client no longer exists")
 
   // Resolved now rather than stored at plan time, so an address corrected
   // between planning and sending is the one actually used.
-  const onFile = await listEmailsByClientId(policy.clientId)
+  const onFile = await listEmailsByClientId(orgId, policy.clientId)
   if (onFile.length === 0) throw new UnsendableError("Client has no email address on file")
 
   const values = buildCorrespondenceMergeValues({ client, policy, agent: agencyIdentity() })

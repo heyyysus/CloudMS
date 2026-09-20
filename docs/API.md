@@ -12,12 +12,18 @@ depth — this doc assumes that context and focuses on the resource routes.
 - **Mounting**: routers are mounted at the app root (e.g. `GET /clients`, not
   `GET /api/v1/clients`) — nginx strips the `/api/v1` prefix before
   proxying to the backend, matching the existing `/auth/*` routes.
-- **Auth**: every route below requires a valid `session` cookie
-  (`requireAuth` — see `auth/middleware.ts`). There is no anonymous access.
-- **Tenancy**: every resource is currently agency-wide; the schema has no
-  organization yet. Once it does, the session's organization scopes every
-  route below and never appears in a URL, header, or body — see
-  [`multitenancy.md`](./multitenancy.md).
+- **Auth**: every route below requires a valid `session` cookie bound to an
+  active organization (`requireAuth` — see `auth/middleware.ts`). There is no
+  anonymous access. A session with no org bound (or whose membership in its
+  bound org was deactivated) gets `403 { error: "No active organization",
+  code: "ORG_REQUIRED" }` from every route below, regardless of resource —
+  see the **Auth for frontend clients** section.
+- **Tenancy**: the session's organization never appears in a URL, header, or
+  body. The *session* is fully org-scoped as of this doc's Users section
+  below, but the resource routes above it (clients, policies, accounting,
+  etc.) do not filter by org yet — every domain row still lands in one
+  default organization regardless of which org's session created it. See
+  [`multitenancy.md`](./multitenancy.md) for the rollout plan.
 - **Roles**: `staff` and `admin`. Admins pass every `requireRole` check
   (admin-bypass), so the tables below only call out where a route is
   restricted beyond plain authentication.
@@ -45,10 +51,37 @@ mechanics. What a frontend integration needs to know:
   these endpoints **must** set `credentials: "include"` (fetch) or
   `withCredentials: true` (axios), or the cookie won't be sent and every
   request will 401.
-- Login: `POST /auth/google` with `{ idToken }`, sets the cookie. Current
-  user: `GET /auth/me`. Logout: `POST /auth/logout`.
 - There is no refresh-token flow; a session lasts 7 days and a fresh login
   is required after that (or after 401).
+- All three routes below use `requireSession` (authenticated, but no active
+  org required), not `requireAuth` — they have to work for a session that
+  isn't bound to an org yet. Every other route in this doc requires
+  `requireAuth`.
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/auth/google` | body `{ idToken }`. Sets the cookie. `403 Account not authorized` if there's no user row for the verified email, the user is disabled, or the user has zero active org memberships (same message for all three - doesn't leak which). Auto-binds the session's org if the user has exactly one active membership; leaves it unbound (`null`) if they have more than one. |
+| GET | `/auth/me` | current `{ user, org, memberships }` for the session. `user.role` and `org` are `null` when the session has no org bound. |
+| POST | `/auth/org` | body `{ orgId }`. Re-binds the session to an org the caller has an active membership in; `403 Not a member of that organization` otherwise. Returns the same shape as the two above. This is how a multi-membership user (or one switching orgs) picks/changes which org their session is bound to. |
+| POST | `/auth/logout` | clears the cookie and deletes the session row. |
+
+`POST /auth/google` and `POST /auth/org` both return, and `GET /auth/me`
+always returns:
+
+```json
+{
+  "user": { "id": 1, "email": "a@example.com", "name": "A", "role": "admin" },
+  "org": { "id": 1, "name": "Acme Agency", "slug": "acme" },
+  "memberships": [
+    { "orgId": 1, "name": "Acme Agency", "slug": "acme", "role": "admin" }
+  ]
+}
+```
+
+`org` is `null` and `user.role` is `null` when the session has no org bound
+(new login with multiple memberships, or after `/auth/org` rejected a
+switch). `memberships` lists every org the user has an *active* membership
+in, regardless of which one (if any) the session is currently bound to.
 
 ## No pagination
 
@@ -458,39 +491,59 @@ Status codes specific to these routes:
 
 ## Users
 
-Account administration. Every route here is admin-only. There is no
-`DELETE /users/:id`: accounts are disabled, not removed, so the policy logs
-and records they authored keep their author.
+Administers **memberships of the caller's active org**, not a global user
+list — every route here operates on `org_memberships` scoped to `req.orgId`,
+even though the path says `/users/:id` (`:id` is a user id; the route looks
+up that user's membership in the caller's org). Every route here is
+admin-only (of the active org).
 
 | Method | Path | Role | Notes |
 |---|---|---|---|
-| POST | `/users/invite` | **admin** | creates the account and sends the welcome email; body `{ email, name?, role? }` |
-| GET | `/users` | **admin** | every user, ordered by id |
-| PATCH | `/users/:id` | **admin** | body `{ name?, role?, isActive? }` |
-| POST | `/users/:id/resend-welcome` | **admin** | re-sends the welcome email; body `{ email: <result> }` |
+| POST | `/users/invite` | **admin** | body `{ email, name?, role? }`. Creates the user row (if the email is new) or adds a membership to an existing one, and sends the welcome email. |
+| GET | `/users` | **admin** | every member of the active org, ordered by user id - includes disabled (but not platform-deleted) members. |
+| PATCH | `/users/:id` | **admin** | body `{ name?, role?, isActive? }`. `name` updates the (global) user row; `role`/`isActive` update the caller's-org membership only. |
+| POST | `/users/:id/resend-welcome` | **admin** | re-sends the welcome email for the caller's-org membership; body `{ email: <result> }` |
+| DELETE | `/users/:id` | **admin** | deactivates the membership (`isActive: false`) and drops that org's sessions for the user. Not a global delete - the user row, and any membership in another org, are untouched. `204` on success. |
+| POST | `/users/:id/restore` | **admin** | reachable only after a *platform-level* delete (see below, not `DELETE /users/:id` above) reverses it and re-activates (or creates) the membership in the caller's org. |
 
 User rows from these routes carry `id`, `email`, `name`, `role`, `isActive`,
 `hasSignedIn`, `createdAt`, and `updatedAt`. `googleSub` is never exposed;
 `hasSignedIn` reports whether it is set, which distinguishes an invited user
 who has never signed in from one who has. `email` is not editable — it is the
 identity the Google account is matched on, so changing it would orphan the
-login rather than rename it.
+login rather than rename it. **`role` and `isActive` are the caller's-org
+membership's, not the user row's** — the user row has its own `isActive`
+too, but that's the platform-level flag (see below), not what these
+responses report.
 
-One guard applies to PATCH:
+One guard applies to PATCH and DELETE:
 
-- `400` — an admin tried to change their own role or disable their own
-  account. Renaming yourself is allowed.
+- `400` — an admin tried to change their own role, disable their own
+  account, or delete themselves. Renaming yourself is allowed.
 
-That single rule is also what keeps the install from ever losing its last
-admin, so there is no separate "last admin" check: `requireAuth` +
-`requireRole("admin")` mean the caller is always an active admin, and they can
-only ever demote or disable someone else, so they themselves always survive
-the change.
+That single rule is also what keeps the *organization* from ever losing its
+last admin, so there is no separate "last admin" check: `requireAuth` +
+`requireRole("admin")` mean the caller is always an active admin of this org,
+and they can only ever demote, disable, or delete someone else, so they
+themselves always survive the change.
 
-Disabling a user deletes their sessions, so they are logged out immediately
-rather than at their next request. (`requireAuth` also rejects a disabled user
-with `403 Account is disabled`, and `POST /auth/google` refuses them at login,
-so both paths are covered even if a session row survives.)
+Disabling (PATCH `isActive: false`) or deleting a membership deletes that
+user's sessions **in this org only**, so they are logged out of it
+immediately rather than at their next request - a session they hold in a
+different org is untouched. (`requireAuth` also rejects a deactivated
+membership with `403 { code: "ORG_REQUIRED" }` on its next request even if a
+session row survives, and `POST /auth/google` won't auto-bind to an org
+where the membership is inactive.)
+
+Re-inviting an email that already has a (deactivated) membership in the
+caller's org reactivates it (`201`, updating `role`) rather than creating a
+duplicate `users` row; re-inviting an email that's already an *active*
+member of the org is a `409`. There is also a separate, platform-level
+"account is disabled everywhere" state (`users.deletedAt`, distinct from any
+org's membership `isActive`) that these routes don't produce — it's reserved
+for a future platform-admin capability. `POST /users/invite` surfaces it as
+`409 { error: "This email belonged to a deleted user", deletedUserId }`, and
+`POST /users/:id/restore` is how it's undone.
 
 The welcome-email result is never fatal: a mail failure comes back as
 `{ status: "failed", error }` alongside a `201`/`200`, because the account

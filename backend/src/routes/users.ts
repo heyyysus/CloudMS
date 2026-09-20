@@ -3,16 +3,18 @@ import { requireAuth, requireRole } from "../auth/middleware"
 import { sendWelcomeEmail } from "../emails"
 import { AUTOMATION_USER_EMAIL } from "../jobs/automationUser"
 import {
+  createMembership,
   createUser,
-  deleteSessionsByUserId,
+  deleteSessionsByUserIdAndOrg,
+  findMembership,
   findUserByEmail,
   findUserById,
-  listUsers,
+  listOrgMembers,
   restoreUser,
-  softDeleteUser,
+  updateMembership,
   updateUser,
 } from "../repositories"
-import type { User } from "../types"
+import type { OrgMembership, User, UserRole } from "../types"
 import { firstIssue, isPgUniqueViolation, parseId } from "./helpers"
 import { inviteUserBody, updateUserBody } from "./schemas"
 
@@ -23,10 +25,19 @@ export const usersRouter = Router()
 // user who has never signed in from one who has. deletedAt/deletedBy are
 // server bookkeeping only - a deleted user is meant to look gone, not to show
 // up in the payload with a timestamp explaining that it isn't, quite.
-function adminUser(user: User) {
+// `role`/`isActive` come from the membership, not the user row - they shadow
+// the user row's own `isActive`, which stays the platform-level flag: a user
+// disabled at the platform level is invisible here (rejected earlier, at
+// requireSession) while an org-disabled member still shows up as isActive: false.
+function adminUser(user: User, membership: Pick<OrgMembership, "role" | "isActive">) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { googleSub, deletedAt, deletedBy, ...rest } = user
-  return { ...rest, hasSignedIn: googleSub !== null }
+  const { googleSub, deletedAt, deletedBy, isActive: _userIsActive, ...rest } = user
+  return {
+    ...rest,
+    hasSignedIn: googleSub !== null,
+    role: membership.role,
+    isActive: membership.isActive,
+  }
 }
 
 // Named "invite", not a plain POST /users: the operation's contract is
@@ -55,35 +66,49 @@ usersRouter.post(
         .json({ error: "This email belonged to a deleted user", deletedUserId: existing.id })
       return
     }
-    if (existing) {
-      res.status(409).json({ error: "A user with this email already exists" })
-      return
-    }
 
-    let user
-    try {
-      user = await createUser({ email, name: name ?? null, role })
-    } catch (err) {
-      if (isPgUniqueViolation(err, "users_email_unique")) {
-        res.status(409).json({ error: "A user with this email already exists" })
+    let user: User
+    let membership: OrgMembership
+    if (existing) {
+      // A live user: invite means "add a membership in this org", not
+      // "create another users row" - the email is already provisioned.
+      const existingMembership = await findMembership(existing.id, req.orgId!)
+      if (existingMembership?.isActive) {
+        res.status(409).json({ error: "This user is already a member of this organization" })
         return
       }
-      throw err
+      user = existing
+      membership = existingMembership
+        ? // Reactivating rather than inserting avoids the (user_id, org_id)
+          // unique constraint an insert would hit.
+          ((await updateMembership(existingMembership.id, { isActive: true, role })) as OrgMembership)
+        : await createMembership({ userId: existing.id, orgId: req.orgId!, role })
+    } else {
+      try {
+        user = await createUser({ email, name: name ?? null })
+      } catch (err) {
+        if (isPgUniqueViolation(err, "users_email_unique")) {
+          res.status(409).json({ error: "A user with this email already exists" })
+          return
+        }
+        throw err
+      }
+      membership = await createMembership({ userId: user.id, orgId: req.orgId!, role })
     }
 
-    const emailResult = await sendWelcomeEmail(user, req.user!)
+    const emailResult = await sendWelcomeEmail(user, req.user!, role)
 
     req.log.info(
       { invitedUserId: user.id, actorId: req.user?.id, emailStatus: emailResult.status },
       "user invited"
     )
-    res.status(201).json({ user: adminUser(user), email: emailResult })
+    res.status(201).json({ user: adminUser(user, membership), email: emailResult })
   }
 )
 
-usersRouter.get("/users", requireAuth, requireRole("admin"), async (_req, res: Response) => {
-  const rows = await listUsers()
-  res.json(rows.map(adminUser))
+usersRouter.get("/users", requireAuth, requireRole("admin"), async (req: Request, res: Response) => {
+  const rows = await listOrgMembers(req.orgId!)
+  res.json(rows.map((row) => adminUser(row.user, row)))
 })
 
 usersRouter.patch(
@@ -99,19 +124,19 @@ usersRouter.patch(
       res.status(400).json({ error: firstIssue(parsed.error) })
       return
     }
-    const { role, isActive } = parsed.data
+    const { name, role, isActive } = parsed.data
 
     // An admin editing their own row may rename themselves, but must not lock
     // themselves out or hand away their own access - the UI hides these too,
     // this is the enforcement.
     //
-    // These two checks are also what guarantees the install always keeps at
-    // least one active admin, so no separate "last admin" rule is needed:
-    // requireAuth + requireRole mean the actor here is always an active admin,
-    // and they can only ever demote or disable someone else, so they themselves
-    // always survive the change.
+    // These two checks are also what guarantees the organization always keeps
+    // at least one active admin, so no separate "last admin" rule is needed:
+    // requireAuth + requireRole mean the actor here is always an active admin
+    // of this org, and they can only ever demote or disable someone else, so
+    // they themselves always survive the change.
     if (id === req.user!.id) {
-      if (role !== undefined && role !== req.user!.role) {
+      if (role !== undefined && role !== req.membership!.role) {
         res.status(400).json({ error: "You cannot change your own role" })
         return
       }
@@ -121,31 +146,33 @@ usersRouter.patch(
       }
     }
 
-    // A deleted user is meant to look gone - not something PATCH can quietly
-    // re-enable via isActive: true. Restoring one only happens through the
-    // invite flow, above.
-    const target = await findUserById(id)
-    if (!target || target.deletedAt) {
+    const membership = await findMembership(id, req.orgId!)
+    if (!membership) {
       res.status(404).json({ error: "User not found" })
       return
     }
 
-    const user = await updateUser(id, parsed.data)
+    const user = name !== undefined ? await updateUser(id, { name }) : await findUserById(id)
     if (!user) {
       res.status(404).json({ error: "User not found" })
       return
     }
 
-    // requireAuth already rejects a disabled user on their next request, but
-    // dropping the rows makes the logout immediate and leaves nothing to
-    // resurrect if the account is re-enabled later.
-    if (isActive === false) await deleteSessionsByUserId(id)
+    const updatedMembership =
+      role !== undefined || isActive !== undefined
+        ? ((await updateMembership(membership.id, { role, isActive })) as OrgMembership)
+        : membership
+
+    // requireAuth already rejects a disabled membership on their next request
+    // in this org, but dropping the rows makes the logout immediate and
+    // leaves nothing to resurrect if the membership is re-enabled later.
+    if (isActive === false) await deleteSessionsByUserIdAndOrg(id, req.orgId!)
 
     req.log.info(
       { targetUserId: id, actorId: req.user?.id, role, isActive },
       "user updated by admin"
     )
-    res.json(adminUser(user))
+    res.json(adminUser(user, updatedMembership))
   }
 )
 
@@ -157,13 +184,18 @@ usersRouter.post(
     const id = parseId(req.params.id, res)
     if (id === undefined) return
 
+    const membership = await findMembership(id, req.orgId!)
+    if (!membership) {
+      res.status(404).json({ error: "User not found" })
+      return
+    }
     const user = await findUserById(id)
-    if (!user || user.deletedAt) {
+    if (!user) {
       res.status(404).json({ error: "User not found" })
       return
     }
 
-    const emailResult = await sendWelcomeEmail(user, req.user!)
+    const emailResult = await sendWelcomeEmail(user, req.user!, membership.role)
 
     req.log.info(
       { targetUserId: id, actorId: req.user?.id, emailStatus: emailResult.status },
@@ -173,9 +205,11 @@ usersRouter.post(
   }
 )
 
-// Never a hard delete - see softDeleteUser. To an admin this is meant to look
-// permanent: the row disappears from GET /users and can never sign in again;
-// the only way back is re-inviting the same email (see POST /users/invite).
+// Deactivates the caller's membership in the active org - not a platform-
+// level delete (see softDeleteUser for that). To an admin this is meant to
+// look permanent: the row disappears from GET /users for this org and can
+// never sign in to it again; the only way back is re-inviting the same email
+// to this org (see POST /users/invite).
 usersRouter.delete(
   "/users/:id",
   requireAuth,
@@ -185,15 +219,15 @@ usersRouter.delete(
     if (id === undefined) return
 
     // Mirrors the self-guard on PATCH: the actor here is always an active
-    // admin, and they can only ever delete someone else, so one admin always
-    // survives.
+    // admin of this org, and they can only ever delete someone else, so one
+    // admin always survives.
     if (id === req.user!.id) {
       res.status(400).json({ error: "You cannot delete your own account" })
       return
     }
 
     const target = await findUserById(id)
-    if (!target || target.deletedAt) {
+    if (!target) {
       res.status(404).json({ error: "User not found" })
       return
     }
@@ -202,10 +236,16 @@ usersRouter.delete(
       return
     }
 
-    await softDeleteUser(id, req.user!.id)
+    const membership = await findMembership(id, req.orgId!)
+    if (!membership) {
+      res.status(404).json({ error: "User not found" })
+      return
+    }
+
+    await updateMembership(membership.id, { isActive: false })
     // Same reasoning as the isActive: false branch on PATCH - immediate
     // logout rather than waiting for the session to expire.
-    await deleteSessionsByUserId(id)
+    await deleteSessionsByUserIdAndOrg(id, req.orgId!)
 
     req.log.info({ targetUserId: id, actorId: req.user?.id }, "user deleted by admin")
     res.status(204).send()
@@ -214,6 +254,8 @@ usersRouter.delete(
 
 // Reachable only from the invite flow's 409 response above - re-inviting a
 // deleted user's email surfaces its id, and the admin confirms restoring it.
+// Platform-level (restoreUser undoes a global soft delete); the active org's
+// membership is then reactivated, or created if this is a new org for them.
 usersRouter.post(
   "/users/:id/restore",
   requireAuth,
@@ -228,12 +270,18 @@ usersRouter.post(
       return
     }
 
-    const emailResult = await sendWelcomeEmail(user, req.user!)
+    const existingMembership = await findMembership(id, req.orgId!)
+    const defaultRole: UserRole = "staff"
+    const membership = existingMembership
+      ? ((await updateMembership(existingMembership.id, { isActive: true })) as OrgMembership)
+      : await createMembership({ userId: id, orgId: req.orgId!, role: defaultRole })
+
+    const emailResult = await sendWelcomeEmail(user, req.user!, membership.role)
 
     req.log.info(
       { targetUserId: id, actorId: req.user?.id, emailStatus: emailResult.status },
       "user restored by admin"
     )
-    res.json({ user: adminUser(user), email: emailResult })
+    res.json({ user: adminUser(user, membership), email: emailResult })
   }
 )

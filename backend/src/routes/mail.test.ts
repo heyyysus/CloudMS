@@ -391,7 +391,7 @@ describe("POST /policies/:policyId/send-correspondence", () => {
       .set("Cookie", cookie)
       .send({ templateId: template.id, to: ["jane@example.com"], cc: ["spouse@example.com"] })
 
-    const logs = await listPolicyLogsByPolicyId(policy.id)
+    const logs = await listPolicyLogsByPolicyId(await ctx.orgId(), policy.id)
     expect(logs).toHaveLength(1)
     // The log records the actual email: recipients, subject, and rendered body.
     const lines = logs[0].body.split("\n")
@@ -498,7 +498,7 @@ describe("POST /policies/:policyId/send-correspondence", () => {
     expect(rows[0].status).toBe("failed")
     expect(rows[0].resendId).toBeNull()
     // Nothing was sent, so the policy's history must not claim otherwise.
-    expect(await listPolicyLogsByPolicyId(policy.id)).toHaveLength(0)
+    expect(await listPolicyLogsByPolicyId(await ctx.orgId(), policy.id)).toHaveLength(0)
   })
 
   it("returns 502 and logs the failure when Resend responds with an error status", async () => {
@@ -517,6 +517,6 @@ describe("POST /policies/:policyId/send-correspondence", () => {
     const rows = await db.select().from(emailLog).where(eq(emailLog.triggeredBy, user.id))
     expect(rows).toHaveLength(1)
     expect(rows[0].status).toBe("failed")
-    expect(await listPolicyLogsByPolicyId(policy.id)).toHaveLength(0)
+    expect(await listPolicyLogsByPolicyId(await ctx.orgId(), policy.id)).toHaveLength(0)
   })
 })

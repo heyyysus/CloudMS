@@ -438,7 +438,7 @@ describe("PATCH /policies/:id change form", () => {
     expect(attachments.body[0].sourceType).toBe("policy_change")
     expect(attachments.body[0].sourceId).toBe(policy.id)
     expect(vi.mocked(putObject)).toHaveBeenCalledWith(
-      expect.stringMatching(new RegExp(`^policy-attachments/${policy.id}/`)),
+      expect.stringMatching(new RegExp(`^org/${await ctx.orgId()}/policies/${policy.id}/`)),
       expect.any(Buffer),
       "application/pdf"
     )

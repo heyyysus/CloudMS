@@ -46,7 +46,7 @@ describe("GET /policy-attachments/:id/link", () => {
     const user = await ctx.user("attach-link-baddisp")
     const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
-    const attachment = await createPolicyAttachment({
+    const attachment = await createPolicyAttachment(await ctx.orgId(), {
       policyId: policy.id,
       fileName: "test.pdf",
       storageKey: `policy-attachments/${policy.id}/test.pdf`,
@@ -65,7 +65,7 @@ describe("GET /policy-attachments/:id/link", () => {
     const user = await ctx.user("attach-link-inline")
     const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
-    const attachment = await createPolicyAttachment({
+    const attachment = await createPolicyAttachment(await ctx.orgId(), {
       policyId: policy.id,
       fileName: "test.pdf",
       storageKey: `policy-attachments/${policy.id}/test.pdf`,
@@ -89,7 +89,7 @@ describe("GET /policy-attachments/:id/link", () => {
     const user = await ctx.user("attach-link-download")
     const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
-    const attachment = await createPolicyAttachment({
+    const attachment = await createPolicyAttachment(await ctx.orgId(), {
       policyId: policy.id,
       fileName: "declarations-page.pdf",
       storageKey: `policy-attachments/${policy.id}/declarations-page.pdf`,
@@ -123,7 +123,7 @@ describe("POST /policy-attachments/confirm", () => {
       .set("Cookie", cookie)
       .send({
         policyId: policy.id,
-        storageKey: `${attachmentKeyPrefix(policy.id)}uuid-decl.pdf`,
+        storageKey: `${attachmentKeyPrefix(await ctx.orgId(), policy.id)}uuid-decl.pdf`,
         fileName: "../../etc/passwd\u0007.pdf",
       })
 
@@ -142,7 +142,7 @@ describe("POST /policy-attachments/confirm", () => {
       .set("Cookie", cookie)
       .send({
         policyId: policy.id,
-        storageKey: `${attachmentKeyPrefix(policy.id)}uuid-decl.pdf`,
+        storageKey: `${attachmentKeyPrefix(await ctx.orgId(), policy.id)}uuid-decl.pdf`,
         fileName: "declarations page (2026).pdf",
       })
 
@@ -163,7 +163,7 @@ describe("POST /policy-attachments/confirm", () => {
       .set("Cookie", cookie)
       .send({
         policyId: policy.id,
-        storageKey: `${attachmentKeyPrefix(policy.id)}uuid-decl.pdf`,
+        storageKey: `${attachmentKeyPrefix(await ctx.orgId(), policy.id)}uuid-decl.pdf`,
         fileName: "decl.pdf",
         description: "before\u0000after",
       })

@@ -33,10 +33,7 @@ function makeUser(suffix: string, overrides: Partial<User> = {}) {
   return createUser({ email: `${testEmailPrefix}${suffix}@example.com`, ...overrides })
 }
 
-async function makeSessionCookie(
-  userId: number,
-  opts: { orgId?: number; expiresAt?: Date } = {}
-) {
+async function makeSessionCookie(userId: number, opts: { orgId?: number; expiresAt?: Date } = {}) {
   const token = generateSessionToken()
   await createSession({
     userId,

@@ -412,12 +412,12 @@ describe("PATCH /users/:id", () => {
       .send({ isActive: false })
     expect(res.status).toBe(200)
 
-    expect(
-      (await request(app).get("/auth/me").set("Cookie", targetCookieInAdminOrg)).status
-    ).toBe(401)
-    expect(
-      (await request(app).get("/auth/me").set("Cookie", targetCookieInOtherOrg)).status
-    ).toBe(200)
+    expect((await request(app).get("/auth/me").set("Cookie", targetCookieInAdminOrg)).status).toBe(
+      401
+    )
+    expect((await request(app).get("/auth/me").set("Cookie", targetCookieInOtherOrg)).status).toBe(
+      200
+    )
   })
 })
 

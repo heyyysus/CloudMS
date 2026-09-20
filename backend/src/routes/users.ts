@@ -81,7 +81,10 @@ usersRouter.post(
       membership = existingMembership
         ? // Reactivating rather than inserting avoids the (user_id, org_id)
           // unique constraint an insert would hit.
-          ((await updateMembership(existingMembership.id, { isActive: true, role })) as OrgMembership)
+          ((await updateMembership(existingMembership.id, {
+            isActive: true,
+            role,
+          })) as OrgMembership)
         : await createMembership({ userId: existing.id, orgId: req.orgId!, role })
     } else {
       try {
@@ -106,10 +109,15 @@ usersRouter.post(
   }
 )
 
-usersRouter.get("/users", requireAuth, requireRole("admin"), async (req: Request, res: Response) => {
-  const rows = await listOrgMembers(req.orgId!)
-  res.json(rows.map((row) => adminUser(row.user, row)))
-})
+usersRouter.get(
+  "/users",
+  requireAuth,
+  requireRole("admin"),
+  async (req: Request, res: Response) => {
+    const rows = await listOrgMembers(req.orgId!)
+    res.json(rows.map((row) => adminUser(row.user, row)))
+  }
+)
 
 usersRouter.patch(
   "/users/:id",

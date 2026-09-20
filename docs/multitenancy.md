@@ -100,13 +100,20 @@ but landing in the same migration since both touch every table's columns.
   `requireSession` instead since the org picker has to work before a session
   is bound. `TestContext` gets a per-context organization and org-aware
   `user()`/`cookie()` helpers.
-- **Not done yet (#119, #120, #121):** domain repositories and routes
-  (clients, policies, accounting, etc.) still don't take an `orgId` - since
-  #130 dropped `org_id`'s temporary `DEFAULT 1`, every domain row created
-  through today's routes lands with `org_id NULL` regardless of which org's
-  session created it, rather than in a single default organization. The
-  *session's* org and the org domain rows land in are deliberately different
-  things until #119 lands.
+- **Done (#119), first half:** people, clients (with phones/emails),
+  carriers, auto policies, vehicles, and search take an explicit `orgId` and
+  filter every read/write by it; a row in another organization is invisible,
+  answering exactly as a missing row does. `carriers.naic` and
+  `auto_policies.policy_number` are unique per organization rather than
+  globally.
+- **Not done yet (#120, #121):** logs, attachments, and accounting documents
+  (#120) and email templates, reminder rules, scheduled emails, the reminder
+  planner/scheduler, and storage keys (#121) still don't take an `orgId` -
+  since #130 dropped `org_id`'s temporary `DEFAULT 1`, every row created
+  through those still-unscoped routes lands with `org_id NULL` regardless of
+  which org's session created it, rather than in a single default
+  organization. The *session's* org and the org those rows land in are
+  deliberately different things until #120/#121 land.
 - **Repositories take an explicit `orgId`.** All of them, so the compiler
   enforces scoping and a forgotten filter is a type error, not a data leak.
   The comment at the top of `backend/src/repositories/index.ts` anticipated
@@ -179,8 +186,9 @@ created automatically by a migration.
    the organization; `TestContext` gets a per-context organization. **Auth
    half done:** the session carries the org and `requireAuth`/`TestContext`
    enforce and provide it (see *Request scoping* above). **Repository/route
-   half remains** (#119): domain repositories and routes still don't take an
-   `orgId`.
+   half, first part done (#119):** people, clients, carriers, policies,
+   vehicles, and search take an explicit `orgId`. **Remains (#120):** logs,
+   attachments, and accounting documents.
 5. Per-organization invoice and receipt numbers (#120).
 6. Organization settings columns; move the agency-level environment variables
    onto them; scope the reminder planner per organization.

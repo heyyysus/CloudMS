@@ -1,6 +1,6 @@
 import { and, eq, lt, sql } from "drizzle-orm"
 import { db } from "../db"
-import { reminderRules, scheduledEmails } from "../db/schema"
+import { autoPolicies, reminderRules, scheduledEmails } from "../db/schema"
 import {
   buildCorrespondenceMergeValues,
   correspondenceSentLogBody,
@@ -83,12 +83,22 @@ async function claimBatch(batchSize: number): Promise<ClaimedRow[]> {
 // rather than retried three times to the same end.
 class UnsendableError extends Error {}
 
+// scheduled_emails.org_id is nullable until #121 threads it through the
+// planner (sub-issue 7); until then every row is planned with a null org, so
+// falling back to the policy's own org (rather than skipping) is what keeps
+// existing reminders sendable in the meantime.
+async function resolveOrgId(row: ClaimedRow): Promise<string> {
+  if (row.org_id !== null) return row.org_id
+  const [policy] = await db
+    .select({ orgId: autoPolicies.orgId })
+    .from(autoPolicies)
+    .where(eq(autoPolicies.id, row.policy_id))
+  if (!policy?.orgId) throw new UnsendableError("Cannot resolve organization for this policy")
+  return policy.orgId
+}
+
 async function sendOne(row: ClaimedRow): Promise<void> {
-  // scheduled_emails.org_id is nullable until #121; a null here means the row
-  // predates org scoping and cannot be resolved against an org-scoped policy
-  // repository, so it is skipped rather than guessed at.
-  if (row.org_id === null) throw new UnsendableError("Scheduled email has no organization")
-  const orgId = row.org_id
+  const orgId = await resolveOrgId(row)
 
   const automation = await getAutomationUser()
 

@@ -117,7 +117,9 @@ describe("planReminders", () => {
     // on today again only if we also move it back, so simulate the next term
     // by setting expiration such that the offset points at today again.
     const { updateAutoPolicy } = await import("../repositories")
-    await updateAutoPolicy(policy.id, { expirationDate: isoDaysFromToday(112_347 + 365) })
+    await updateAutoPolicy(await ctx.orgId(), policy.id, {
+      expirationDate: isoDaysFromToday(112_347 + 365),
+    })
     await planDueReminders()
 
     // Still one row: the new occurrence is 365 days out, outside the horizon.
@@ -436,7 +438,7 @@ describe("dispatchReminders", () => {
     const fetchMock = stubResend()
     const { client, policy } = await dueReminder(212_006)
     const { replaceClientEmails } = await import("../repositories")
-    await replaceClientEmails(client.id, [])
+    await replaceClientEmails(await ctx.orgId(), client.id, [])
 
     await dispatchReminders()
 

@@ -974,8 +974,7 @@ contract changing. Today `scheduled_emails` is the only source and every row is
 |---|---|---|---|
 | GET | `/policies/:policyId/activities` | any | returns `{ activities }` — upcoming *and* already-sent, so the tab shows history rather than emptying out |
 
-An unknown policy id returns `200` with an empty list rather than a `404`; the
-tab is a view over a policy the caller already has open.
+An unknown or another org's policy id returns `404`.
 
 ```json
 {

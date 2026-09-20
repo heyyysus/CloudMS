@@ -51,14 +51,15 @@ describe("invoice documents", () => {
   it("files a numbered PDF when an invoice is created", async () => {
     const user = await ctx.user("acctdoc-invoice")
     const cookie = await ctx.cookie(user.id)
-    const policy = await ctx.policy()
+    const orgId = await ctx.orgId()
+    const policy = await ctx.policy({ orgId })
 
     const invoice = await makeInvoice(cookie, policy.id)
 
     const rows = await attachments(policy.id, cookie)
     expect(rows).toHaveLength(1)
     expect(rows[0]).toMatchObject({
-      fileName: `Invoice #${invoice.id}.pdf`,
+      fileName: `Invoice #${invoice.invoiceNumber}.pdf`,
       mimeType: "application/pdf",
       description: "Auto-generated invoice",
       isVoided: false,
@@ -66,7 +67,9 @@ describe("invoice documents", () => {
       sourceId: invoice.id,
     })
     expect(vi.mocked(putObject)).toHaveBeenCalledWith(
-      expect.stringMatching(new RegExp(`^policy-attachments/${policy.id}/.*-invoice\\.pdf$`)),
+      expect.stringMatching(
+        new RegExp(`^org/${orgId}/policies/${policy.id}/.*-invoice\\.pdf$`)
+      ),
       expect.any(Buffer),
       "application/pdf"
     )
@@ -110,7 +113,9 @@ describe("receipt documents", () => {
     expect(rows).toHaveLength(3)
     const receipts = rows.filter((row) => row.sourceType === "receipt")
     expect(receipts.map((row) => row.fileName).sort()).toEqual(
-      [first.body.id, second.body.id].map((id) => `Receipt #${id}.pdf`).sort()
+      [first.body.receiptNumber, second.body.receiptNumber]
+        .map((n) => `Receipt #${n}.pdf`)
+        .sort()
     )
     expect(receipts.every((row) => row.description === "Auto-generated receipt")).toBe(true)
   })
@@ -128,7 +133,7 @@ describe("receipt documents", () => {
       .set("Cookie", staffCookie)
       .send({ invoiceId: invoice.id, method: "cash", amount: 400 })
     expect(payment.status).toBe(201)
-    const receiptFileName = `Receipt #${payment.body.id}.pdf`
+    const receiptFileName = `Receipt #${payment.body.receiptNumber}.pdf`
 
     expect((await attachments(policy.id, staffCookie)).map((r) => r.fileName)).toContain(
       receiptFileName

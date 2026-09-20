@@ -1,7 +1,7 @@
 import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
-import { TestContext } from "./testHelpers"
+import { MISSING_ROW_ID, TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 afterEach(() => ctx.cleanup())
@@ -26,7 +26,7 @@ describe("GET /carriers/:id", () => {
   it("returns 404 for an unknown id", async () => {
     const user = await ctx.user("carriers-404")
     const cookie = await ctx.cookie(user.id)
-    expect((await request(app).get("/carriers/999999999").set("Cookie", cookie)).status).toBe(404)
+    expect((await request(app).get(`/carriers/${MISSING_ROW_ID}`).set("Cookie", cookie)).status).toBe(404)
   })
 })
 

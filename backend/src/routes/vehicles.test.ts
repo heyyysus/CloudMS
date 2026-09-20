@@ -1,7 +1,7 @@
 import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
-import { TestContext } from "./testHelpers"
+import { MISSING_ROW_ID, TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 afterEach(() => ctx.cleanup())
@@ -127,7 +127,7 @@ describe("DELETE /vehicles/:id", () => {
     const user = await ctx.user("vehicles-del-404")
     const cookie = await ctx.cookie(user.id)
 
-    expect((await request(app).delete("/vehicles/999999999").set("Cookie", cookie)).status).toBe(
+    expect((await request(app).delete(`/vehicles/${MISSING_ROW_ID}`).set("Cookie", cookie)).status).toBe(
       404
     )
   })

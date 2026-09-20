@@ -7,14 +7,8 @@ import {
 } from "./accountingDocuments"
 
 describe("formatDocumentNumber", () => {
-  it("zero-pads to five digits", () => {
-    expect(formatDocumentNumber(1)).toBe("#00001")
-    expect(formatDocumentNumber(12)).toBe("#00012")
-    expect(formatDocumentNumber(99999)).toBe("#99999")
-  })
-
-  it("lets ids past five digits grow rather than truncating", () => {
-    expect(formatDocumentNumber(123456)).toBe("#123456")
+  it("renders the row id as-is", () => {
+    expect(formatDocumentNumber("V5hljhW0QKfnT4cspj7MfQ")).toBe("#V5hljhW0QKfnT4cspj7MfQ")
   })
 })
 

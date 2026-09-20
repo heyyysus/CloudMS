@@ -19,7 +19,7 @@ import { db } from "../db"
 import { emailLog, reminderRules, scheduledEmails } from "../db/schema"
 import { WELCOME_TEMPLATE_KEY } from "../emails"
 import { findEmailTemplateByKey, listPolicyLogsByPolicyId } from "../repositories"
-import { isoDaysFromToday, TestContext } from "../routes/testHelpers"
+import { isoDaysFromToday, MISSING_ROW_ID, TestContext } from "../routes/testHelpers"
 import { AUTOMATION_USER_EMAIL, resetAutomationUserCache } from "./automationUser"
 import { dispatchReminders } from "./dispatcher"
 import { PLANNER_LOCK_KEY, planDueReminders, planReminders } from "./planner"
@@ -663,7 +663,7 @@ describe("reminder rules", () => {
     it("404s for an unknown rule", async () => {
       const cookie = await cookieFor("rr-missing")
       const res = await request(app)
-        .patch("/reminder-rules/99999999")
+        .patch(`/reminder-rules/${MISSING_ROW_ID}`)
         .set("Cookie", cookie)
         .send({ enabled: true })
       expect(res.status).toBe(404)
@@ -756,7 +756,7 @@ describe("policy activities", () => {
 
   it("empties out for an unknown policy rather than erroring", async () => {
     const cookie = await cookieFor("act-unknown")
-    const res = await request(app).get("/policies/99999999/activities").set("Cookie", cookie)
+    const res = await request(app).get(`/policies/${MISSING_ROW_ID}/activities`).set("Cookie", cookie)
     expect(res.status).toBe(200)
     expect(res.body.activities).toEqual([])
   })
@@ -828,7 +828,7 @@ describe("scheduled emails", () => {
   it("404s for an unknown reminder", async () => {
     const cookie = await cookieFor("sched-404", "staff")
     const res = await request(app)
-      .post("/scheduled-emails/99999999/cancel")
+      .post(`/scheduled-emails/${MISSING_ROW_ID}/cancel`)
       .set("Cookie", cookie)
       .send({})
     expect(res.status).toBe(404)

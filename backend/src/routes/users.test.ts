@@ -5,7 +5,7 @@ import app from "../app"
 import { db } from "../db"
 import { emailLog, users } from "../db/schema"
 import { createMembership, findMembership, softDeleteUser } from "../repositories"
-import { makeTestUser, TestContext } from "./testHelpers"
+import { makeTestUser, MISSING_ROW_ID, TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 
@@ -237,7 +237,7 @@ describe("PATCH /users/:id", () => {
     const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
-      .patch("/users/999999999")
+      .patch(`/users/${MISSING_ROW_ID}`)
       .set("Cookie", cookie)
       .send({ name: "Nobody" })
     expect(res.status).toBe(404)
@@ -439,7 +439,7 @@ describe("POST /users/:id/resend-welcome", () => {
     const cookie = await ctx.cookie(admin.id)
 
     const res = await request(app)
-      .post("/users/999999999/resend-welcome")
+      .post(`/users/${MISSING_ROW_ID}/resend-welcome`)
       .set("Cookie", cookie)
       .send()
     expect(res.status).toBe(404)
@@ -501,7 +501,7 @@ describe("DELETE /users/:id", () => {
     const admin = await ctx.user("delete-user-404", "admin")
     const cookie = await ctx.cookie(admin.id)
 
-    const res = await request(app).delete("/users/999999999").set("Cookie", cookie)
+    const res = await request(app).delete(`/users/${MISSING_ROW_ID}`).set("Cookie", cookie)
     expect(res.status).toBe(404)
   })
 

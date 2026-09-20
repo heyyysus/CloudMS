@@ -1,7 +1,7 @@
 import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
-import { TestContext } from "./testHelpers"
+import { MISSING_ROW_ID, TestContext } from "./testHelpers"
 import type { UserRole } from "../types"
 
 const ctx = new TestContext()
@@ -259,7 +259,7 @@ describe("POST /payments (errors)", () => {
     const res = await request(app)
       .post("/payments")
       .set("Cookie", cookie)
-      .send({ invoiceId: 999999999, method: "cash", amount: 10 })
+      .send({ invoiceId: MISSING_ROW_ID, method: "cash", amount: 10 })
     expect(res.status).toBe(404)
   })
 
@@ -360,7 +360,7 @@ describe("POST /payments/:id/void", () => {
   it("returns 404 for a nonexistent payment", async () => {
     const { cookie } = await authed("pay-void-404", "admin")
     expect(
-      (await request(app).post("/payments/999999999/void").set("Cookie", cookie).send({})).status
+      (await request(app).post(`/payments/${MISSING_ROW_ID}/void`).set("Cookie", cookie).send({})).status
     ).toBe(404)
   })
 })

@@ -1,7 +1,7 @@
 import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
-import { TestContext } from "./testHelpers"
+import { MISSING_ROW_ID, TestContext } from "./testHelpers"
 import type { UserRole } from "../types"
 
 const ctx = new TestContext()
@@ -89,7 +89,7 @@ describe("POST /invoices", () => {
       .post("/invoices")
       .set("Cookie", cookie)
       .send({
-        policyId: 999999999,
+        policyId: MISSING_ROW_ID,
         items: [{ category: "agency", type: "new_business_fee", amount: 10 }],
       })
     expect(res.status).toBe(404)
@@ -229,7 +229,7 @@ describe("GET /invoices", () => {
 
   it("returns 404 for a missing invoice", async () => {
     const { cookie } = await authed("inv-get-404")
-    expect((await request(app).get("/invoices/999999999").set("Cookie", cookie)).status).toBe(404)
+    expect((await request(app).get(`/invoices/${MISSING_ROW_ID}`).set("Cookie", cookie)).status).toBe(404)
   })
 })
 

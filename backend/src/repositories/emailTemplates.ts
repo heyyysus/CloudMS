@@ -83,6 +83,7 @@ export async function upsertEmailTemplate(input: {
   subject: string
   body: string
   updatedBy: string | null
+  orgId: string
 }): Promise<EmailTemplate> {
   const [row] = await db
     .insert(emailTemplates)

@@ -237,6 +237,73 @@ describe("DELETE /policy-log-attachments/:id", () => {
         .status
     ).toBe(404)
   })
+
+  it("404s a link belonging to another org", async () => {
+    const user = await ctx.user("logatt-del-wrongorg")
+    const cookie = await ctx.cookie(user.id)
+
+    const other = await ctx.org()
+    const otherUser = await ctx.user("logatt-del-wrongorg-other", "staff", other.id)
+    const otherCookie = await ctx.cookie(otherUser.id, other.id)
+    const theirPolicy = await ctx.policy({ orgId: other.id })
+    const theirLog = await ctx.log(theirPolicy.id, otherUser.id, "Their note", other.id)
+    const theirAttachment = await makeAttachment(other.id, theirPolicy.id, otherUser.id)
+    await request(app)
+      .post("/policy-log-attachments")
+      .set("Cookie", otherCookie)
+      .send({ logId: theirLog.id, attachmentIds: [theirAttachment.id] })
+    const [theirRow] = await links(theirPolicy.id, otherCookie)
+
+    expect(
+      (await request(app).delete(`/policy-log-attachments/${theirRow.id}`).set("Cookie", cookie))
+        .status
+    ).toBe(404)
+  })
+})
+
+describe("wrong-org", () => {
+  it("does not see another org's links, and linking against a cross-org log or attachment 404s", async () => {
+    const user = await ctx.user("logatt-wrongorg")
+    const cookie = await ctx.cookie(user.id)
+    const policy = await ctx.policy()
+    const log = await ctx.log(policy.id, user.id)
+    const a = await makeAttachment(await ctx.orgId(), policy.id, user.id)
+
+    const other = await ctx.org()
+    const otherUser = await ctx.user("logatt-wrongorg-other", "staff", other.id)
+    const otherCookie = await ctx.cookie(otherUser.id, other.id)
+    const theirPolicy = await ctx.policy({ orgId: other.id })
+    const theirLog = await ctx.log(theirPolicy.id, otherUser.id, "Their note", other.id)
+    const theirAttachment = await makeAttachment(other.id, theirPolicy.id, otherUser.id)
+    await request(app)
+      .post("/policy-log-attachments")
+      .set("Cookie", otherCookie)
+      .send({ logId: theirLog.id, attachmentIds: [theirAttachment.id] })
+
+    const list = await request(app)
+      .get(`/policy-log-attachments?policyId=${theirPolicy.id}`)
+      .set("Cookie", cookie)
+    expect(list.status).toBe(200)
+    expect(list.body).toEqual([])
+
+    expect(
+      (
+        await request(app)
+          .post("/policy-log-attachments")
+          .set("Cookie", cookie)
+          .send({ logId: theirLog.id, attachmentIds: [a.id] })
+      ).status
+    ).toBe(404)
+
+    expect(
+      (
+        await request(app)
+          .post("/policy-log-attachments")
+          .set("Cookie", cookie)
+          .send({ logId: log.id, attachmentIds: [theirAttachment.id] })
+      ).status
+    ).toBe(404)
+  })
 })
 
 describe("voided documents", () => {

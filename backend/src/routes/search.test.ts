@@ -88,7 +88,7 @@ describe("GET /search", () => {
       lastName: "Wrongorg99",
     })
     const client = await ctx.client({ orgId: other.id, namedInsuredId: person.id })
-    const policy = await ctx.policy({
+    await ctx.policy({
       orgId: other.id,
       clientId: client.id,
       policyNumber: "WRONGORG99-POL",

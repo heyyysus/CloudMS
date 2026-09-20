@@ -88,9 +88,9 @@ describe("GET /policies/:id", () => {
           .send({ status: "active" })
       ).status
     ).toBe(404)
-    expect(
-      (await request(app).delete(`/policies/${policy.id}`).set("Cookie", cookie)).status
-    ).toBe(404)
+    expect((await request(app).delete(`/policies/${policy.id}`).set("Cookie", cookie)).status).toBe(
+      404
+    )
   })
 })
 

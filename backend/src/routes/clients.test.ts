@@ -52,9 +52,7 @@ describe("GET /clients/:id", () => {
 
     const list = await request(app).get("/clients").set("Cookie", cookie)
     expect(list.body.some((c: { id: string }) => c.id === client.id)).toBe(false)
-    expect((await request(app).get(`/clients/${client.id}`).set("Cookie", cookie)).status).toBe(
-      404
-    )
+    expect((await request(app).get(`/clients/${client.id}`).set("Cookie", cookie)).status).toBe(404)
     expect(
       (
         await request(app)
@@ -63,9 +61,9 @@ describe("GET /clients/:id", () => {
           .send({ mailingAddress1: "X" })
       ).status
     ).toBe(404)
-    expect(
-      (await request(app).delete(`/clients/${client.id}`).set("Cookie", cookie)).status
-    ).toBe(404)
+    expect((await request(app).delete(`/clients/${client.id}`).set("Cookie", cookie)).status).toBe(
+      404
+    )
   })
 })
 

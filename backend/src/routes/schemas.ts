@@ -351,6 +351,10 @@ export const updateUserBody = z.object({
   isActive: z.boolean().optional(),
 })
 
+export const setActiveOrgBody = z.object({
+  orgId: z.number().int().positive(),
+})
+
 export const updateEmailTemplateBody = z.object({
   subject: z.string().trim().min(1).max(200),
   body: z.string().trim().min(1).max(20000),

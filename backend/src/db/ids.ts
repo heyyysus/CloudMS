@@ -22,7 +22,10 @@ export const ROW_ID_DEFAULT_SQL = sql`translate(encode(gen_random_bytes(16), 'ba
 // including raw SQL, always produces a valid id) plus a Drizzle-side default
 // (so `.returning()` sees the id before the round-trip).
 export function rowIdPk() {
-  return varchar("id", { length: ROW_ID_LENGTH }).primaryKey().$defaultFn(generateRowId).default(ROW_ID_DEFAULT_SQL)
+  return varchar("id", { length: ROW_ID_LENGTH })
+    .primaryKey()
+    .$defaultFn(generateRowId)
+    .default(ROW_ID_DEFAULT_SQL)
 }
 
 // Foreign-key / plain id-reference column. No default: these are always

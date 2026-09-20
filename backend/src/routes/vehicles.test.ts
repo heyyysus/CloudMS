@@ -127,8 +127,8 @@ describe("DELETE /vehicles/:id", () => {
     const user = await ctx.user("vehicles-del-404")
     const cookie = await ctx.cookie(user.id)
 
-    expect((await request(app).delete(`/vehicles/${MISSING_ROW_ID}`).set("Cookie", cookie)).status).toBe(
-      404
-    )
+    expect(
+      (await request(app).delete(`/vehicles/${MISSING_ROW_ID}`).set("Cookie", cookie)).status
+    ).toBe(404)
   })
 })

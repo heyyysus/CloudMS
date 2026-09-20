@@ -38,7 +38,9 @@ describe("GET /persons/:id", () => {
     const user = await ctx.user("persons-404")
     const cookie = await ctx.cookie(user.id)
 
-    expect((await request(app).get(`/persons/${MISSING_ROW_ID}`).set("Cookie", cookie)).status).toBe(404)
+    expect(
+      (await request(app).get(`/persons/${MISSING_ROW_ID}`).set("Cookie", cookie)).status
+    ).toBe(404)
   })
 
   it("returns 404 for a malformed id", async () => {

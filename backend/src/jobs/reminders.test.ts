@@ -756,7 +756,9 @@ describe("policy activities", () => {
 
   it("empties out for an unknown policy rather than erroring", async () => {
     const cookie = await cookieFor("act-unknown")
-    const res = await request(app).get(`/policies/${MISSING_ROW_ID}/activities`).set("Cookie", cookie)
+    const res = await request(app)
+      .get(`/policies/${MISSING_ROW_ID}/activities`)
+      .set("Cookie", cookie)
     expect(res.status).toBe(200)
     expect(res.body.activities).toEqual([])
   })

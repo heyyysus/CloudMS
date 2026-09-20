@@ -233,7 +233,8 @@ describe("DELETE /policy-log-attachments/:id", () => {
     const user = await ctx.user("logatt-del-404")
     const cookie = await ctx.cookie(user.id)
     expect(
-      (await request(app).delete(`/policy-log-attachments/${MISSING_ROW_ID}`).set("Cookie", cookie)).status
+      (await request(app).delete(`/policy-log-attachments/${MISSING_ROW_ID}`).set("Cookie", cookie))
+        .status
     ).toBe(404)
   })
 })

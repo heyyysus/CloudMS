@@ -37,7 +37,8 @@ describe("GET /policy-attachments/:id/link", () => {
     const cookie = await ctx.cookie(user.id)
 
     expect(
-      (await request(app).get(`/policy-attachments/${MISSING_ROW_ID}/link`).set("Cookie", cookie)).status
+      (await request(app).get(`/policy-attachments/${MISSING_ROW_ID}/link`).set("Cookie", cookie))
+        .status
     ).toBe(404)
   })
 

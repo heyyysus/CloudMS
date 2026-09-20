@@ -110,9 +110,7 @@ describe("receipt documents", () => {
     expect(rows).toHaveLength(3)
     const receipts = rows.filter((row) => row.sourceType === "receipt")
     expect(receipts.map((row) => row.fileName).sort()).toEqual(
-      [first.body.id, second.body.id]
-        .map((id) => `Receipt #${id}.pdf`)
-        .sort()
+      [first.body.id, second.body.id].map((id) => `Receipt #${id}.pdf`).sort()
     )
     expect(receipts.every((row) => row.description === "Auto-generated receipt")).toBe(true)
   })

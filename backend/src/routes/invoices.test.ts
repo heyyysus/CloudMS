@@ -229,7 +229,9 @@ describe("GET /invoices", () => {
 
   it("returns 404 for a missing invoice", async () => {
     const { cookie } = await authed("inv-get-404")
-    expect((await request(app).get(`/invoices/${MISSING_ROW_ID}`).set("Cookie", cookie)).status).toBe(404)
+    expect(
+      (await request(app).get(`/invoices/${MISSING_ROW_ID}`).set("Cookie", cookie)).status
+    ).toBe(404)
   })
 })
 

@@ -23,17 +23,17 @@ clientsRouter.get("/clients", requireAuth, async (req: Request, res: Response) =
       res.status(400).json({ error: firstIssue(parsed.error) })
       return
     }
-    res.json(await searchClients(parsed.data.q, 50))
+    res.json(await searchClients(req.orgId!, parsed.data.q, 50))
     return
   }
-  res.json(await listClients())
+  res.json(await listClients(req.orgId!))
 })
 
 clientsRouter.get("/clients/:id", requireAuth, async (req: Request, res: Response) => {
   const id = parseId(req.params.id, res)
   if (id === undefined) return
 
-  const client = await getClientWithDetails(id)
+  const client = await getClientWithDetails(req.orgId!, id)
   if (!client) {
     res.status(404).json({ error: "Client not found" })
     return
@@ -49,11 +49,11 @@ clientsRouter.post("/clients", requireAuth, async (req: Request, res: Response) 
   }
 
   const { phones, emails, ...clientInput } = parsed.data
-  const client = await createClient(clientInput)
-  if (phones) await replaceClientPhones(client.id, phones)
-  if (emails) await replaceClientEmails(client.id, emails)
+  const client = await createClient(req.orgId!, clientInput)
+  if (phones) await replaceClientPhones(req.orgId!, client.id, phones)
+  if (emails) await replaceClientEmails(req.orgId!, client.id, emails)
 
-  res.status(201).json(await getClientWithDetails(client.id))
+  res.status(201).json(await getClientWithDetails(req.orgId!, client.id))
 })
 
 clientsRouter.patch("/clients/:id", requireAuth, async (req: Request, res: Response) => {
@@ -66,18 +66,18 @@ clientsRouter.patch("/clients/:id", requireAuth, async (req: Request, res: Respo
     return
   }
 
-  const existing = await findClientById(id)
+  const existing = await findClientById(req.orgId!, id)
   if (!existing) {
     res.status(404).json({ error: "Client not found" })
     return
   }
 
   const { phones, emails, ...clientInput } = parsed.data
-  if (Object.keys(clientInput).length > 0) await updateClient(id, clientInput)
-  if (phones !== undefined) await replaceClientPhones(id, phones)
-  if (emails !== undefined) await replaceClientEmails(id, emails)
+  if (Object.keys(clientInput).length > 0) await updateClient(req.orgId!, id, clientInput)
+  if (phones !== undefined) await replaceClientPhones(req.orgId!, id, phones)
+  if (emails !== undefined) await replaceClientEmails(req.orgId!, id, emails)
 
-  res.json(await getClientWithDetails(id))
+  res.json(await getClientWithDetails(req.orgId!, id))
 })
 
 clientsRouter.delete(
@@ -88,7 +88,7 @@ clientsRouter.delete(
     const id = parseId(req.params.id, res)
     if (id === undefined) return
 
-    const deleted = await deleteClient(id)
+    const deleted = await deleteClient(req.orgId!, id)
     if (!deleted) {
       res.status(404).json({ error: "Client not found" })
       return

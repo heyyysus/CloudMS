@@ -32,4 +32,4 @@ COPY package*.json ./
 # before serving. drizzle-kit push reads schema.ts from source at runtime,
 # which is why src/ and drizzle.config.ts are copied in above; drizzle-kit
 # itself is resolvable because it's a runtime dependency (see package.json).
-CMD ["sh", "-c", "npx drizzle-kit push --force && node dist/db/roles.js && node dist/db/bootstrap.js && node dist/index.js"]
+CMD ["sh", "-c", "node dist/db/extensions.js && npx drizzle-kit push --force && node dist/db/roles.js && node dist/db/bootstrap.js && node dist/index.js"]

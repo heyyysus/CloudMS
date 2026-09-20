@@ -338,6 +338,11 @@ export class TestContext {
     // organizations, so it needs neither side deleted first, but everything
     // above (sessions, users) that references an org must already be gone.
     if (this.orgIds.length) {
+      // upsertEmailTemplate can mint a row scoped to a tracked org (e.g. the
+      // welcome-template PUT route) without going through template(), so it
+      // is never in templateIds. Sweep by org here too, or the FK from
+      // email_templates.org_id blocks the delete below.
+      await db.delete(emailTemplates).where(inArray(emailTemplates.orgId, this.orgIds))
       await db.delete(organizations).where(inArray(organizations.id, this.orgIds))
       this.orgIds = []
     }

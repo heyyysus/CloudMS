@@ -63,7 +63,6 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 150 }),
   googleSub: varchar("google_sub", { length: 64 }).unique(),
-  role: userRoleEnum("role").notNull().default("staff"),
   isActive: boolean("is_active").notNull().default(true),
   // A deleted user is hidden from the admin list and can never sign in, but
   // the row stays: policy_logs.author_id and eight other NOT NULL FKs point
@@ -75,9 +74,8 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 })
 
-// Which organizations a user belongs to, and their role in each. `role`
-// mirrors `users.role` until sub-issue 3 retires the latter; nothing reads
-// this table's role yet.
+// Which organizations a user belongs to, and their role in each. `role` is
+// the sole source of a user's role - `users.role` was retired in sub-issue 3.
 export const orgMemberships = pgTable(
   "org_memberships",
   {
@@ -106,8 +104,8 @@ export const sessions = pgTable(
     userId: integer("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    // Nullable: nothing reads or writes this until sub-issue 3 attaches the
-    // organization to the session at sign-in.
+    // Nullable: a session with multiple candidate orgs starts unbound until
+    // POST /auth/org picks one. Sub-issue 3 attaches this at sign-in.
     orgId: integer("org_id").references(() => organizations.id),
     tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
     expiresAt: timestamp("expires_at").notNull(),

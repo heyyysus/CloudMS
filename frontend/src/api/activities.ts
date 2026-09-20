@@ -19,7 +19,7 @@ export interface PolicyActivity {
 }
 
 export function getPolicyActivities(
-  policyId: number,
+  policyId: string,
   signal?: AbortSignal
 ): Promise<{ activities: PolicyActivity[] }> {
   return request(`/policies/${policyId}/activities`, { signal })

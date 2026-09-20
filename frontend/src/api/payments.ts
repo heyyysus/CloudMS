@@ -2,10 +2,10 @@ import { request } from './client'
 import type { InvoicePayment, PaymentMethod } from './invoices'
 
 export interface Payment {
-  id: number
-  invoiceId: number
-  policyId: number
-  clientId: number
+  id: string
+  invoiceId: string
+  policyId: string
+  clientId: string
   method: PaymentMethod
   amount: string
   amountApplied: string
@@ -15,7 +15,7 @@ export interface Payment {
 }
 
 export interface RecordPaymentBody {
-  invoiceId: number
+  invoiceId: string
   method: PaymentMethod
   amount: string
   note?: string | null
@@ -24,11 +24,11 @@ export interface RecordPaymentBody {
 
 // POST /payments returns the minted receipt, not the payment.
 export interface ReceiptDetail {
-  id: number
-  paymentId: number
-  invoiceId: number
-  policyId: number
-  clientId: number
+  id: string
+  paymentId: string
+  invoiceId: string
+  policyId: string
+  clientId: string
   amountApplied: string
   changeGiven: string
   amountDueAfter: string
@@ -54,10 +54,10 @@ export interface VoidPaymentBody {
 // here only need the payment columns - and since it describes the *payment*
 // rather than the invoice, an invoice detail already in cache has to be
 // refetched after this rather than patched from the response.
-export function voidPayment(id: number, body: VoidPaymentBody = {}): Promise<InvoicePayment> {
+export function voidPayment(id: string, body: VoidPaymentBody = {}): Promise<InvoicePayment> {
   return request(`/payments/${id}/void`, { method: 'POST', body: JSON.stringify(body) })
 }
 
-export function getPaymentsByPolicy(policyId: number, signal?: AbortSignal): Promise<InvoicePayment[]> {
+export function getPaymentsByPolicy(policyId: string, signal?: AbortSignal): Promise<InvoicePayment[]> {
   return request(`/payments?policyId=${policyId}`, { signal })
 }

@@ -3,24 +3,24 @@ import { request } from './client'
 // Logs are append-only: created via POST, never edited or deleted, so there
 // is no update/delete body type here.
 export interface PolicyLog {
-  id: number
-  policyId: number
+  id: string
+  policyId: string
   logNumber: number
   body: string
   createdAt: string
   author: {
-    id: number
+    id: string
     name: string | null
     email: string
   }
 }
 
-export function getPolicyLogs(policyId: number, signal?: AbortSignal): Promise<PolicyLog[]> {
+export function getPolicyLogs(policyId: string, signal?: AbortSignal): Promise<PolicyLog[]> {
   return request(`/policy-logs?policyId=${policyId}`, { signal })
 }
 
 export interface CreatePolicyLogBody {
-  policyId: number
+  policyId: string
   body: string
 }
 

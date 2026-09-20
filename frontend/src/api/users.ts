@@ -42,11 +42,11 @@ export function getUsers(signal?: AbortSignal): Promise<AdminUser[]> {
   return request('/users', { signal })
 }
 
-export function updateUser(id: number, body: UpdateUserBody): Promise<AdminUser> {
+export function updateUser(id: string, body: UpdateUserBody): Promise<AdminUser> {
   return request(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
 }
 
-export function resendWelcome(id: number): Promise<{ email: InviteEmailResult }> {
+export function resendWelcome(id: string): Promise<{ email: InviteEmailResult }> {
   return request(`/users/${id}/resend-welcome`, { method: 'POST' })
 }
 
@@ -54,10 +54,10 @@ export function resendWelcome(id: number): Promise<{ email: InviteEmailResult }>
 // again. The row itself survives server-side (see backend comment on
 // users.deletedAt) - the only way back is restoreUser, reached by re-inviting
 // the same email.
-export function deleteUser(id: number): Promise<void> {
+export function deleteUser(id: string): Promise<void> {
   return request(`/users/${id}`, { method: 'DELETE' })
 }
 
-export function restoreUser(id: number): Promise<InviteUserResult> {
+export function restoreUser(id: string): Promise<InviteUserResult> {
   return request(`/users/${id}/restore`, { method: 'POST' })
 }

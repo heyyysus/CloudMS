@@ -68,6 +68,30 @@ describe("GET /policies/:id", () => {
       (await request(app).get(`/policies/${MISSING_ROW_ID}`).set("Cookie", cookie)).status
     ).toBe(404)
   })
+
+  it("does not see a policy from another org", async () => {
+    const user = await ctx.user("policies-wrongorg", "admin")
+    const cookie = await ctx.cookie(user.id)
+    const other = await ctx.org()
+    const policy = await ctx.policy({ orgId: other.id })
+
+    const list = await request(app).get("/policies").set("Cookie", cookie)
+    expect(list.body.some((p: { id: string }) => p.id === policy.id)).toBe(false)
+    expect((await request(app).get(`/policies/${policy.id}`).set("Cookie", cookie)).status).toBe(
+      404
+    )
+    expect(
+      (
+        await request(app)
+          .patch(`/policies/${policy.id}`)
+          .set("Cookie", cookie)
+          .send({ status: "active" })
+      ).status
+    ).toBe(404)
+    expect(
+      (await request(app).delete(`/policies/${policy.id}`).set("Cookie", cookie)).status
+    ).toBe(404)
+  })
 })
 
 describe("POST /policies", () => {
@@ -103,6 +127,25 @@ describe("POST /policies", () => {
       expirationDate: "2027-01-01",
     })
     expect(res.status).toBe(409)
+  })
+
+  it("allows the same policy number in a different org", async () => {
+    const user = await ctx.user("policies-dup-otherorg")
+    const cookie = await ctx.cookie(user.id)
+    const other = await ctx.org()
+    const theirs = await ctx.policy({ orgId: other.id })
+    const client = await ctx.client()
+    const carrier = await ctx.carrier()
+
+    const res = await request(app).post("/policies").set("Cookie", cookie).send({
+      clientId: client.id,
+      carrierId: carrier.id,
+      policyNumber: theirs.policyNumber,
+      effectiveDate: "2026-01-01",
+      expirationDate: "2027-01-01",
+    })
+    expect(res.status).toBe(201)
+    ctx.track("policy", res.body.id)
   })
 
   it("returns 400 for an invalid effectiveDate", async () => {
@@ -333,6 +376,40 @@ describe("PATCH /policies/:id", () => {
       .set("Cookie", cookie)
       .send({ status: "active" })
     expect(res.status).toBe(404)
+  })
+
+  it("rejects a PATCH repointing clientId at another org's client", async () => {
+    const user = await ctx.user("policies-crossorg-client")
+    const cookie = await ctx.cookie(user.id)
+    const policy = await ctx.policy()
+    const other = await ctx.org()
+    const theirClient = await ctx.client({ orgId: other.id })
+
+    const res = await request(app)
+      .patch(`/policies/${policy.id}`)
+      .set("Cookie", cookie)
+      .send({ clientId: theirClient.id })
+    expect(res.status).toBe(400)
+
+    const after = await request(app).get(`/policies/${policy.id}`).set("Cookie", cookie)
+    expect(after.body.client.id).toBe(policy.clientId)
+  })
+
+  it("rejects a PATCH repointing carrierId at another org's carrier", async () => {
+    const user = await ctx.user("policies-crossorg-carrier")
+    const cookie = await ctx.cookie(user.id)
+    const policy = await ctx.policy()
+    const other = await ctx.org()
+    const theirCarrier = await ctx.carrier({ orgId: other.id })
+
+    const res = await request(app)
+      .patch(`/policies/${policy.id}`)
+      .set("Cookie", cookie)
+      .send({ carrierId: theirCarrier.id })
+    expect(res.status).toBe(400)
+
+    const after = await request(app).get(`/policies/${policy.id}`).set("Cookie", cookie)
+    expect(after.body.carrier.id).toBe(policy.carrierId)
   })
 })
 

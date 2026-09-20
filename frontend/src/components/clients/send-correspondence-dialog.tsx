@@ -185,7 +185,7 @@ export function SendCorrespondenceDialog({
           noValidate
           onSubmit={handleSubmit((values) =>
             mutation.mutate({
-              templateId: Number(values.templateId),
+              templateId: values.templateId,
               to: values.to.map((r) => normalize(r.email)),
               cc: values.cc.map((r) => normalize(r.email)),
             })
@@ -297,7 +297,7 @@ interface RecipientFieldProps {
   values: string[]
   onRemove: (index: number) => void
   onAdd: (email: string) => void
-  onFile: { id: number; email: string }[]
+  onFile: { id: string; email: string }[]
   error?: string
   fieldErrors: (string | undefined)[]
 }

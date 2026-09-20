@@ -36,9 +36,13 @@ export const STATUS_DOT_CLASS: Record<PolicyDisplayStatus, string> = {
 }
 
 // Oldest first; id tiebreak keeps order stable for policies created in the
-// same batch (shared createdAt timestamps).
+// same batch (shared createdAt timestamps). Row ids are opaque strings, so the
+// tiebreak is lexicographic - stable across renders, but arbitrary rather than
+// creation-ordered. createdAt is what carries chronology.
 export function sortPoliciesByCreatedAt<T extends Pick<AutoPolicy, 'createdAt' | 'id'>>(
   policies: T[]
 ): T[] {
-  return [...policies].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id - b.id)
+  return [...policies].sort(
+    (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)
+  )
 }

@@ -28,7 +28,7 @@ export function DeleteUserDialog({
   const toast = useToast()
 
   const mutation = useMutation({
-    mutationFn: (id: number) => deleteUserFn(id),
+    mutationFn: (id: string) => deleteUserFn(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       onOpenChange(false)

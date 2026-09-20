@@ -29,7 +29,7 @@ export function UpcomingReminders({
   })
 
   const cancel = useMutation({
-    mutationFn: (id: number) => cancelScheduledEmailFn(id),
+    mutationFn: (id: string) => cancelScheduledEmailFn(id),
     onSuccess: () => {
       toast.success('Reminder cancelled')
       return queryClient.invalidateQueries({ queryKey: ['scheduledEmails'] })

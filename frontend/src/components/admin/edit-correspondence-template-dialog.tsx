@@ -34,7 +34,7 @@ export function EditCorrespondenceTemplateDialog({
   const toast = useToast()
 
   const mutation = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: Parameters<typeof updateCorrespondenceTemplate>[1] }) =>
+    mutationFn: ({ id, body }: { id: string; body: Parameters<typeof updateCorrespondenceTemplate>[1] }) =>
       updateCorrespondenceTemplateFn(id, body),
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ['correspondenceTemplates'] })

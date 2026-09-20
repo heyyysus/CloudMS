@@ -133,7 +133,7 @@ interface InvoiceChoiceStepProps {
   isLoading: boolean
   isError: boolean
   openInvoices: Invoice[]
-  onPay: (invoiceId: number) => void
+  onPay: (invoiceId: string) => void
   onCreateNew: () => void
   onCancel: () => void
 }
@@ -214,7 +214,7 @@ function emptyLineItem(): BuildFormValues['items'][number] {
 
 // Carrier is never user-selected - the server defaults a sweep item's carrier
 // to the policy's own carrier whenever carrierId is null.
-function toCreateInvoiceBody(policyId: number, values: BuildFormValues): CreateInvoiceBody {
+function toCreateInvoiceBody(policyId: string, values: BuildFormValues): CreateInvoiceBody {
   return {
     policyId,
     note: values.note.trim() || null,
@@ -229,7 +229,7 @@ function toCreateInvoiceBody(policyId: number, values: BuildFormValues): CreateI
 }
 
 interface NewInvoiceFormProps {
-  policy: { id: number; policyNumber: string }
+  policy: { id: string; policyNumber: string }
   onSubmit: (body: CreateInvoiceBody, payments: PaymentRowInput[]) => void
   onCancel: () => void
   onBack?: () => void
@@ -669,7 +669,7 @@ function PayInvoiceForm({
 // --- Step 3: result summary. -----------------------------------------------
 
 interface SubmitResult {
-  invoiceId: number
+  invoiceId: string
   finalStatus: InvoiceStatus
   invoiceTotal: string | null
   receipts: ReceiptDetail[]
@@ -747,19 +747,19 @@ type Step = 'choose' | 'build' | 'pay'
 
 type SubmitInput =
   | { kind: 'create'; body: CreateInvoiceBody; payments: PaymentRowInput[] }
-  | { kind: 'pay'; invoiceId: number; payments: PaymentRowInput[] }
+  | { kind: 'pay'; invoiceId: string; payments: PaymentRowInput[] }
 
 interface InvoicePaymentDialogProps {
   client: Pick<ClientDetail, 'id'>
   // The policy a new invoice is created against - always the one currently
   // being viewed, never user-selected (see PolicyTabs' selection in
   // ClientDetail). Only needed to build a new invoice, not to pay one.
-  policy: { id: number; policyNumber: string }
+  policy: { id: string; policyNumber: string }
   open: boolean
   onOpenChange: (open: boolean) => void
   // Pre-targets a specific invoice (opened via a "Pay" button elsewhere),
   // skipping the choose step.
-  initialInvoiceId?: number
+  initialInvoiceId?: string
   createInvoiceFn?: typeof createInvoice
   recordPaymentFn?: typeof recordPayment
   getInvoicesFn?: typeof getInvoices
@@ -778,7 +778,7 @@ export function InvoicePaymentDialog({
   const queryClient = useQueryClient()
   const toast = useToast()
   const [manualStep, setManualStep] = useState<Step | null>(null)
-  const [payTargetId, setPayTargetId] = useState<number | null>(null)
+  const [payTargetId, setPayTargetId] = useState<string | null>(null)
 
   const invoicesQuery = useQuery({
     queryKey: ['invoices', 'byClient', client.id],
@@ -802,7 +802,7 @@ export function InvoicePaymentDialog({
 
   const mutation = useMutation({
     mutationFn: async (input: SubmitInput): Promise<SubmitResult> => {
-      let invoiceId: number | null = null
+      let invoiceId: string | null = null
       let invoiceTotal: string | null = null
       const receipts: ReceiptDetail[] = []
       let closed = false

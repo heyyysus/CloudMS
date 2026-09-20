@@ -43,7 +43,7 @@ export function ManageCarriersCard({
   // Activate/deactivate straight from the row; anything else goes through the
   // edit dialog.
   const toggleActive = useMutation({
-    mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
       updateCarrierFn(id, { isActive }),
     onSuccess: (carrier) => {
       queryClient.invalidateQueries({ queryKey: ['carriers'] })

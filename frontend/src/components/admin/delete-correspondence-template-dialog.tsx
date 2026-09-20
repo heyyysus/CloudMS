@@ -31,7 +31,7 @@ export function DeleteCorrespondenceTemplateDialog({
   const toast = useToast()
 
   const mutation = useMutation({
-    mutationFn: (id: number) => deleteCorrespondenceTemplateFn(id),
+    mutationFn: (id: string) => deleteCorrespondenceTemplateFn(id),
     onSuccess: (_result, _id) => {
       queryClient.invalidateQueries({ queryKey: ['correspondenceTemplates'] })
       onOpenChange(false)

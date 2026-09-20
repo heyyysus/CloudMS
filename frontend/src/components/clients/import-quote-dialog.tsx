@@ -85,8 +85,8 @@ function namesMatch(a: { firstName: string; lastName: string }, b: { firstName: 
 function matchDrivers(
   options: ExistingDriverOption[],
   parsed: ParsedQuote
-): { matchedPersonIds: Set<number>; unmatched: ParsedDriver[] } {
-  const matchedPersonIds = new Set<number>()
+): { matchedPersonIds: Set<string>; unmatched: ParsedDriver[] } {
+  const matchedPersonIds = new Set<string>()
   const unmatched: ParsedDriver[] = []
   for (const person of [parsed.insured, ...parsed.additionalDrivers]) {
     const match = options.find((option) => namesMatch(option.person, person))
@@ -101,7 +101,7 @@ function matchDrivers(
 // a deep one), so it has to reproduce every field, not just `checked`.
 function buildExistingDriverRows(
   options: ExistingDriverOption[],
-  matchedPersonIds: Set<number>
+  matchedPersonIds: Set<string>
 ): AddPolicyFormValues['existingDrivers'] {
   return options.map((option) => ({
     checked: matchedPersonIds.has(option.personId),

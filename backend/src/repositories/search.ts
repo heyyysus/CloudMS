@@ -1,5 +1,5 @@
 import { alias } from "drizzle-orm/pg-core"
-import { AnyColumn, eq, ilike, inArray, or, sql } from "drizzle-orm"
+import { and, AnyColumn, eq, ilike, inArray, or, sql } from "drizzle-orm"
 import { db } from "../db"
 import { autoPolicies, clientEmails, clientPhones, clients, persons } from "../db/schema"
 
@@ -25,41 +25,53 @@ function addressConcat(cols: {
   return sql`(coalesce(${cols.address1}, '') || ' ' || coalesce(${cols.address2}, '') || ' ' || coalesce(${cols.city}, '') || ' ' || coalesce(${cols.state}, '') || ' ' || coalesce(${cols.zip}, ''))`
 }
 
-export async function searchClients(q: string, limit = 10) {
+export async function searchClients(orgId: string, q: string, limit = 10) {
   const pattern = likePattern(q)
   const secondInsured = alias(persons, "second_insured")
 
   const matches = await db
     .selectDistinct({ id: clients.id })
     .from(clients)
-    .innerJoin(persons, eq(clients.namedInsuredId, persons.id))
-    .leftJoin(secondInsured, eq(clients.secondNamedInsuredId, secondInsured.id))
-    .leftJoin(clientPhones, eq(clientPhones.clientId, clients.id))
-    .leftJoin(clientEmails, eq(clientEmails.clientId, clients.id))
+    .innerJoin(persons, and(eq(clients.namedInsuredId, persons.id), eq(persons.orgId, orgId)))
+    .leftJoin(
+      secondInsured,
+      and(eq(clients.secondNamedInsuredId, secondInsured.id), eq(secondInsured.orgId, orgId))
+    )
+    .leftJoin(
+      clientPhones,
+      and(eq(clientPhones.clientId, clients.id), eq(clientPhones.orgId, orgId))
+    )
+    .leftJoin(
+      clientEmails,
+      and(eq(clientEmails.clientId, clients.id), eq(clientEmails.orgId, orgId))
+    )
     .where(
-      or(
-        ilike(persons.firstName, pattern),
-        ilike(persons.lastName, pattern),
-        sql`(${persons.firstName} || ' ' || ${persons.lastName}) ILIKE ${pattern}`,
-        ilike(secondInsured.firstName, pattern),
-        ilike(secondInsured.lastName, pattern),
-        sql`(${secondInsured.firstName} || ' ' || ${secondInsured.lastName}) ILIKE ${pattern}`,
-        sql`${addressConcat({
-          address1: clients.mailingAddress1,
-          address2: clients.mailingAddress2,
-          city: clients.mailingCity,
-          state: clients.mailingState,
-          zip: clients.mailingZip,
-        })} ILIKE ${pattern}`,
-        sql`${addressConcat({
-          address1: clients.physicalAddress1,
-          address2: clients.physicalAddress2,
-          city: clients.physicalCity,
-          state: clients.physicalState,
-          zip: clients.physicalZip,
-        })} ILIKE ${pattern}`,
-        ilike(clientPhones.phoneNumber, pattern),
-        ilike(clientEmails.email, pattern)
+      and(
+        eq(clients.orgId, orgId),
+        or(
+          ilike(persons.firstName, pattern),
+          ilike(persons.lastName, pattern),
+          sql`(${persons.firstName} || ' ' || ${persons.lastName}) ILIKE ${pattern}`,
+          ilike(secondInsured.firstName, pattern),
+          ilike(secondInsured.lastName, pattern),
+          sql`(${secondInsured.firstName} || ' ' || ${secondInsured.lastName}) ILIKE ${pattern}`,
+          sql`${addressConcat({
+            address1: clients.mailingAddress1,
+            address2: clients.mailingAddress2,
+            city: clients.mailingCity,
+            state: clients.mailingState,
+            zip: clients.mailingZip,
+          })} ILIKE ${pattern}`,
+          sql`${addressConcat({
+            address1: clients.physicalAddress1,
+            address2: clients.physicalAddress2,
+            city: clients.physicalCity,
+            state: clients.physicalState,
+            zip: clients.physicalZip,
+          })} ILIKE ${pattern}`,
+          ilike(clientPhones.phoneNumber, pattern),
+          ilike(clientEmails.email, pattern)
+        )
       )
     )
     .limit(limit)
@@ -68,8 +80,13 @@ export async function searchClients(q: string, limit = 10) {
 
   const ids = matches.map((m) => m.id)
   const rows = await db.query.clients.findMany({
-    where: inArray(clients.id, ids),
-    with: { namedInsured: true, secondNamedInsured: true, phones: true, emails: true },
+    where: and(inArray(clients.id, ids), eq(clients.orgId, orgId)),
+    with: {
+      namedInsured: true,
+      secondNamedInsured: true,
+      phones: { where: eq(clientPhones.orgId, orgId) },
+      emails: { where: eq(clientEmails.orgId, orgId) },
+    },
   })
 
   // Preserve the match/limit order rather than whatever findMany returns.
@@ -77,7 +94,7 @@ export async function searchClients(q: string, limit = 10) {
   return ids.map((id) => byId.get(id)).filter((r) => r !== undefined)
 }
 
-export async function searchPolicies(q: string, limit = 10) {
+export async function searchPolicies(orgId: string, q: string, limit = 10) {
   const pattern = likePattern(q)
 
   return db
@@ -91,18 +108,21 @@ export async function searchPolicies(q: string, limit = 10) {
       clientName: sql<string>`${persons.firstName} || ' ' || ${persons.lastName}`,
     })
     .from(autoPolicies)
-    .innerJoin(clients, eq(autoPolicies.clientId, clients.id))
-    .innerJoin(persons, eq(clients.namedInsuredId, persons.id))
+    .innerJoin(clients, and(eq(autoPolicies.clientId, clients.id), eq(clients.orgId, orgId)))
+    .innerJoin(persons, and(eq(clients.namedInsuredId, persons.id), eq(persons.orgId, orgId)))
     .where(
-      or(
-        ilike(autoPolicies.policyNumber, pattern),
-        sql`${addressConcat({
-          address1: autoPolicies.policyAddress1,
-          address2: autoPolicies.policyAddress2,
-          city: autoPolicies.policyCity,
-          state: autoPolicies.policyState,
-          zip: autoPolicies.policyZip,
-        })} ILIKE ${pattern}`
+      and(
+        eq(autoPolicies.orgId, orgId),
+        or(
+          ilike(autoPolicies.policyNumber, pattern),
+          sql`${addressConcat({
+            address1: autoPolicies.policyAddress1,
+            address2: autoPolicies.policyAddress2,
+            city: autoPolicies.policyCity,
+            state: autoPolicies.policyState,
+            zip: autoPolicies.policyZip,
+          })} ILIKE ${pattern}`
+        )
       )
     )
     .limit(limit)

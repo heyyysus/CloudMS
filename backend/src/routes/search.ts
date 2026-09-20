@@ -14,8 +14,8 @@ searchRouter.get("/search", requireAuth, async (req: Request, res: Response) => 
   }
 
   const [clients, policies] = await Promise.all([
-    searchClients(parsed.data.q, 10),
-    searchPolicies(parsed.data.q, 10),
+    searchClients(req.orgId!, parsed.data.q, 10),
+    searchPolicies(req.orgId!, parsed.data.q, 10),
   ])
   res.json({ clients, policies })
 })

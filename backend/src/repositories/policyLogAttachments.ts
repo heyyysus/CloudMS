@@ -7,7 +7,7 @@
 // from staff, visible to admins - so a receipt for a reversed payment drops
 // out of its log rather than lingering there.
 
-import { desc, eq, inArray } from "drizzle-orm"
+import { and, desc, eq, inArray } from "drizzle-orm"
 import { db } from "../db"
 import { policyAttachments, policyLogAttachments, policyLogs, users } from "../db/schema"
 import { attachmentPublicColumns, type PolicyAttachmentWithUploader } from "./policyAttachments"
@@ -23,6 +23,7 @@ export interface PolicyLogAttachmentLink {
 const userColumns = { id: true, name: true, email: true } as const
 
 export async function listPolicyLogAttachmentsByPolicyId(
+  orgId: string,
   policyId: string,
   options?: { includeVoided?: boolean }
 ): Promise<PolicyLogAttachmentLink[]> {
@@ -37,7 +38,7 @@ export async function listPolicyLogAttachmentsByPolicyId(
     .from(policyLogAttachments)
     // Links are addressed by log, so the policy scope comes from the log side.
     .innerJoin(policyLogs, eq(policyLogAttachments.logId, policyLogs.id))
-    .where(eq(policyLogs.policyId, policyId))
+    .where(and(eq(policyLogs.policyId, policyId), eq(policyLogs.orgId, orgId)))
     .orderBy(desc(policyLogAttachments.createdAt))
 
   if (rows.length === 0) return []
@@ -90,20 +91,28 @@ export type LinkAttachmentsResult =
 // Links one or more attachments to a single log. Both ends must sit on the
 // same policy - the client only ever offers logs from the policy it is looking
 // at, so a mismatch means a hand-rolled request. Re-linking is a no-op rather
-// than an error, so a double submit can't 409.
-export async function linkAttachmentsToLog(input: {
-  logId: string
-  attachmentIds: string[]
-  linkedBy: string
-}): Promise<LinkAttachmentsResult> {
+// than an error, so a double submit can't 409. Both the log and every
+// attachment must belong to orgId - a cross-org id answers exactly like a
+// missing one.
+export async function linkAttachmentsToLog(
+  orgId: string,
+  input: {
+    logId: string
+    attachmentIds: string[]
+    linkedBy: string
+  }
+): Promise<LinkAttachmentsResult> {
   const log = await db.query.policyLogs.findFirst({
-    where: eq(policyLogs.id, input.logId),
+    where: and(eq(policyLogs.id, input.logId), eq(policyLogs.orgId, orgId)),
     columns: { id: true, policyId: true },
   })
   if (!log) return { status: "log_not_found" }
 
   const attachments = await db.query.policyAttachments.findMany({
-    where: inArray(policyAttachments.id, input.attachmentIds),
+    where: and(
+      inArray(policyAttachments.id, input.attachmentIds),
+      eq(policyAttachments.orgId, orgId)
+    ),
     columns: { id: true, policyId: true },
   })
   if (attachments.length !== new Set(input.attachmentIds).size) {
@@ -115,6 +124,7 @@ export async function linkAttachmentsToLog(input: {
     .insert(policyLogAttachments)
     .values(
       attachments.map((a) => ({
+        orgId,
         logId: input.logId,
         attachmentId: a.id,
         linkedBy: input.linkedBy,
@@ -124,7 +134,7 @@ export async function linkAttachmentsToLog(input: {
 
   // Reloaded through the list so the response carries the same embedded shape
   // the client already renders, including any link that already existed.
-  const all = await listPolicyLogAttachmentsByPolicyId(log.policyId, { includeVoided: true })
+  const all = await listPolicyLogAttachmentsByPolicyId(orgId, log.policyId, { includeVoided: true })
   const requested = new Set(input.attachmentIds)
   return {
     status: "ok",
@@ -135,10 +145,10 @@ export async function linkAttachmentsToLog(input: {
 // Linking is an editorial call, so undoing one is too - unlike the logs and
 // attachments themselves, which are append-only. Anyone may unlink, including
 // a link someone else made.
-export async function unlinkPolicyLogAttachment(id: string): Promise<boolean> {
+export async function unlinkPolicyLogAttachment(orgId: string, id: string): Promise<boolean> {
   const deleted = await db
     .delete(policyLogAttachments)
-    .where(eq(policyLogAttachments.id, id))
+    .where(and(eq(policyLogAttachments.id, id), eq(policyLogAttachments.orgId, orgId)))
     .returning({ id: policyLogAttachments.id })
   return deleted.length > 0
 }

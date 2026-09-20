@@ -7,8 +7,8 @@ import {
 } from "./accountingDocuments"
 
 describe("formatDocumentNumber", () => {
-  it("renders the row id as-is", () => {
-    expect(formatDocumentNumber("V5hljhW0QKfnT4cspj7MfQ")).toBe("#V5hljhW0QKfnT4cspj7MfQ")
+  it("renders the number as a plain integer", () => {
+    expect(formatDocumentNumber(12)).toBe("#12")
   })
 })
 
@@ -18,6 +18,7 @@ describe("formatDocumentNumber", () => {
 function makeInvoice(overrides: Partial<Record<string, unknown>> = {}): InvoiceDetail {
   return {
     id: "12",
+    invoiceNumber: 12,
     policyId: "7",
     clientId: "3",
     status: "open",
@@ -73,10 +74,10 @@ describe("buildAccountingDocumentPdf", () => {
           voidedAt: null,
         },
       ],
-      receipts: [{ id: "9", paymentId: "40" }],
+      receipts: [{ id: "9", receiptNumber: 9, paymentId: "40" }],
     })
     const pdf = await buildAccountingDocumentPdf(
-      meta({ kind: "receipt", invoice, receipt: { id: "9", paymentId: "40" } })
+      meta({ kind: "receipt", invoice, receipt: { id: "9", receiptNumber: 9, paymentId: "40" } })
     )
     expect(pdf.subarray(0, 4).toString()).toBe("%PDF")
   })
@@ -93,7 +94,7 @@ describe("buildAccountingDocumentPdf", () => {
           voidedAt: new Date(),
         },
       ],
-      receipts: [{ id: "10", paymentId: "41" }],
+      receipts: [{ id: "10", receiptNumber: 10, paymentId: "41" }],
     })
     const pdf = await buildAccountingDocumentPdf(meta({ invoice }))
     expect(pdf.subarray(0, 4).toString()).toBe("%PDF")

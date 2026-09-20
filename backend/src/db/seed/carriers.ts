@@ -24,7 +24,7 @@ export const SECOND_ORG_CARRIER_COUNT = 2
 // usedNaics is shared across both orgs' calls since carriers.naic stays
 // globally unique in this sub-issue.
 export async function seedCarriers(
-  orgId: number,
+  orgId: string,
   count: number,
   usedNaics: Set<string>
 ): Promise<Carrier[]> {

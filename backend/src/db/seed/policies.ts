@@ -7,7 +7,7 @@ import type { Household } from "./households"
 import { addDays, chunk, faker, toDateString } from "./rng"
 
 export interface SeededPolicy {
-  id: number
+  id: string
   effectiveDate: string
   expirationDate: string
   status: PolicyStatus

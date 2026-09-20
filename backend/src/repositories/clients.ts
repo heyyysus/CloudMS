@@ -7,12 +7,12 @@ export async function listClients(): Promise<Client[]> {
   return db.select().from(clients)
 }
 
-export async function findClientById(id: number): Promise<Client | undefined> {
+export async function findClientById(id: string): Promise<Client | undefined> {
   const [row] = await db.select().from(clients).where(eq(clients.id, id))
   return row
 }
 
-export async function getClientWithDetails(id: number) {
+export async function getClientWithDetails(id: string) {
   return db.query.clients.findFirst({
     where: eq(clients.id, id),
     with: {
@@ -31,7 +31,7 @@ export async function createClient(input: NewClient): Promise<Client> {
 }
 
 export async function updateClient(
-  id: number,
+  id: string,
   input: Partial<NewClient>
 ): Promise<Client | undefined> {
   const [row] = await db
@@ -42,7 +42,7 @@ export async function updateClient(
   return row
 }
 
-export async function deleteClient(id: number): Promise<boolean> {
+export async function deleteClient(id: string): Promise<boolean> {
   const deleted = await db.delete(clients).where(eq(clients.id, id)).returning({ id: clients.id })
   return deleted.length > 0
 }

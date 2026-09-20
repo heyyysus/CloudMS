@@ -22,7 +22,7 @@ function personValues(firstName: string) {
   } as const
 }
 
-function policyValues(carrierId: number, clientId: number, suffix: string) {
+function policyValues(carrierId: string, clientId: string, suffix: string) {
   return {
     clientId,
     carrierId,

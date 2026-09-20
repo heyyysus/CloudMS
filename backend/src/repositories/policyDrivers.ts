@@ -3,26 +3,26 @@ import { db } from "../db"
 import { policyDrivers } from "../db/schema"
 import type { PolicyDriver } from "../types"
 
-export async function listDriversForPolicy(policyId: number) {
+export async function listDriversForPolicy(policyId: string) {
   return db.query.policyDrivers.findMany({
     where: eq(policyDrivers.policyId, policyId),
     with: { driver: { with: { person: true } } },
   })
 }
 
-export async function listPoliciesForDriver(driverId: number) {
+export async function listPoliciesForDriver(driverId: string) {
   return db.query.policyDrivers.findMany({
     where: eq(policyDrivers.driverId, driverId),
     with: { policy: true },
   })
 }
 
-export async function addDriverToPolicy(policyId: number, driverId: number): Promise<PolicyDriver> {
+export async function addDriverToPolicy(policyId: string, driverId: string): Promise<PolicyDriver> {
   const [row] = await db.insert(policyDrivers).values({ policyId, driverId }).returning()
   return row
 }
 
-export async function removeDriverFromPolicy(policyId: number, driverId: number): Promise<boolean> {
+export async function removeDriverFromPolicy(policyId: string, driverId: string): Promise<boolean> {
   const deleted = await db
     .delete(policyDrivers)
     .where(and(eq(policyDrivers.policyId, policyId), eq(policyDrivers.driverId, driverId)))

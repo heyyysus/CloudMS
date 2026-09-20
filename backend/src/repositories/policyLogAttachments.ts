@@ -13,17 +13,17 @@ import { policyAttachments, policyLogAttachments, policyLogs, users } from "../d
 import { attachmentPublicColumns, type PolicyAttachmentWithUploader } from "./policyAttachments"
 
 export interface PolicyLogAttachmentLink {
-  id: number
-  logId: number
+  id: string
+  logId: string
   createdAt: Date
-  linkedBy: { id: number; name: string | null; email: string }
+  linkedBy: { id: string; name: string | null; email: string }
   attachment: PolicyAttachmentWithUploader
 }
 
 const userColumns = { id: true, name: true, email: true } as const
 
 export async function listPolicyLogAttachmentsByPolicyId(
-  policyId: number,
+  policyId: string,
   options?: { includeVoided?: boolean }
 ): Promise<PolicyLogAttachmentLink[]> {
   const rows = await db
@@ -92,9 +92,9 @@ export type LinkAttachmentsResult =
 // at, so a mismatch means a hand-rolled request. Re-linking is a no-op rather
 // than an error, so a double submit can't 409.
 export async function linkAttachmentsToLog(input: {
-  logId: number
-  attachmentIds: number[]
-  linkedBy: number
+  logId: string
+  attachmentIds: string[]
+  linkedBy: string
 }): Promise<LinkAttachmentsResult> {
   const log = await db.query.policyLogs.findFirst({
     where: eq(policyLogs.id, input.logId),
@@ -135,7 +135,7 @@ export async function linkAttachmentsToLog(input: {
 // Linking is an editorial call, so undoing one is too - unlike the logs and
 // attachments themselves, which are append-only. Anyone may unlink, including
 // a link someone else made.
-export async function unlinkPolicyLogAttachment(id: number): Promise<boolean> {
+export async function unlinkPolicyLogAttachment(id: string): Promise<boolean> {
   const deleted = await db
     .delete(policyLogAttachments)
     .where(eq(policyLogAttachments.id, id))

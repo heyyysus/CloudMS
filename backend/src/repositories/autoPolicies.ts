@@ -7,16 +7,16 @@ export async function listAutoPolicies(): Promise<AutoPolicy[]> {
   return db.select().from(autoPolicies)
 }
 
-export async function listAutoPoliciesByClientId(clientId: number): Promise<AutoPolicy[]> {
+export async function listAutoPoliciesByClientId(clientId: string): Promise<AutoPolicy[]> {
   return db.select().from(autoPolicies).where(eq(autoPolicies.clientId, clientId))
 }
 
-export async function findAutoPolicyById(id: number): Promise<AutoPolicy | undefined> {
+export async function findAutoPolicyById(id: string): Promise<AutoPolicy | undefined> {
   const [row] = await db.select().from(autoPolicies).where(eq(autoPolicies.id, id))
   return row
 }
 
-export async function getPolicyWithDetails(id: number) {
+export async function getPolicyWithDetails(id: string) {
   return db.query.autoPolicies.findFirst({
     where: eq(autoPolicies.id, id),
     with: {
@@ -45,7 +45,7 @@ export type CreatePolicyVehicleInput = Omit<
 export type CreatePolicyDriverInput =
   | {
       kind: "existing"
-      personId: number
+      personId: string
       dlNumber?: string
       rating?: DriverRating
       sr22?: boolean
@@ -79,12 +79,12 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 // transaction.
 async function linkPolicyDrivers(
   tx: Tx,
-  policyId: number,
+  policyId: string,
   specs: CreatePolicyDriverInput[]
 ): Promise<void> {
-  const linkedDriverIds = new Set<number>()
+  const linkedDriverIds = new Set<string>()
   for (const spec of specs) {
-    let driverId: number
+    let driverId: string
     if (spec.kind === "existing") {
       const [person] = await tx
         .select({ id: persons.id })
@@ -157,7 +157,7 @@ export async function createAutoPolicyWithDetails(input: CreatePolicyInput) {
 }
 
 export async function updateAutoPolicy(
-  id: number,
+  id: string,
   input: Partial<NewAutoPolicy>
 ): Promise<AutoPolicy | undefined> {
   const [row] = await db
@@ -174,7 +174,7 @@ export async function updateAutoPolicy(
 // replaces it (vehicle row ids change; removed drivers are unlinked, never
 // deleted, since a person/driver may be linked elsewhere). Returns undefined
 // when no policy has that id.
-export async function updateAutoPolicyWithDetails(id: number, input: UpdatePolicyInput) {
+export async function updateAutoPolicyWithDetails(id: string, input: UpdatePolicyInput) {
   const { vehicles: vehicleInputs, drivers: driverInputs, ...policyFields } = input
 
   const found = await db.transaction(async (tx) => {
@@ -208,7 +208,7 @@ export async function updateAutoPolicyWithDetails(id: number, input: UpdatePolic
   return detail
 }
 
-export async function deleteAutoPolicy(id: number): Promise<boolean> {
+export async function deleteAutoPolicy(id: string): Promise<boolean> {
   const deleted = await db
     .delete(autoPolicies)
     .where(eq(autoPolicies.id, id))

@@ -7,11 +7,11 @@ export async function listVehicles(): Promise<Vehicle[]> {
   return db.select().from(vehicles)
 }
 
-export async function listVehiclesByPolicyId(policyId: number): Promise<Vehicle[]> {
+export async function listVehiclesByPolicyId(policyId: string): Promise<Vehicle[]> {
   return db.select().from(vehicles).where(eq(vehicles.policyId, policyId))
 }
 
-export async function findVehicleById(id: number): Promise<Vehicle | undefined> {
+export async function findVehicleById(id: string): Promise<Vehicle | undefined> {
   const [row] = await db.select().from(vehicles).where(eq(vehicles.id, id))
   return row
 }
@@ -22,7 +22,7 @@ export async function createVehicle(input: NewVehicle): Promise<Vehicle> {
 }
 
 export async function updateVehicle(
-  id: number,
+  id: string,
   input: Partial<NewVehicle>
 ): Promise<Vehicle | undefined> {
   const [row] = await db
@@ -33,7 +33,7 @@ export async function updateVehicle(
   return row
 }
 
-export async function deleteVehicle(id: number): Promise<boolean> {
+export async function deleteVehicle(id: string): Promise<boolean> {
   const deleted = await db
     .delete(vehicles)
     .where(eq(vehicles.id, id))

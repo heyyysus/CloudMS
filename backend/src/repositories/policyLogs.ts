@@ -23,15 +23,15 @@ function isLogNumberRaceViolation(err: unknown): boolean {
 }
 
 export interface PolicyLogWithAuthor {
-  id: number
-  policyId: number
+  id: string
+  policyId: string
   logNumber: number
   body: string
   createdAt: Date
-  author: { id: number; name: string | null; email: string }
+  author: { id: string; name: string | null; email: string }
 }
 
-export async function listPolicyLogsByPolicyId(policyId: number): Promise<PolicyLogWithAuthor[]> {
+export async function listPolicyLogsByPolicyId(policyId: string): Promise<PolicyLogWithAuthor[]> {
   return db.query.policyLogs.findMany({
     where: eq(policyLogs.policyId, policyId),
     orderBy: desc(policyLogs.logNumber),
@@ -66,8 +66,8 @@ export async function withLogNumberRetry<T>(fn: () => Promise<T>): Promise<T> {
 // the surrounding withLogNumberRetry's job.
 export async function insertPolicyLogInTx(
   tx: Tx,
-  input: { policyId: number; authorId: number; body: string }
-): Promise<number> {
+  input: { policyId: string; authorId: string; body: string }
+): Promise<string> {
   const [{ nextNumber }] = await tx
     .select({
       nextNumber: sql<number>`coalesce(max(${policyLogs.logNumber}), 0) + 1`,
@@ -91,8 +91,8 @@ export async function insertPolicyLogInTx(
 // Creates a standalone log (the POST /policy-logs path). Returns undefined
 // when the policy doesn't exist.
 export async function createPolicyLog(input: {
-  policyId: number
-  authorId: number
+  policyId: string
+  authorId: string
   body: string
 }): Promise<PolicyLogWithAuthor | undefined> {
   const id = await withLogNumberRetry(async () =>

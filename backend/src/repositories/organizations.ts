@@ -3,7 +3,7 @@ import { db } from "../db"
 import { organizations } from "../db/schema"
 import type { Organization } from "../types"
 
-export async function findOrganizationById(id: number): Promise<Organization | undefined> {
+export async function findOrganizationById(id: string): Promise<Organization | undefined> {
   const [row] = await db.select().from(organizations).where(eq(organizations.id, id))
   return row
 }

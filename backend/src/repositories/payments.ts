@@ -9,25 +9,25 @@ import { insertPolicyLogInTx, withLogNumberRetry } from "./policyLogs"
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 export interface RecordPaymentInput {
-  invoiceId: number
+  invoiceId: string
   method: PaymentMethod
   amount: string
   note?: string | null
   receiptNote?: string | null
-  createdBy: number
+  createdBy: string
 }
 
 // logId is the policy log this payment appended, carried out so the route can
 // attach the receipt PDF - generated after this commits - to that same log.
 export type RecordPaymentResult =
-  | { status: "ok"; receiptId: number; logId: number }
+  | { status: "ok"; receiptId: string; logId: string }
   | { status: "invoice_not_found" }
   | { status: "invoice_not_open" }
 
 // On full payment the carrier's share leaves the trust account (a
 // "carrier_sweep" per sweep item) and the agency keeps its fee (an
 // "agency_fee" per agency item). Posted once, when the invoice closes.
-async function postSweepAndFeeEntries(tx: Tx, invoiceId: number): Promise<void> {
+async function postSweepAndFeeEntries(tx: Tx, invoiceId: string): Promise<void> {
   const [invoice] = await tx
     .select({ policyId: invoices.policyId, clientId: invoices.clientId })
     .from(invoices)
@@ -153,7 +153,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
 // couldn't have been swept if the money wasn't fully collected.
 async function reverseSweepAndFeeEntries(
   tx: Tx,
-  invoiceId: number,
+  invoiceId: string,
   note: string | null
 ): Promise<void> {
   const entries = await tx.select().from(trustLedger).where(eq(trustLedger.invoiceId, invoiceId))
@@ -186,15 +186,15 @@ async function reverseSweepAndFeeEntries(
 // receiptId identifies the receipt this void just cancelled, so the caller can
 // hide the receipt's generated PDF.
 export type VoidPaymentResult =
-  { status: "ok"; receiptId: number | null } | { status: "not_found" } | { status: "already_void" }
+  { status: "ok"; receiptId: string | null } | { status: "not_found" } | { status: "already_void" }
 
 // Voids a payment: reverses the money it put into the trust account, voids its
 // receipt, and reopens the invoice if this payment had closed it (reversing
 // the sweep/fee entries too). The payment and receipt rows are kept for the
 // audit trail, stamped with voidedAt.
 export async function voidPayment(
-  paymentId: number,
-  voidedBy: number,
+  paymentId: string,
+  voidedBy: string,
   reason: string | null
 ): Promise<VoidPaymentResult> {
   return withLogNumberRetry(async () =>
@@ -285,22 +285,22 @@ const paymentDetailWith = {
   createdByUser: { columns: { id: true, name: true, email: true } },
 } as const
 
-export async function getPaymentWithDetails(id: number) {
+export async function getPaymentWithDetails(id: string) {
   return db.query.payments.findFirst({ where: eq(payments.id, id), with: paymentDetailWith })
 }
 
-export async function listPaymentsByPolicyId(policyId: number) {
+export async function listPaymentsByPolicyId(policyId: string) {
   return db.query.payments.findMany({
     where: eq(payments.policyId, policyId),
-    orderBy: desc(payments.id),
+    orderBy: [desc(payments.createdAt), desc(payments.id)],
     with: { receipt: true },
   })
 }
 
-export async function listPaymentsByClientId(clientId: number) {
+export async function listPaymentsByClientId(clientId: string) {
   return db.query.payments.findMany({
     where: eq(payments.clientId, clientId),
-    orderBy: desc(payments.id),
+    orderBy: [desc(payments.createdAt), desc(payments.id)],
     with: { receipt: true },
   })
 }

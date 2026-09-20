@@ -6,7 +6,7 @@ import type { ReminderRule } from "../types"
 // A rule plus the template it sends, which is what every caller actually
 // wants - a rule showing a bare templateId is useless in the admin list.
 export interface ReminderRuleWithTemplate extends ReminderRule {
-  template: { id: number; key: string; name: string | null; subject: string } | null
+  template: { id: string; key: string; name: string | null; subject: string } | null
 }
 
 export async function listReminderRules(): Promise<ReminderRuleWithTemplate[]> {
@@ -26,7 +26,7 @@ export async function listReminderRules(): Promise<ReminderRuleWithTemplate[]> {
   return rows.map((row) => ({ ...row.rule, template: row.template }))
 }
 
-export async function findReminderRuleById(id: number): Promise<ReminderRule | undefined> {
+export async function findReminderRuleById(id: string): Promise<ReminderRule | undefined> {
   const [row] = await db.select().from(reminderRules).where(eq(reminderRules.id, id))
   return row
 }
@@ -35,22 +35,22 @@ export async function createReminderRule(input: {
   name: string
   trigger: "policy_expiration"
   offsetDays: number
-  templateId: number
+  templateId: string
   enabled: boolean
-  updatedBy: number | null
+  updatedBy: string | null
 }): Promise<ReminderRule> {
   const [row] = await db.insert(reminderRules).values(input).returning()
   return row
 }
 
 export async function updateReminderRule(
-  id: number,
+  id: string,
   input: {
     name?: string
     offsetDays?: number
-    templateId?: number
+    templateId?: string
     enabled?: boolean
-    updatedBy: number | null
+    updatedBy: string | null
   }
 ): Promise<ReminderRule | undefined> {
   const [row] = await db
@@ -64,7 +64,7 @@ export async function updateReminderRule(
 // Cascades the rule's scheduled_emails rows away. That is deliberate:
 // email_log is the permanent record of what was actually sent, so the queue
 // carries no audit value of its own once its rule is gone.
-export async function deleteReminderRule(id: number): Promise<boolean> {
+export async function deleteReminderRule(id: string): Promise<boolean> {
   const deleted = await db
     .delete(reminderRules)
     .where(eq(reminderRules.id, id))

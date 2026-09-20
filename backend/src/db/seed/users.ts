@@ -23,7 +23,7 @@ interface SeedUsersOptions {
 // two orgs' random staff (and ADMIN_EMAIL) can't collide on users.email,
 // which stays globally unique.
 export async function seedUsers(
-  orgId: number,
+  orgId: string,
   usedEmails: Set<string>,
   { staffCount, adminAmongStaff = 0, includeAdmin }: SeedUsersOptions
 ): Promise<User[]> {

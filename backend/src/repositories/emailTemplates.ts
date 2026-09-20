@@ -29,7 +29,7 @@ export async function listCorrespondenceTemplates(): Promise<EmailTemplate[]> {
 }
 
 export async function findCorrespondenceTemplateById(
-  id: number
+  id: string
 ): Promise<EmailTemplate | undefined> {
   const [row] = await db
     .select()
@@ -43,7 +43,7 @@ export async function createCorrespondenceTemplate(input: {
   name: string
   subject: string
   body: string
-  updatedBy: number | null
+  updatedBy: string | null
 }): Promise<EmailTemplate> {
   const [row] = await db
     .insert(emailTemplates)
@@ -53,8 +53,8 @@ export async function createCorrespondenceTemplate(input: {
 }
 
 export async function updateCorrespondenceTemplate(
-  id: number,
-  input: { name: string; subject: string; body: string; updatedBy: number | null }
+  id: string,
+  input: { name: string; subject: string; body: string; updatedBy: string | null }
 ): Promise<EmailTemplate | undefined> {
   const [row] = await db
     .update(emailTemplates)
@@ -70,7 +70,7 @@ export async function updateCorrespondenceTemplate(
   return row
 }
 
-export async function deleteCorrespondenceTemplate(id: number): Promise<boolean> {
+export async function deleteCorrespondenceTemplate(id: string): Promise<boolean> {
   const deleted = await db
     .delete(emailTemplates)
     .where(and(eq(emailTemplates.id, id), eq(emailTemplates.kind, "correspondence")))
@@ -82,7 +82,7 @@ export async function upsertEmailTemplate(input: {
   key: string
   subject: string
   body: string
-  updatedBy: number | null
+  updatedBy: string | null
 }): Promise<EmailTemplate> {
   const [row] = await db
     .insert(emailTemplates)

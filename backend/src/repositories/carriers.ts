@@ -7,7 +7,7 @@ export async function listCarriers(): Promise<Carrier[]> {
   return db.select().from(carriers)
 }
 
-export async function findCarrierById(id: number): Promise<Carrier | undefined> {
+export async function findCarrierById(id: string): Promise<Carrier | undefined> {
   const [row] = await db.select().from(carriers).where(eq(carriers.id, id))
   return row
 }
@@ -18,7 +18,7 @@ export async function createCarrier(input: NewCarrier): Promise<Carrier> {
 }
 
 export async function updateCarrier(
-  id: number,
+  id: string,
   input: Partial<NewCarrier>
 ): Promise<Carrier | undefined> {
   const [row] = await db
@@ -29,7 +29,7 @@ export async function updateCarrier(
   return row
 }
 
-export async function deleteCarrier(id: number): Promise<boolean> {
+export async function deleteCarrier(id: string): Promise<boolean> {
   const deleted = await db
     .delete(carriers)
     .where(eq(carriers.id, id))

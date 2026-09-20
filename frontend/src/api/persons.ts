@@ -16,6 +16,6 @@ export function createPerson(body: CreatePersonBody): Promise<Person> {
   return request('/persons', { method: 'POST', body: JSON.stringify(body) })
 }
 
-export function updatePerson(id: number, body: UpdatePersonBody): Promise<Person> {
+export function updatePerson(id: string, body: UpdatePersonBody): Promise<Person> {
   return request(`/persons/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
 }

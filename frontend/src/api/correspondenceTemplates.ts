@@ -1,7 +1,7 @@
 import { request } from './client'
 
 export interface CorrespondenceTemplate {
-  id: number
+  id: string
   key: string
   name: string
   subject: string
@@ -33,7 +33,7 @@ export function createCorrespondenceTemplate(
 }
 
 export function updateCorrespondenceTemplate(
-  id: number,
+  id: string,
   body: CorrespondenceTemplateBody
 ): Promise<CorrespondenceTemplate> {
   return request(`/correspondence-templates/${id}`, {
@@ -42,6 +42,6 @@ export function updateCorrespondenceTemplate(
   })
 }
 
-export function deleteCorrespondenceTemplate(id: number): Promise<void> {
+export function deleteCorrespondenceTemplate(id: string): Promise<void> {
   return request(`/correspondence-templates/${id}`, { method: 'DELETE' })
 }

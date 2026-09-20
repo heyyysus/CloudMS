@@ -1,7 +1,7 @@
 import { request } from './client'
 
 export interface Person {
-  id: number
+  id: string
   firstName: string
   lastName: string
   dateOfBirth: string
@@ -20,23 +20,23 @@ export interface Person {
 }
 
 export interface ClientPhone {
-  id: number
-  clientId: number
+  id: string
+  clientId: string
   phoneNumber: string
   createdAt: string
 }
 
 export interface ClientEmail {
-  id: number
-  clientId: number
+  id: string
+  clientId: string
   email: string
   createdAt: string
 }
 
 export interface AutoPolicy {
-  id: number
-  clientId: number
-  carrierId: number
+  id: string
+  clientId: string
+  carrierId: string
   policyNumber: string
   policyAddress1: string | null
   policyAddress2: string | null
@@ -51,9 +51,9 @@ export interface AutoPolicy {
 }
 
 export interface ClientDetail {
-  id: number
-  namedInsuredId: number
-  secondNamedInsuredId: number | null
+  id: string
+  namedInsuredId: string
+  secondNamedInsuredId: string | null
   mailingAddress1: string | null
   mailingAddress2: string | null
   mailingCity: string | null
@@ -73,13 +73,13 @@ export interface ClientDetail {
   policies: AutoPolicy[]
 }
 
-export function getClient(id: number, signal?: AbortSignal): Promise<ClientDetail> {
+export function getClient(id: string, signal?: AbortSignal): Promise<ClientDetail> {
   return request(`/clients/${id}`, { signal })
 }
 
 export interface UpdateClientBody {
-  namedInsuredId?: number
-  secondNamedInsuredId?: number | null
+  namedInsuredId?: string
+  secondNamedInsuredId?: string | null
   mailingAddress1?: string | null
   mailingAddress2?: string | null
   mailingCity?: string | null
@@ -96,12 +96,12 @@ export interface UpdateClientBody {
   emails?: string[]
 }
 
-export function updateClient(id: number, body: UpdateClientBody): Promise<ClientDetail> {
+export function updateClient(id: string, body: UpdateClientBody): Promise<ClientDetail> {
   return request(`/clients/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
 }
 
 export interface CreateClientBody extends UpdateClientBody {
-  namedInsuredId: number
+  namedInsuredId: string
 }
 
 export function createClient(body: CreateClientBody): Promise<ClientDetail> {
@@ -114,6 +114,9 @@ export function clientDisplayName(client: {
   return `${client.namedInsured.firstName} ${client.namedInsured.lastName}`
 }
 
-export function formatClientId(id: number): string {
-  return String(id).padStart(5, '0')
+// Ids are now opaque 22-char strings rather than zero-padded sequence
+// numbers, so there is nothing left to format - this just documents the
+// display convention (call sites still go through it in case that changes).
+export function formatClientId(id: string): string {
+  return id
 }

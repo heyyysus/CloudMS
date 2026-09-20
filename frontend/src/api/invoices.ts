@@ -14,11 +14,11 @@ export type InvoiceItemType =
 export type PaymentMethod = 'cash' | 'check' | 'credit_card' | 'debit_card'
 
 export interface InvoiceItem {
-  id: number
-  invoiceId: number
+  id: string
+  invoiceId: string
   category: InvoiceItemCategory
   type: InvoiceItemType
-  carrierId: number | null
+  carrierId: string | null
   description: string | null
   amount: string
   createdAt: string
@@ -29,61 +29,61 @@ export interface InvoiceItem {
 // payments/receipts. total/amountPaid are decimal strings; amount due is
 // total - amountPaid (compute via lib/money's toCents, never string-compare).
 export interface Invoice {
-  id: number
-  policyId: number
-  clientId: number
-  createdBy: number
+  id: string
+  policyId: string
+  clientId: string
+  createdBy: string
   status: InvoiceStatus
   total: string
   amountPaid: string
   note: string | null
   voidedAt: string | null
-  voidedBy: number | null
+  voidedBy: string | null
   voidReason: string | null
   createdAt: string
   updatedAt: string
   items: InvoiceItem[]
 }
 
-export function getInvoices(clientId: number, signal?: AbortSignal): Promise<Invoice[]> {
+export function getInvoices(clientId: string, signal?: AbortSignal): Promise<Invoice[]> {
   return request(`/invoices?clientId=${clientId}`, { signal })
 }
 
 export interface InvoicePayment {
-  id: number
-  invoiceId: number
-  policyId: number
-  clientId: number
+  id: string
+  invoiceId: string
+  policyId: string
+  clientId: string
   method: PaymentMethod
   amount: string
   amountApplied: string
   changeGiven: string
   note: string | null
   voidedAt: string | null
-  voidedBy: number | null
+  voidedBy: string | null
   voidReason: string | null
   createdAt: string
 }
 
 export interface InvoiceReceipt {
-  id: number
-  paymentId: number
-  invoiceId: number
-  policyId: number
-  clientId: number
+  id: string
+  paymentId: string
+  invoiceId: string
+  policyId: string
+  clientId: string
   amountApplied: string
   changeGiven: string
   amountDueAfter: string
   invoiceClosed: boolean
   note: string | null
   voidedAt: string | null
-  voidedBy: number | null
+  voidedBy: string | null
   voidReason: string | null
   createdAt: string
 }
 
 export interface InvoiceCreatedByUser {
-  id: number
+  id: string
   name: string | null
   email: string
 }
@@ -97,7 +97,7 @@ export interface InvoiceDetail extends Invoice {
   createdByUser: InvoiceCreatedByUser | null
 }
 
-export function getInvoice(id: number, signal?: AbortSignal): Promise<InvoiceDetail> {
+export function getInvoice(id: string, signal?: AbortSignal): Promise<InvoiceDetail> {
   return request(`/invoices/${id}`, { signal })
 }
 
@@ -108,13 +108,13 @@ export function amountDueCents(invoice: Pick<Invoice, 'total' | 'amountPaid'>): 
 export interface CreateInvoiceItemBody {
   category: InvoiceItemCategory
   type: InvoiceItemType
-  carrierId?: number | null
+  carrierId?: string | null
   description?: string | null
   amount: string
 }
 
 export interface CreateInvoiceBody {
-  policyId: number
+  policyId: string
   note?: string | null
   items: CreateInvoiceItemBody[]
 }
@@ -133,6 +133,6 @@ export interface VoidInvoiceBody {
 // voidReason), so callers can setQueryData with it instead of refetching.
 // Refusals arrive as ApiError 409s carrying the server's wording: "Invoice is
 // already void" / "Void the invoice's payments before voiding the invoice".
-export function voidInvoice(id: number, body: VoidInvoiceBody = {}): Promise<InvoiceDetail> {
+export function voidInvoice(id: string, body: VoidInvoiceBody = {}): Promise<InvoiceDetail> {
   return request(`/invoices/${id}/void`, { method: 'POST', body: JSON.stringify(body) })
 }

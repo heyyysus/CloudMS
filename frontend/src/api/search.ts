@@ -4,12 +4,12 @@ import type { ClientDetail } from './clients'
 export type SearchClientResult = Omit<ClientDetail, 'policies'>
 
 export interface SearchPolicyResult {
-  id: number
+  id: string
   policyNumber: string
   status: 'pending' | 'active' | 'cancelled' | 'expired'
   effectiveDate: string
   expirationDate: string
-  clientId: number
+  clientId: string
   clientName: string
 }
 

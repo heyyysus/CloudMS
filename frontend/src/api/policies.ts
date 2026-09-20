@@ -3,8 +3,8 @@ import { request } from './client'
 import type { AutoPolicy, Person } from './clients'
 
 export interface Vehicle {
-  id: number
-  policyId: number
+  id: string
+  policyId: string
   vin: string
   make: string
   model: string
@@ -25,13 +25,13 @@ export interface Vehicle {
 }
 
 export interface PolicyDriver {
-  id: number
-  policyId: number
-  driverId: number
+  id: string
+  policyId: string
+  driverId: string
   createdAt: string
   driver: {
-    id: number
-    personId: number
+    id: string
+    personId: string
     dlNumber: string | null
     rating: string
     sr22: boolean
@@ -41,9 +41,9 @@ export interface PolicyDriver {
 
 export interface PolicyDetail extends AutoPolicy {
   client: {
-    id: number
-    namedInsuredId: number
-    secondNamedInsuredId: number | null
+    id: string
+    namedInsuredId: string
+    secondNamedInsuredId: string | null
     mailingAddress1: string | null
     mailingAddress2: string | null
     mailingCity: string | null
@@ -62,7 +62,7 @@ export interface PolicyDetail extends AutoPolicy {
   policyDrivers: PolicyDriver[]
 }
 
-export function getPolicy(id: number, signal?: AbortSignal): Promise<PolicyDetail> {
+export function getPolicy(id: string, signal?: AbortSignal): Promise<PolicyDetail> {
   return request(`/policies/${id}`, { signal })
 }
 
@@ -87,7 +87,7 @@ export interface CreatePolicyVehicleBody {
 export type CreatePolicyDriverBody =
   | {
       kind: 'existing'
-      personId: number
+      personId: string
       // ignored by the server when the person already has a drivers row
       dlNumber?: string
       rating?: 'rated' | 'excluded'
@@ -109,8 +109,8 @@ export type CreatePolicyDriverBody =
     }
 
 export interface CreatePolicyBody {
-  clientId: number
-  carrierId: number
+  clientId: string
+  carrierId: string
   policyNumber: string
   policyAddress1: string | null
   policyAddress2: string | null
@@ -135,6 +135,6 @@ export function createPolicy(body: CreatePolicyBody): Promise<PolicyDetail> {
 // are replace-all when present ([] clears, [...] replaces atomically).
 export type UpdatePolicyBody = Partial<CreatePolicyBody>
 
-export function updatePolicy(id: number, body: UpdatePolicyBody): Promise<PolicyDetail> {
+export function updatePolicy(id: string, body: UpdatePolicyBody): Promise<PolicyDetail> {
   return request(`/policies/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
 }

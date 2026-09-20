@@ -1,7 +1,7 @@
 import { request } from './client'
 
 export interface Carrier {
-  id: number
+  id: string
   name: string
   naic: string
   isActive: boolean
@@ -36,6 +36,6 @@ export function createCarrier(body: CarrierBody): Promise<Carrier> {
 // There is deliberately no deleteCarrier: policies, invoice items, and trust
 // ledger rows all reference carriers with no cascade, so retiring one is
 // `isActive: false` rather than a delete that the server would reject anyway.
-export function updateCarrier(id: number, body: Partial<CarrierBody>): Promise<Carrier> {
+export function updateCarrier(id: string, body: Partial<CarrierBody>): Promise<Carrier> {
   return request(`/carriers/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
 }

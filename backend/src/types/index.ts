@@ -111,6 +111,13 @@ declare global {
   namespace Express {
     interface Request {
       user?: User
+      // Set by requireSession (and requireAuth, which calls it internally).
+      session?: Session
+      // Set by requireAuth only: the session's bound org and the caller's
+      // membership in it. Optional to match `user?`/the existing `req.user!`
+      // convention - routes behind requireAuth use `req.orgId!`/`req.membership!`.
+      orgId?: number
+      membership?: OrgMembership
     }
   }
 }

@@ -371,7 +371,7 @@ describe("dispatchReminders", () => {
 
     // And the send shows up in the policy's own history as the full email:
     // recipient, subject, and rendered body (merge fields expanded).
-    const policyLogs = await listPolicyLogsByPolicyId(policy.id)
+    const policyLogs = await listPolicyLogsByPolicyId(await ctx.orgId(), policy.id)
     expect(policyLogs).toHaveLength(1)
     expect(policyLogs[0].body.split("\n")[0]).toBe(`To: ${email.email}`)
     expect(policyLogs[0].body).toContain(`Subject: Your policy ${policy.policyNumber}`)
@@ -756,13 +756,23 @@ describe("policy activities", () => {
     expect(res.body.activities).toEqual([])
   })
 
-  it("empties out for an unknown policy rather than erroring", async () => {
+  it("404s for an unknown policy", async () => {
     const cookie = await cookieFor("act-unknown")
     const res = await request(app)
       .get(`/policies/${MISSING_ROW_ID}/activities`)
       .set("Cookie", cookie)
-    expect(res.status).toBe(200)
-    expect(res.body.activities).toEqual([])
+    expect(res.status).toBe(404)
+  })
+
+  it("404s for another org's policy", async () => {
+    const cookie = await cookieFor("act-wrongorg")
+    const other = await ctx.org()
+    const theirPolicy = await ctx.policy({ orgId: other.id })
+
+    const res = await request(app)
+      .get(`/policies/${theirPolicy.id}/activities`)
+      .set("Cookie", cookie)
+    expect(res.status).toBe(404)
   })
 })
 

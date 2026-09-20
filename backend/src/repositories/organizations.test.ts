@@ -30,7 +30,7 @@ describe("organizations repository", () => {
   })
 
   it("returns undefined for an unknown id", async () => {
-    expect(await findOrganizationById(-1)).toBeUndefined()
+    expect(await findOrganizationById("unknown000000000000000")).toBeUndefined()
   })
 
   it("finds an organization by slug", async () => {

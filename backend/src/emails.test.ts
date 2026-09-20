@@ -39,7 +39,7 @@ describe("renderTemplate", () => {
 
 describe("sendWelcomeEmail", () => {
   const ORIGINAL_ENV = { ...process.env }
-  const createdUserIds: number[] = []
+  const createdUserIds: string[] = []
 
   afterEach(async () => {
     vi.unstubAllGlobals()

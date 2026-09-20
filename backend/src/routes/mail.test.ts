@@ -213,7 +213,7 @@ const TEMPLATE_BODY = {
 
 // Templates aren't tracked by TestContext (they're global, not client-scoped),
 // so each test that creates one registers its id here for teardown.
-const templateIds: number[] = []
+const templateIds: string[] = []
 
 afterEach(async () => {
   if (templateIds.length) {
@@ -290,7 +290,7 @@ describe("POST /policies/:policyId/send-correspondence", () => {
   it("returns 401 without a cookie", async () => {
     const res = await request(app)
       .post("/policies/1/send-correspondence")
-      .send({ templateId: 1, to: ["a@example.com"] })
+      .send({ templateId: "1", to: ["a@example.com"] })
     expect(res.status).toBe(401)
   })
 

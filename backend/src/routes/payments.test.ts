@@ -17,8 +17,8 @@ async function authed(prefix: string, role: UserRole = "staff") {
 // $300 sweep + $100 fee = $400 total.
 async function makeInvoice(
   cookie: string,
-  policyId: number,
-  items: { category: string; type: string; carrierId?: number; amount: number }[] = [
+  policyId: string,
+  items: { category: string; type: string; carrierId?: string; amount: number }[] = [
     { category: "sweep", type: "new_business_sweep", amount: 300 },
     { category: "agency", type: "new_business_fee", amount: 100 },
   ]
@@ -31,12 +31,12 @@ async function makeInvoice(
 interface LogRow {
   logNumber: number
   body: string
-  author: { id: number }
+  author: { id: string }
 }
 
 // Accounting writes are auto-logged to the policy. Newest first (logNumber
 // descending), per GET /policy-logs.
-async function policyLogs(policyId: number, cookie: string): Promise<LogRow[]> {
+async function policyLogs(policyId: string, cookie: string): Promise<LogRow[]> {
   const res = await request(app).get(`/policy-logs?policyId=${policyId}`).set("Cookie", cookie)
   expect(res.status).toBe(200)
   return res.body
@@ -249,7 +249,7 @@ describe("accounting activity is written to the policy log", () => {
 describe("POST /payments (errors)", () => {
   it("returns 401 without a cookie", async () => {
     expect(
-      (await request(app).post("/payments").send({ invoiceId: 1, method: "cash", amount: 1 }))
+      (await request(app).post("/payments").send({ invoiceId: "1", method: "cash", amount: 1 }))
         .status
     ).toBe(401)
   })

@@ -20,7 +20,7 @@ afterEach(() => {
 })
 
 let fileCounter = 0
-async function makeAttachment(policyId: number, createdBy: number) {
+async function makeAttachment(policyId: string, createdBy: string) {
   fileCounter += 1
   return createPolicyAttachment({
     policyId,
@@ -33,13 +33,13 @@ async function makeAttachment(policyId: number, createdBy: number) {
 }
 
 interface LinkRow {
-  id: number
-  logId: number
-  linkedBy: { id: number; name: string | null; email: string }
-  attachment: { id: number; fileName: string; isVoided: boolean; sourceType: string }
+  id: string
+  logId: string
+  linkedBy: { id: string; name: string | null; email: string }
+  attachment: { id: string; fileName: string; isVoided: boolean; sourceType: string }
 }
 
-async function links(policyId: number, cookie: string): Promise<LinkRow[]> {
+async function links(policyId: string, cookie: string): Promise<LinkRow[]> {
   const res = await request(app)
     .get(`/policy-log-attachments?policyId=${policyId}`)
     .set("Cookie", cookie)

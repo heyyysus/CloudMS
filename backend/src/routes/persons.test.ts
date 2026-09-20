@@ -19,7 +19,7 @@ describe("GET /persons", () => {
 
     const res = await request(app).get("/persons").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.some((p: { id: number }) => p.id === person.id)).toBe(true)
+    expect(res.body.some((p: { id: string }) => p.id === person.id)).toBe(true)
   })
 })
 

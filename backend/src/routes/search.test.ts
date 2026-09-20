@@ -26,10 +26,10 @@ describe("GET /search", () => {
 
     const byName = await request(app).get("/search?q=Grouped99").set("Cookie", cookie)
     expect(byName.status).toBe(200)
-    expect(byName.body.clients.some((c: { id: number }) => c.id === client.id)).toBe(true)
+    expect(byName.body.clients.some((c: { id: string }) => c.id === client.id)).toBe(true)
 
     const byPolicy = await request(app).get("/search?q=GROUPED99-POL").set("Cookie", cookie)
-    expect(byPolicy.body.policies.some((p: { id: number }) => p.id === policy.id)).toBe(true)
+    expect(byPolicy.body.policies.some((p: { id: string }) => p.id === policy.id)).toBe(true)
   })
 
   it("matches a client by mailing city split across address fields", async () => {
@@ -44,7 +44,7 @@ describe("GET /search", () => {
 
     const res = await request(app).get("/search?q=Hoosville77").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.clients.some((c: { id: number }) => c.id === client.id)).toBe(true)
+    expect(res.body.clients.some((c: { id: string }) => c.id === client.id)).toBe(true)
   })
 
   it("matches a policy by its city and zip", async () => {
@@ -58,10 +58,10 @@ describe("GET /search", () => {
     })
 
     const byCity = await request(app).get("/search?q=Springvale77").set("Cookie", cookie)
-    expect(byCity.body.policies.some((p: { id: number }) => p.id === policy.id)).toBe(true)
+    expect(byCity.body.policies.some((p: { id: string }) => p.id === policy.id)).toBe(true)
 
     const byZip = await request(app).get("/search?q=62799").set("Cookie", cookie)
-    expect(byZip.body.policies.some((p: { id: number }) => p.id === policy.id)).toBe(true)
+    expect(byZip.body.policies.some((p: { id: string }) => p.id === policy.id)).toBe(true)
   })
 
   it("escapes % and _ so they are not treated as wildcards", async () => {
@@ -70,10 +70,10 @@ describe("GET /search", () => {
     const policy = await ctx.policy({ policyNumber: "ESC_98%TEST" })
 
     const literalMatch = await request(app).get("/search?q=ESC_98%25TEST").set("Cookie", cookie)
-    expect(literalMatch.body.policies.some((p: { id: number }) => p.id === policy.id)).toBe(true)
+    expect(literalMatch.body.policies.some((p: { id: string }) => p.id === policy.id)).toBe(true)
 
     const wildcardAttempt = await request(app).get("/search?q=ESCX98YTEST").set("Cookie", cookie)
-    expect(wildcardAttempt.body.policies.some((p: { id: number }) => p.id === policy.id)).toBe(
+    expect(wildcardAttempt.body.policies.some((p: { id: string }) => p.id === policy.id)).toBe(
       false
     )
   })

@@ -18,7 +18,7 @@ describe("GET /vehicles", () => {
 
     const res = await request(app).get("/vehicles").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.some((v: { id: number }) => v.id === vehicle.id)).toBe(true)
+    expect(res.body.some((v: { id: string }) => v.id === vehicle.id)).toBe(true)
   })
 
   it("filters by policyId", async () => {
@@ -31,7 +31,7 @@ describe("GET /vehicles", () => {
 
     const res = await request(app).get(`/vehicles?policyId=${policyA.id}`).set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.map((v: { id: number }) => v.id)).toEqual([vehicleA.id])
+    expect(res.body.map((v: { id: string }) => v.id)).toEqual([vehicleA.id])
   })
 
   it("returns 400 for a non-numeric policyId", async () => {

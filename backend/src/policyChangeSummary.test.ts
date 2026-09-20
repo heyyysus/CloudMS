@@ -11,9 +11,9 @@ import type { UpdatePolicyInput } from "./repositories/autoPolicies"
 // a given test are left at these defaults.
 function makePolicy(overrides: Partial<PolicyDetail> = {}): PolicyDetail {
   return {
-    id: 1,
-    clientId: 1,
-    carrierId: 1,
+    id: "1",
+    clientId: "1",
+    carrierId: "1",
     policyNumber: "POL-1",
     policyAddress1: null,
     policyAddress2: null,
@@ -27,7 +27,7 @@ function makePolicy(overrides: Partial<PolicyDetail> = {}): PolicyDetail {
     updatedAt: new Date(),
     client: {} as PolicyDetail["client"],
     carrier: {
-      id: 1,
+      id: "1",
       name: "Progressive",
       naic: "1234567890",
       createdAt: new Date(),
@@ -39,7 +39,7 @@ function makePolicy(overrides: Partial<PolicyDetail> = {}): PolicyDetail {
   }
 }
 
-function person(id: number, firstName: string, lastName: string) {
+function person(id: string, firstName: string, lastName: string) {
   return {
     id,
     firstName,
@@ -76,9 +76,9 @@ describe("summarizePolicyChanges", () => {
 
   it("reports a carrier change by name, not id", () => {
     const before = makePolicy({
-      carrierId: 1,
+      carrierId: "1",
       carrier: {
-        id: 1,
+        id: "1",
         name: "Progressive",
         naic: "1111111111",
         createdAt: new Date(),
@@ -86,9 +86,9 @@ describe("summarizePolicyChanges", () => {
       },
     })
     const after = makePolicy({
-      carrierId: 2,
+      carrierId: "2",
       carrier: {
-        id: 2,
+        id: "2",
         name: "Geico",
         naic: "2222222222",
         createdAt: new Date(),
@@ -96,7 +96,7 @@ describe("summarizePolicyChanges", () => {
       },
     })
 
-    const lines = summarizePolicyChanges(before, after, { carrierId: 2 })
+    const lines = summarizePolicyChanges(before, after, { carrierId: "2" })
     expect(lines).toEqual(["Carrier: Progressive → Geico"])
   })
 
@@ -105,8 +105,8 @@ describe("summarizePolicyChanges", () => {
     const after = makePolicy({
       vehicles: [
         {
-          id: 1,
-          policyId: 1,
+          id: "1",
+          policyId: "1",
           vin: "VIN1",
           make: "Honda",
           model: "Civic",
@@ -120,24 +120,24 @@ describe("summarizePolicyChanges", () => {
 
   it("reports added and removed vehicles by VIN when the vehicles key is present", () => {
     const keep = {
-      id: 1,
-      policyId: 1,
+      id: "1",
+      policyId: "1",
       vin: "KEEPVIN",
       make: "Honda",
       model: "Civic",
       year: 2020,
     } as PolicyDetail["vehicles"][number]
     const removed = {
-      id: 2,
-      policyId: 1,
+      id: "2",
+      policyId: "1",
       vin: "OLDVIN",
       make: "Ford",
       model: "Focus",
       year: 2018,
     } as PolicyDetail["vehicles"][number]
     const added = {
-      id: 3,
-      policyId: 1,
+      id: "3",
+      policyId: "1",
       vin: "NEWVIN",
       make: "Toyota",
       model: "Camry",
@@ -158,8 +158,8 @@ describe("summarizePolicyChanges", () => {
 
   it("lists every coverage carried by an added vehicle, skipping the blank ones", () => {
     const added = {
-      id: 3,
-      policyId: 1,
+      id: "3",
+      policyId: "1",
       vin: "NEWVIN",
       make: "Toyota",
       model: "Camry",
@@ -192,8 +192,8 @@ describe("summarizePolicyChanges", () => {
     const before = makePolicy({
       vehicles: [
         {
-          id: 1,
-          policyId: 1,
+          id: "1",
+          policyId: "1",
           vin: "SAMEVIN",
           make: "Honda",
           model: "Civic",
@@ -205,8 +205,8 @@ describe("summarizePolicyChanges", () => {
     const after = makePolicy({
       vehicles: [
         {
-          id: 1,
-          policyId: 1,
+          id: "1",
+          policyId: "1",
           vin: "SAMEVIN",
           make: "Honda",
           model: "Civic",
@@ -222,9 +222,9 @@ describe("summarizePolicyChanges", () => {
   })
 
   it("reports added and removed drivers by person when the drivers key is present", () => {
-    const kept = policyDriver(person(1, "Jane", "Kept"))
-    const removed = policyDriver(person(2, "John", "Removed"))
-    const added = policyDriver(person(3, "Alex", "Added"))
+    const kept = policyDriver(person("1", "Jane", "Kept"))
+    const removed = policyDriver(person("2", "John", "Removed"))
+    const added = policyDriver(person("3", "Alex", "Added"))
 
     const before = makePolicy({ policyDrivers: [kept, removed] })
     const after = makePolicy({ policyDrivers: [kept, added] })
@@ -242,7 +242,7 @@ describe("summarizePolicyChanges", () => {
   it("lists every detail of an added driver", () => {
     const added = policyDriver(
       {
-        ...person(3, "Alex", "Added"),
+        ...person("3", "Alex", "Added"),
         dateOfBirth: "1991-05-12",
         maritalStatus: "married",
         relationToInsured: "significant-other",
@@ -266,7 +266,7 @@ describe("summarizePolicyChanges", () => {
   it("omits an added driver's marital status and DL number when they are unset", () => {
     const added = policyDriver(
       {
-        ...person(3, "Alex", "Added"),
+        ...person("3", "Alex", "Added"),
         maritalStatus: null,
       } as PolicyDetail["policyDrivers"][number]["driver"]["person"],
       { dlNumber: null }

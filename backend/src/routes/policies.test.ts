@@ -31,7 +31,7 @@ describe("GET /policies", () => {
 
     const res = await request(app).get("/policies").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.some((p: { id: number }) => p.id === policy.id)).toBe(true)
+    expect(res.body.some((p: { id: string }) => p.id === policy.id)).toBe(true)
   })
 
   it("filters by clientId", async () => {
@@ -43,7 +43,7 @@ describe("GET /policies", () => {
 
     const res = await request(app).get(`/policies?clientId=${client.id}`).set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.map((p: { id: number }) => p.id)).toEqual([policyA.id])
+    expect(res.body.map((p: { id: string }) => p.id)).toEqual([policyA.id])
   })
 })
 
@@ -446,7 +446,7 @@ describe("GET /policies?q=", () => {
 
     const res = await request(app).get("/policies?q=SEARCHABLE-77").set("Cookie", cookie)
     expect(res.status).toBe(200)
-    expect(res.body.some((p: { id: number }) => p.id === policy.id)).toBe(true)
+    expect(res.body.some((p: { id: string }) => p.id === policy.id)).toBe(true)
   })
 
   it("returns 400 when q is too short", async () => {

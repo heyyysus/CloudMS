@@ -32,7 +32,7 @@ stage, and it is why recovery means *remove the label, then add it back*.
 
 ```
 issue opened
-  └─ agent-triage            → type + area labels        (never adds `agent`)
+  └─ agent-triage            → type + area + risk labels (never adds `agent`)
 `agent`                      → agent-trigger             → pipeline:needs-plan
 pipeline:needs-plan          → agent-planner             → pipeline:plan-ready    | needs-human
 pipeline:plan-ready          → agent-plan-reviewer       → pipeline:plan-approved | needs-human
@@ -139,13 +139,17 @@ Target **one coder run with no resume**: roughly **≤15 files**, a single
 `area:`, and acceptance criteria the coder can verify itself before it
 finishes.
 
-Weight that by risk, not just file count:
+Weight that by risk, not just file count. **`agent-triage` already classified
+it** — read the `risk:` label rather than working it out again:
 
-- **Smaller than the target** for schema/migration changes, auth, sessions, RLS,
-  and anything that alters money handling. `org_id NOT NULL` (#121) was
-  dangerous at any size.
-- **Larger is fine** for mechanical sweeps — renames, test fixture updates, doc
-  passes — where the work is repetitive and verification is cheap.
+- `risk:high` — halve the target. Schema and migrations, auth, sessions, RLS,
+  anything recording money. `org_id NOT NULL` (#121) was dangerous at any size.
+- `risk:medium` — the target as written.
+- `risk:low` — larger is fine. Mechanical sweeps (renames, fixture updates, doc
+  passes) are repetitive and cheap to verify.
+- **No `risk:` label** — triage could not classify it, or the issue predates
+  risk labelling. Judge it yourself by the criteria above, and say in the log
+  that you did.
 
 Evidence: every sub-issue of the multi-tenant epic (#119–#123) ran 20–43 files
 and exhausted the 200-turn coder, each needing a manual resume. The cap is now

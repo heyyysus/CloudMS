@@ -62,3 +62,11 @@ None. Implemented as scoped.
   headless shell via `npx playwright install chromium` first, since it wasn't
   present on this runner)
 - `cd frontend && npm run build` — pass
+
+## Docs
+
+Updated `docs/API.md`: plain `GET /clients` used to return bare Client rows;
+it now returns the same detail-minus-`policies` shape as `GET /clients?q=`
+(ordered by last name/first name, not filtered). Fixed the bare-Client
+description, the "search is a different shape" paragraph, the `/clients`
+table row, and the example-response caption to match.

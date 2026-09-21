@@ -10,7 +10,7 @@ needs-plan ────► agent-planner (opus)      writes plan.md → pipeline
 plan-ready ────► agent-plan-reviewer       writes review.md → plan-approved | needs-human
 plan-approved ─► agent-coder (sonnet)      code + notes.md → pipeline:docs
 docs ──────────► agent-docs (sonnet)       docs commit, opens PR → pipeline:pr-open
-PR opened/push ► agent-pr-review (sonnet)  review comment → pipeline:pr-reviewed
+PR opened/push ► agent-pr-review (opus)    review comment → pipeline:pr-reviewed
 merge ─────────► agent-cleanup             strips pipeline:* labels
 ```
 
@@ -35,7 +35,8 @@ reviewed commit so only new pushes are re-reviewed).
 - `pipeline:*` — current stage; exactly one at a time. Set only by the workflows.
 - `needs-human` — something stopped: plan rejected, a stage failed, a blocking
   security finding, or the PR was closed unmerged.
-- `agent:deep-review` — put on a PR to make the PR review use Opus.
+- `agent:deep-review` — put on a PR to make the PR review deeper: full line-by-line
+  audit prompt, more turns and time, a bigger diff cap. PR review runs Opus either way.
 - `area:*`, `bug`/`enhancement`/`documentation`/`question` — Haiku triage guesses.
 
 ## Resuming / intervening
@@ -53,8 +54,9 @@ reviewed commit so only new pushes are re-reviewed).
 
 Each stage has `--max-turns` and a job `timeout-minutes` (the coder gets 200 turns and
 90 minutes; every tool call is a turn). Every run writes a token / cost table to the job
-summary (Actions → run → Summary). Opus is used only by the planner unless you add
-`agent:deep-review`. `/code-review ultra` is never automated.
+summary (Actions → run → Summary). Opus runs the planner (once per issue) and the PR
+review (once per push); `agent:deep-review` widens the PR review's turns, timeout, and
+diff cap rather than switching models. `/code-review ultra` is never automated.
 
 ## Setup (once)
 

@@ -9,7 +9,7 @@ label() { gh label create "$1" --repo "$repo" --color "$2" --description "$3" --
 
 # Opt-in / control
 label "agent"                  "0E8A16" "Opt-in: run the automated agent pipeline on this issue"
-label "agent:deep-review"      "5319E7" "Use Opus for the PR review of this PR (manual opt-in)"
+label "agent:deep-review"      "5319E7" "Use a deeper PR review for this PR (manual opt-in)"
 label "needs-human"            "B60205" "Pipeline halted; a human must look at this"
 
 # Pipeline state machine (one active at a time)

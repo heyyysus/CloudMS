@@ -1,11 +1,32 @@
-import { and, eq } from "drizzle-orm"
+import { and, asc, eq, inArray } from "drizzle-orm"
 import { db } from "../db"
 import { autoPolicies, clientEmails, clientPhones, clients, persons } from "../db/schema"
 import type { Client, NewClient } from "../types"
 import { CrossOrgReferenceError } from "./errors"
 
-export async function listClients(orgId: string): Promise<Client[]> {
-  return db.select().from(clients).where(eq(clients.orgId, orgId))
+export async function listClients(orgId: string) {
+  const matches = await db
+    .select({ id: clients.id })
+    .from(clients)
+    .innerJoin(persons, and(eq(clients.namedInsuredId, persons.id), eq(persons.orgId, orgId)))
+    .where(eq(clients.orgId, orgId))
+    .orderBy(asc(persons.lastName), asc(persons.firstName))
+
+  if (matches.length === 0) return []
+
+  const ids = matches.map((m) => m.id)
+  const rows = await db.query.clients.findMany({
+    where: and(inArray(clients.id, ids), eq(clients.orgId, orgId)),
+    with: {
+      namedInsured: true,
+      secondNamedInsured: true,
+      phones: { where: eq(clientPhones.orgId, orgId) },
+      emails: { where: eq(clientEmails.orgId, orgId) },
+    },
+  })
+
+  const byId = new Map(rows.map((r) => [r.id, r]))
+  return ids.map((id) => byId.get(id)).filter((r) => r !== undefined)
 }
 
 export async function findClientById(orgId: string, id: string): Promise<Client | undefined> {

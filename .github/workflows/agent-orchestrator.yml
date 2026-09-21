@@ -186,7 +186,14 @@ jobs:
           allowed_tools: "Read,Grep,Glob,Bash"
           prompt: ${{ env.PROMPT }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ github.token }}
+          # PIPELINE_BOT_TOKEN, not github.token: anything done with the default
+          # GITHUB_TOKEN creates no workflow runs. Every other stage adds its
+          # chain-advancing label from a shell step carrying GH_TOKEN; this stage
+          # has no such step — the model adds labels itself with `gh` inside this
+          # action. If the action exports its github_token as GH_TOKEN it would
+          # shadow the job-level one, and every `agent` label would silently
+          # start nothing.
+          github_token: ${{ secrets.PIPELINE_BOT_TOKEN }}
 
       - name: Report a run that did not finish
         if: steps.control.outputs.skip != 'true' && steps.claude.outputs.stop_reason != 'success'

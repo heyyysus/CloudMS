@@ -23,12 +23,15 @@ Cloud CMS is early-stage. What's built so far:
 
 **Frontend** — a Vite + React 19 single-page app in TypeScript, talking to the API over `/api/v1`. Routing is `react-router`, server state is TanStack Query, and forms are react-hook-form + zod. The UI is Tailwind CSS v4 with shadcn/ui components vendored into the repo as owned source over Radix primitives, plus lucide icons; `docs/frontend-ui-design.md` covers the design system and its conventions in depth.
 
-Sign-in is Google Sign-In exchanged for the backend's httpOnly `session` cookie, held in an auth context and enforced on protected routes by a `RequireAuth` guard, with dedicated `/login` and `/logout` pages (see `docs/AUTH_SESSIONS_EXPLAINED.md`). Around that sits an authenticated app shell: a sidebar layout, a light/dark/system theme toggle, tabs for the clients you have open (persisted to `localStorage`), and a ⌘K command palette that searches clients and policies. The screens themselves:
+Sign-in is Google Sign-In exchanged for the backend's httpOnly `session` cookie, bound to an active organization, held in an auth context and enforced on protected routes by a `RequireAuth` guard, with dedicated `/login` and `/logout` pages (see `docs/AUTH_SESSIONS_EXPLAINED.md`). A session with more than one active org membership lands on a login org picker (`SelectOrg`, `components/auth/org-picker.tsx`) before it can bind; a bound session can switch orgs from a sidebar switcher (`components/layout/org-switcher.tsx`). Around that sits an authenticated app shell: a sidebar layout, a light/dark/system theme toggle, tabs for the clients you have open (persisted to `localStorage`), and a ⌘K command palette that searches clients and policies. The screens themselves:
 
 - `/home` — a placeholder dashboard; its cards are still stubs
 - `/clients/:clientId` — the working screen: a client summary, the client's policies as tabs (each with its vehicles and their coverages, and its rated drivers), the selected policy's append-only log, and the client's invoices, with dialogs to record a payment and to produce a printable receipt/invoice summary
+- `/admin`, `/admin/users`, `/admin/carriers`, `/admin/correspondence`, `/admin/reminders`, `/admin/trust-accounting` — admin-facing screens for org users/carriers, trust-ledger review, and reminder/correspondence-template management
 
 Vehicle entry decodes a VIN against the NHTSA vPIC API to prefill year, make, and model. For quality, oxlint and `tsc` run over the codebase, and Storybook stories double as the test suite — executed in a real Chromium through Vitest's browser mode — alongside a few plain unit tests for the helpers in `src/lib`.
+
+**Organizations** — an agency is an organization in the database: `organizations` (name, slug, `next_invoice_number`, `next_receipt_number`) and `org_memberships` (linking a user to an org with a role, unique per user/org pair) let one user belong to multiple organizations. Every tenant-owned table carries `org_id`, and a carrier's NAIC and a policy's policy number are unique per organization rather than globally. Isolation is two layers: every repository function takes `orgId` as its first argument and filters by it (layer 1), and Postgres row-level security is the backstop (layer 2), enforced through the `db` (non-superuser `app` role, `DATABASE_URL`) vs `adminDb` (owner role, `DATABASE_ADMIN_URL`) split — `adminDb` is reserved for schema push, bootstrap/seed, and the reminder planner/dispatcher. Every row id (primary key and foreign key alike) is 128 random bits rendered as an opaque, unpadded 22-character base64url string, generated both DB-side and Drizzle-side, so no id anywhere leaks creation order or row count. See `docs/multitenancy.md`.
 
 **Domain model** — the data model for the first supported line of business (personal auto) is in place:
 
@@ -44,22 +47,32 @@ Vehicle entry decodes a VIN against the NHTSA vPIC API to prefill year, make, an
 - `invoices` / `invoiceItems` — policy-scoped charges, where each line item is either a `sweep` (the carrier's share) or an `agency` fee
 - `payments` / `receipts` — payments recorded against an invoice, each one minting a receipt
 - `trustLedger` — every movement of money in or out of the agency trust account
+- `emailTemplates` / `emailLog` — org-authored, merge-field-driven correspondence templates (plus the singleton `welcome` invite email), and every send's outcome
+- `reminderRules` / `scheduledEmails` — standing rules that schedule a template send off a policy date (e.g. a renewal reminder), and the resulting per-occurrence send queue
 
 Accounting follows a trust model: a client pays the agency, the funds sit in the agency's trust account, and once an invoice is paid in full the carrier's share is swept out and the agency keeps its fee. Those records are immutable — corrections are made by voiding, which posts reversing ledger entries rather than editing or deleting rows. `docs/API.md` documents the endpoints.
 
-**Deployment** — Docker Compose orchestrates the stack: nginx, the API container, and Postgres. nginx does double duty — it serves the built frontend as static files and reverse-proxies `/api/v1/` to the API, stripping the prefix. TLS terminates at nginx using a Cloudflare Origin CA certificate with Cloudflare in front of it; Certbot is no longer part of the stack (see `docs/cloudflare-https.md`). This is the one and only deployment: every agency will be an organization inside it, and there is no per-agency stack, host, or database (see `docs/multitenancy.md`). Today the schema has no organization yet, so a deployment holds exactly one agency.
+**Correspondence and reminders** — automated email ships today: `backend/src/mailer.ts` sends through Resend, and `backend/src/jobs/{planner,dispatcher,scheduler}.ts` plan and dispatch reminder-rule sends with leader election and `FOR UPDATE SKIP LOCKED`, so running several app containers needs no extra configuration. Staff can also send one-off correspondence from an admin-authored template. Automated SMS and AI-assisted communication remain future work.
+
+**Deployment** — Docker Compose orchestrates the stack: nginx, the API container, and Postgres. nginx does double duty — it serves the built frontend as static files and reverse-proxies `/api/v1/` to the API, stripping the prefix. TLS terminates at nginx using a Cloudflare Origin CA certificate with Cloudflare in front of it; Certbot is no longer part of the stack (see `docs/cloudflare-https.md`). This is the one and only deployment: every agency is an organization inside it, and there is no per-agency stack, host, or database (see `docs/multitenancy.md`).
 
 CI/CD runs as two GitHub Actions workflows. `ci.yml` typechecks, lints, format-checks, tests, and builds the backend — path-filtered, so it only runs when backend or infrastructure files change — and deploys to the production host on merge to `main`. `frontend.yml` lints and builds the frontend on changes under `frontend/`, then deploys by rsyncing the built assets to the host and restarting nginx, since the frontend isn't containerized. One gap worth naming: the frontend's Vitest/Storybook suite isn't wired into CI yet — only lint and build run there.
 
-**Not yet built** — none of the AI or automated SMS/email features described above exist in code yet, and third-party/carrier integration so far is limited to VIN decoding and TurboRater rater-file import. The Home dashboard's client/policy/activity summary cards are still placeholders — the only real content there today is the rater-file drop target — and personal auto remains the only line of business modeled. Multi-tenancy is designed but not built: there is no `organizations` table, no `org_id` on any row, and no demo org. The domain model's `clientPhones`/`clientEmails` tables already capture the contact data those future features will need.
+**Not yet built** — automated email ships today (see **Correspondence and reminders** above), but automated SMS and AI-assisted features described above don't exist in code yet, and third-party/carrier integration so far is limited to VIN decoding and TurboRater rater-file import. The Home dashboard's client/policy/activity summary cards are still placeholders — the only real content there today is the rater-file drop target — and personal auto remains the only line of business modeled. The domain model's `clientPhones`/`clientEmails` tables already capture the contact data those future features will need.
+
+Multi-tenancy's remaining pieces (see `docs/multitenancy.md`):
+
+- **Organization creation and first-admin bootstrap.** Inviting a user into an org that already exists ships today as `POST /users/invite`; what's missing is a route that creates the organization and seats its first admin.
+- **Organization settings columns**, to retire the last agency-level environment variables — `MAIL_REPLY_TO`, `REMINDER_TIMEZONE`, `REMINDER_SEND_HOUR` — together with per-organization scoping of the reminder planner.
+- **A demo org** living in the same deployment.
 
 ## Direction
 
 Roughly, in order:
 
 1. Turn the Home dashboard into a real landing page — a client list and search — and wire the frontend test suite into CI.
-2. Make the app multitenant so it can be released to more than one agency: an `organizations` table, `org_id` on every tenant-owned row, organization-scoped repositories, per-organization invoice and receipt numbering, organization settings in place of agency-level environment variables, an organization creation and invite flow, and a demo org that lives in the same deployment. The full plan is `docs/multitenancy.md`.
+2. **Mostly done (#117, #119, #120, #121, #122, #130).** Make the app multitenant so it can be released to more than one agency. Shipped: an `organizations` table, `org_id` on every tenant-owned row, organization-scoped repositories, row-level security as the backstop, per-organization invoice and receipt numbering, and opaque row ids. What is left is listed under **Not yet built** above; the full plan is `docs/multitenancy.md`.
 3. Expand the domain model beyond personal auto to additional lines of business.
 4. Layer in carrier and third-party integrations so data enters the system without manual re-keying.
-5. Add automated SMS/email communication for renewals, document requests, and policy updates.
+5. Add automated SMS communication for renewals, document requests, and policy updates — email is done, see **Correspondence and reminders** above.
 6. Introduce AI-assisted workflows on top of the above — communication drafting, document summarization, and underwriting/coverage-gap review.

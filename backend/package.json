@@ -16,6 +16,7 @@
     "test:coverage": "vitest run --coverage",
     "db:push": "ts-node src/db/extensions.ts && drizzle-kit push --force && ts-node src/db/roles.ts",
     "db:bootstrap": "ts-node src/db/bootstrap.ts",
+    "db:backfill-org": "ts-node src/db/backfillOrgIds.ts",
     "db:studio": "drizzle-kit studio",
     "db:seed": "ts-node src/db/seed.ts",
     "r2:configure-cors": "ts-node src/scripts/configure-r2-cors.ts",

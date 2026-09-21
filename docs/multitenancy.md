@@ -12,9 +12,9 @@ copy for one large customer remains possible later, because a multitenant
 build with one organization in it *is* a single-tenant deployment; the reverse
 is not true.
 
-The rest of this document is the plan. None of it is implemented yet; it is
-here so that work in flight lands on the same design. Sections marked **Open**
-are decisions still to be made.
+The rest of this document describes what is built. Sections marked **Open**
+are decisions still to be made; the remaining rollout items not yet built are
+called out where they appear.
 
 ## What was ruled out
 
@@ -137,17 +137,88 @@ both touch every table's columns.
   enforces scoping and a forgotten filter is a type error, not a data leak.
   The comment at the top of `backend/src/repositories/index.ts` anticipated
   exactly this. Cross-organization lookups do not exist in the API.
-- **Row-level security as a backstop, later:** a non-superuser database role,
-  `SET LOCAL app.org_id` at the start of each request transaction, and an RLS
-  policy on every tenant table. This is defense in depth against a missed
-  `where`, not the primary mechanism. The non-superuser `app` role already
-  exists (the API and the test suite connect as it) — only `SET LOCAL
-  app.org_id` and the policies themselves remain. **Since #121,** the
-  reminder planner and dispatcher run through `adminDb` (the owner role)
-  instead, because a background job has no request to hang `SET LOCAL
-  app.org_id` off of; until RLS lands, their own `p.org_id = r.org_id`-style
-  joins are what prevents cross-tenant reads, not a database-level backstop.
-  See `backend/src/db/index.ts`'s comment.
+- **Done (#122): row-level security as a backstop.** Isolation layer 1 is
+  every repository filtering by an explicit `orgId`; layer 2 is Postgres
+  itself refusing to show the non-superuser `app` role rows outside the
+  current org, so a repository call that forgot its `where` still can't leak
+  data. `backend/src/db/rls.ts` runs after `roles.ts` on every `db:push` and,
+  for each of the 21 tenant tables listed there, idempotently enables and
+  *forces* row-level security and creates a `FOR ALL` policy of `org_id =
+  current_setting('app.org_id', true)` for both `USING` and `WITH CHECK`. A
+  request that sets no `app.org_id` sees zero rows, not an error and not
+  everything — that's what makes RLS a backstop rather than an opt-in. A
+  completeness check in the same file queries `information_schema.columns`
+  for any `public` table with an `org_id` column and throws if it isn't in
+  the tenant list (or the deliberately-unprotected `users` / `sessions` /
+  `org_memberships` / `organizations`), so a new tenant table can't go live
+  unpolicied. `FORCE ROW LEVEL SECURITY` also binds the table *owner*, so
+  this only holds because `DATABASE_ADMIN_URL` is a superuser in every
+  environment this repo runs in; `ALTER ROLE ... BYPASSRLS` on the owner role
+  is the mitigation if that ever changes.
+
+  `organizations` is deliberately **not** RLS-protected, alongside `users`,
+  `sessions`, and `org_memberships`: `GET /auth/me` and the org picker read
+  it under `requireSession`, before any org context exists, so a row policy
+  keyed on `app.org_id` would 404 the picker itself. All four tables are
+  reached only through the auth layer, never through a repository that might
+  forget an `org_id` filter, so RLS has nothing to backstop there.
+
+  A request carries its org into the database as a transaction, not a
+  per-statement setting: `requireAuth` (`backend/src/auth/middleware.ts`)
+  opens `runInOrg(req.orgId, ...)` around the rest of the request once the
+  session and membership are resolved, which starts a transaction on the
+  `app`-role pool, sets `app.org_id` on it with `set_config(..., true)` (the
+  same trick `roles.ts` uses, since `SET` takes a literal, not a bind
+  parameter), and stores it in an `AsyncLocalStorage`
+  (`backend/src/db/context.ts`). The `db` that every repository already
+  imports is a `Proxy` that resolves to that stored transaction when one is
+  open and to the plain `app`-role pool otherwise, so none of the ~40
+  existing `import { db } from "../db"` call sites changed. The transaction
+  commits when the response finishes sending (on `res`'s `"close"` event, so
+  it also covers an aborted connection), which means one in-flight request
+  now pins one pooled connection for its full duration, including any
+  external I/O the handler does; `DB_POOL_MAX` (default 20, `.env.example`)
+  is the resulting concurrency cap, sized against Postgres's own
+  `max_connections`. A repository or route calling `db.transaction(...)`
+  inside a request becomes a savepoint on that same connection, which is the
+  correct semantics for the repositories that already nest transactions
+  (`payments`, `invoices`, `autoPolicies`, `clients`, ...). Code with no
+  request to hang a transaction off of — a script, a test calling a
+  repository directly — calls `runInOrg(orgId, fn)` itself; `TestContext`'s
+  fixture builders do this so ordinary repository tests don't have to.
+
+  `adminDb` (`backend/src/db/pools.ts`) is the table-owner role and bypasses
+  RLS entirely; it stays reserved for schema push, role grants,
+  bootstrap/seed, and the reminder planner/dispatcher (a background job has
+  no request-scoped org context, so its own `p.org_id = r.org_id`-style joins
+  are what prevent cross-tenant reads there, not RLS). An ESLint rule
+  (`backend/eslint.config.js`) blocks importing `adminDb` from anywhere
+  outside `src/db/**`, `src/jobs/**`, `src/routes/testHelpers.ts`, and
+  `*.test.ts` files, so the boundary is enforced, not just documented.
+
+  Two suites prove this end to end: `backend/src/db/rls.test.ts` runs a
+  hand-written query with no `org_id` filter at all inside an org context and
+  confirms another org's row is invisible (while the same query on `adminDb`
+  sees both), and confirms `SELECT` on a tenant table with no org context set
+  returns zero rows — the one place a global row-count assertion is
+  legitimate, since RLS makes it deterministically zero regardless of
+  concurrent workers. `backend/src/routes/crossTenant.test.ts` drives a
+  table of every org-scoped HTTP endpoint (list/detail/create-with-parent, or
+  an `exempt` entry with a written reason) with an org-A cookie against
+  org-B's fixtures, and separately walks the app's registered routes to
+  assert every one of them has an entry, so a new route without cross-tenant
+  coverage fails the build.
+
+  A commit landing after the response is already on the wire is a known,
+  accepted trade-off: a `201` can reach the client moments before `COMMIT`
+  returns, so a commit failure that only shows up then (a lost connection, a
+  serialization failure) means the client was told about a write that did
+  not durably happen. The alternative — a pinned connection with
+  session-level `SET` and autocommit per statement — gives up request
+  atomicity to close that gap, which is worse. A pg error a handler lets
+  escape aborts the transaction; Postgres turns the subsequent `COMMIT` into
+  a no-op `ROLLBACK` without raising, so the request's earlier writes are
+  correctly discarded and `requireAuth`'s wrapper just logs it.
 
 ## Organization settings replace environment variables
 
@@ -226,7 +297,8 @@ created automatically by a migration.
    scoping remain.
 7. Organization creation and invite flow; retire `ADMIN_EMAIL`.
 8. Demo org: flag, demo sign-in, org-scoped reseed, guardrail settings, banner.
-9. Row-level security backstop (#122).
+9. **Done (#122):** row-level security backstop — see *Request scoping*
+   above.
 
 ## History
 

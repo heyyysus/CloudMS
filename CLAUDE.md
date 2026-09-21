@@ -1,5 +1,16 @@
 # CLAUDE.md
 
+## Multi-tenancy
+
+Every repository function takes `orgId` as its first argument, and filters by
+it — that's isolation layer 1. Row-level security is layer 2, the backstop:
+never import `adminDb` outside `db/`, `jobs/`, and the seed (an ESLint rule
+enforces this); everywhere else, `db` resolves through the current request's
+org context. Route handlers run inside that context automatically
+(`requireAuth` opens it); anything that calls a repository outside a request —
+a script, a test — must wrap the call in `runInOrg`. See
+`docs/multitenancy.md`.
+
 ## Concurrent agents
 
 **Rule: every task must be safe to run while other agents are working in this

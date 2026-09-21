@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { db } from "./db"
+import { db, runInOrg } from "./db"
 import { emailLog } from "./db/schema"
 import { extractMergeFields, renderTemplate, sendWelcomeEmail } from "./emails"
 import { makeTestUser, TestContext } from "./routes/testHelpers"
@@ -76,12 +76,14 @@ describe("sendWelcomeEmail", () => {
     const fetchMock = stubResend({ id: "msg_1" })
     const { invitee, admin, orgId } = await makeUsers()
 
-    const result = await sendWelcomeEmail(orgId, invitee, admin, "staff")
+    const result = await runInOrg(orgId, () => sendWelcomeEmail(orgId, invitee, admin, "staff"))
 
     expect(result).toEqual({ status: "sent", resendId: "msg_1" })
     expect(fetchMock).toHaveBeenCalledTimes(1)
 
-    const [logRow] = await db.select().from(emailLog).where(eq(emailLog.recipient, invitee.email))
+    const [logRow] = await runInOrg(orgId, () =>
+      db.select().from(emailLog).where(eq(emailLog.recipient, invitee.email))
+    )
     expect(logRow.status).toBe("sent")
     expect(logRow.resendId).toBe("msg_1")
     expect(logRow.triggeredBy).toBe(admin.id)
@@ -92,10 +94,12 @@ describe("sendWelcomeEmail", () => {
     delete process.env.MAIL_FROM
     const { invitee, admin, orgId } = await makeUsers()
 
-    const result = await sendWelcomeEmail(orgId, invitee, admin, "staff")
+    const result = await runInOrg(orgId, () => sendWelcomeEmail(orgId, invitee, admin, "staff"))
 
     expect(result.status).toBe("failed")
-    const [logRow] = await db.select().from(emailLog).where(eq(emailLog.recipient, invitee.email))
+    const [logRow] = await runInOrg(orgId, () =>
+      db.select().from(emailLog).where(eq(emailLog.recipient, invitee.email))
+    )
     expect(logRow.status).toBe("failed")
   })
 })

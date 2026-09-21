@@ -17,6 +17,19 @@ module.exports = tseslint.config(
     },
     rules: {
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/db", "**/db/index", "**/db/pools"],
+              importNames: ["adminDb"],
+              message:
+                "adminDb bypasses row-level security. Use db; owner-side code lives in db/, jobs/, and the seed.",
+            },
+          ],
+        },
+      ],
     },
   },
   {
@@ -27,6 +40,12 @@ module.exports = tseslint.config(
     },
     rules: {
       "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+  {
+    files: ["src/db/**", "src/jobs/**", "src/routes/testHelpers.ts", "**/*.test.ts"],
+    rules: {
+      "no-restricted-imports": "off",
     },
   }
 )

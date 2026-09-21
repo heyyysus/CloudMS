@@ -6,9 +6,8 @@ name: agent-pr-fixer
 # is current, builds an environment the fixer can actually run tests in, and
 # hands it to Opus.
 #
-# Rounds are self-limiting: fixing pushes to the branch, which re-triggers
-# agent-pr-review, whose completion re-triggers this. The fixer counts its own
-# marker comments and escalates on the third round rather than looping.
+# Rounds are self-limiting: the fixer counts its own marker comments and
+# escalates on the third round rather than looping.
 #
 # Postgres and a full install are present because a fix that has not been run
 # is a guess. The whole point of this stage is to stop pushing those.
@@ -171,6 +170,11 @@ jobs:
             echo "The branch is checked out at the PR head. Dependencies are installed and"
             echo "Postgres is running, so you can run the backend and frontend suites directly."
             echo
+            echo "Push with \`git push origin ${BRANCH}\`. That push carries GITHUB_TOKEN, so"
+            echo "GitHub creates no workflow runs for it: CI and agent-pr-review will NOT re-run"
+            echo "on your commit. Say so plainly in your round comment, and do not wait for a"
+            echo "review that is not coming."
+            echo
             echo "Read the review comment, the issue, and the diff with \`gh\` before deciding."
             echo "Check the changed paths against the deny-list yourself — do not trust the"
             echo "\`risk:\` label alone."
@@ -195,10 +199,16 @@ jobs:
           allowed_tools: "Read,Grep,Glob,Bash,Edit,Write"
           prompt: ${{ env.PROMPT }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          # The bot token, not github.token: a push made with the default
-          # GITHUB_TOKEN creates no workflow runs, so CI and agent-pr-review
-          # would never re-run and the round would never close.
-          github_token: ${{ secrets.PIPELINE_BOT_TOKEN }}
+          # github.token, because claude-code-action reconfigures git credentials
+          # from this input and PIPELINE_BOT_TOKEN has no `contents: write` — with
+          # the PAT here, `git push` 403s and a round's fix is lost with the runner.
+          # The job's `permissions: contents: write` covers GITHUB_TOKEN, so pushes
+          # land. The cost is that a GITHUB_TOKEN push fires no `synchronize`, so
+          # agent-pr-review does not re-run on its own; the prompt tells the fixer
+          # to say so, and the orchestrator's pipeline:pr-reviewed budget catches
+          # the PR. Grant the PAT `contents: write` and put it back here — then
+          # rounds close without a human.
+          github_token: ${{ github.token }}
 
       - name: Report a run that did not finish
         if: steps.ctx.outputs.skip != 'true' && steps.claude.outputs.stop_reason != 'success'
@@ -214,7 +224,7 @@ jobs:
 
           $RUN_URL
 
-          Anything it pushed stands. If it pushed, agent-pr-review runs again and the next
-          round starts from there; if it did not, the PR is unchanged.
+          Anything it pushed stands. If it pushed, the PR carries it; agent-pr-review does not
+          re-run on a GITHUB_TOKEN push, so check the head SHA rather than waiting for a verdict.
           EOF
           gh issue comment "$LOG_ISSUE" --body-file "$RUNNER_TEMP/body.md"

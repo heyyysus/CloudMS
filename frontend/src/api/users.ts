@@ -15,8 +15,11 @@ export interface InviteEmailResult {
 
 // The admin view of a user: everything `User` carries plus the account state
 // only admins need. `hasSignedIn` distinguishes an invited user who has never
-// completed a Google sign-in from one who has.
+// completed a Google sign-in from one who has. `role` here is that user's
+// role on the admin's active org (from their membership row), not the
+// current session's own role - unrelated to `Me.role`.
 export interface AdminUser extends User {
+  role: 'admin' | 'staff'
   isActive: boolean
   hasSignedIn: boolean
   createdAt: string

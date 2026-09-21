@@ -42,7 +42,7 @@ function ClientDetail() {
   const isValidId = clientId.length > 0
   const { openTab, removeTab } = useClientTabs()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, role } = useAuth()
   const queryClient = useQueryClient()
 
   const {
@@ -316,7 +316,7 @@ function ClientDetail() {
                             <SendCorrespondenceDialog
                               client={client}
                               policy={query.data}
-                              isAdmin={user?.role === 'admin'}
+                              isAdmin={role === 'admin'}
                             />
                             <EditPolicyDialog
                               client={client}
@@ -418,7 +418,7 @@ function ClientDetail() {
         client={client}
         policies={client.policies}
         invoiceId={receiptInvoiceId}
-        isAdmin={user?.role === 'admin'}
+        isAdmin={role === 'admin'}
         open={receiptDialogOpen}
         onOpenChange={(next) => {
           setReceiptDialogOpen(next)

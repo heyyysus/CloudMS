@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthContext'
 import { logout } from '../api/auth'
 
 function Logout() {
-  const { setUser } = useAuth()
+  const { setMe } = useAuth()
   const navigate = useNavigate()
   const ran = useRef(false)
 
@@ -16,10 +16,10 @@ function Logout() {
     logout()
       .catch(() => undefined)
       .finally(() => {
-        setUser(null)
+        setMe(null)
         navigate('/login', { replace: true })
       })
-  }, [navigate, setUser])
+  }, [navigate, setMe])
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-3 text-muted-foreground">

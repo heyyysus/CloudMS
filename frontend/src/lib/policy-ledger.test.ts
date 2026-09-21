@@ -5,6 +5,7 @@ import type { Invoice, InvoicePayment } from '@/api/invoices'
 function makeInvoice(overrides: Partial<Invoice> = {}): Invoice {
   return {
     id: '1',
+    invoiceNumber: 1,
     policyId: '900',
     clientId: '155',
     createdBy: '1',

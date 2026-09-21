@@ -1,9 +1,15 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
-import { expect, fn, userEvent, within } from 'storybook/test'
+import { expect, fn, screen, userEvent, within } from 'storybook/test'
 import { MemoryRouter } from 'react-router'
 import { AppSidebar } from './app-sidebar'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import type { Membership } from '@/api/auth'
+
+const memberships: Membership[] = [
+  { orgId: 'org-1', name: 'Acme Insurance', slug: 'acme', role: 'admin' },
+  { orgId: 'org-2', name: 'Beacon Agency', slug: 'beacon', role: 'staff' },
+]
 
 const meta = {
   title: 'layout/AppSidebar',
@@ -68,6 +74,51 @@ export const AdminCollapsed: Story = {
     for (const title of ['Invite User', 'Manage Users', 'Manage Carriers', 'Trust Accounting']) {
       await expect(canvas.getByRole('link', { name: title })).toBeInTheDocument()
     }
+  },
+}
+
+// A single membership links straight to /home - no dropdown to switch to.
+export const SingleOrg: Story = {
+  args: { orgName: 'Acme Insurance', memberships: [memberships[0]], activeOrgId: 'org-1' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByRole('link', { name: /Acme Insurance/ })).toBeInTheDocument()
+    await expect(canvas.queryByRole('button', { name: /Acme Insurance/ })).not.toBeInTheDocument()
+  },
+}
+
+export const MultiOrg: Story = {
+  args: {
+    orgName: 'Acme Insurance',
+    memberships,
+    activeOrgId: 'org-1',
+    onSelectOrg: fn(),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByRole('button', { name: /Acme Insurance/ }))
+
+    // Radix portals dropdown content onto document.body, so query by role
+    // there rather than canvas - and by menuitem role, since "Acme Insurance"
+    // also appears as the (still-visible) trigger label.
+    await expect(await screen.findByRole('menuitem', { name: 'Beacon Agency' })).toBeInTheDocument()
+    await expect(screen.getByRole('menuitem', { name: 'Acme Insurance' })).toBeInTheDocument()
+
+    // The active org is marked for both sighted and assistive-tech users, so
+    // switching is not a guess. `data-active` drives the styling; the check
+    // icon and aria-current are what actually surface it.
+    const activeItem = screen.getByRole('menuitem', { name: 'Acme Insurance' })
+    await expect(activeItem).toHaveAttribute('data-active', 'true')
+    await expect(activeItem).toHaveAttribute('aria-current', 'true')
+    await expect(activeItem.querySelector('svg')).toBeInTheDocument()
+
+    const otherItem = screen.getByRole('menuitem', { name: 'Beacon Agency' })
+    await expect(otherItem).toHaveAttribute('data-active', 'false')
+    await expect(otherItem).not.toHaveAttribute('aria-current')
+    await expect(otherItem.querySelector('svg')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Beacon Agency' }))
+    await expect(args.onSelectOrg).toHaveBeenCalledWith('org-2')
   },
 }
 

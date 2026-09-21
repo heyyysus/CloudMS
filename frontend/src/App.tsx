@@ -16,6 +16,7 @@ import Login from './pages/Login'
 import Logout from './pages/Logout'
 import ManageCarriers from './pages/ManageCarriers'
 import ManageUsers from './pages/ManageUsers'
+import SelectOrg from './pages/SelectOrg'
 import TrustAccounting from './pages/TrustAccounting'
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/logout" element={<Logout />} />
+              <Route path="/select-org" element={<SelectOrg />} />
               <Route element={<RequireAuth />}>
                 <Route element={<AppLayout />}>
                   <Route path="/home" element={<Home />} />

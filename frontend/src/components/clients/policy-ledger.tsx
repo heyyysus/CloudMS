@@ -11,7 +11,8 @@ import { getInvoices } from '@/api/invoices'
 import { getPaymentsByPolicy } from '@/api/payments'
 
 // Date/time (fits "MM/DD/YYYY - hh:mmpm") | type (fits "Payment void") |
-// reference ("Invoice #10" / "Payment #5") | description (the only column
+// reference (the per-org "Invoice #10"; payment rows still show the opaque
+// payment id, which has no per-org number of its own) | description (the only column
 // that grows) | charge | credit | balance | action (the Pay button).
 const LEDGER_GRID =
   'grid grid-cols-[11rem_6rem_7rem_minmax(0,1fr)_6rem_6rem_6rem_3.5rem] items-center gap-x-3 px-2'

@@ -147,7 +147,7 @@ function voidConfirmCopy(
 
   const cascading = activePayments.length > 0
   return {
-    title: `Void invoice #${invoice.id}?`,
+    title: `Void invoice #${invoice.invoiceNumber}?`,
     description:
       "This can't be undone. The invoice stays on file marked void, its money is reversed out of the trust ledger, and its PDF is withdrawn.",
     submitLabel: cascading
@@ -366,7 +366,7 @@ export function InvoiceReceiptDialog({
             </div>
 
             <div className="flex items-center justify-between">
-              <p className="font-medium">Invoice #{invoice.id}</p>
+              <p className="font-medium">Invoice #{invoice.invoiceNumber}</p>
               <p className={cn('capitalize', INVOICE_STATUS_TEXT_CLASS[invoice.status])}>
                 {INVOICE_STATUS_LABEL[invoice.status]}
               </p>
@@ -413,7 +413,7 @@ export function InvoiceReceiptDialog({
                     <div key={payment.id} className="flex items-start justify-between gap-3">
                       <span>
                         {PAYMENT_METHOD_LABEL[payment.method]}
-                        {receipt ? ` — Receipt #${receipt.id}` : ''}
+                        {receipt ? ` — Receipt #${receipt.receiptNumber}` : ''}
                         {payment.note && (
                           <span className="block text-xs text-muted-foreground">{payment.note}</span>
                         )}

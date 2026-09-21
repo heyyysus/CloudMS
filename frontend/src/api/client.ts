@@ -1,5 +1,18 @@
 const BASE = '/api/v1'
 
+// Registered by AuthProvider so any `request()` call - not just TanStack Query
+// ones - can react to a session losing its org (e.g. a membership was
+// deactivated mid-session), not only the components that render `org`.
+let onOrgRequired: (() => void) | null = null
+
+export function setOrgRequiredHandler(fn: (() => void) | null) {
+  onOrgRequired = fn
+}
+
+function isOrgRequired(status: number, body: unknown): boolean {
+  return status === 403 && (body as { code?: string } | null)?.code === 'ORG_REQUIRED'
+}
+
 export class ApiError extends Error {
   status: number
   // The parsed error body, when the response had one - lets a caller read a
@@ -27,6 +40,7 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => null)
+    if (isOrgRequired(res.status, body)) onOrgRequired?.()
     throw new ApiError(res.status, body?.error ?? res.statusText, body)
   }
 

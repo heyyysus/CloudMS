@@ -172,7 +172,7 @@ function InvoiceChoiceStep({
               className="h-auto justify-between py-2"
               onClick={() => onPay(invoice.id)}
             >
-              <span>Invoice #{invoice.id}</span>
+              <span>Invoice #{invoice.invoiceNumber}</span>
               <span className="text-muted-foreground">
                 {formatMoney(amountDueCents(invoice) / 100)} due
               </span>
@@ -532,7 +532,7 @@ function PayInvoiceForm({
   return (
     <form onSubmit={handleSubmit((values) => onSubmit(toPaymentInputs(values.payments)))} noValidate>
       <DialogHeader>
-        <DialogTitle>Pay invoice #{invoice.id}</DialogTitle>
+        <DialogTitle>Pay invoice #{invoice.invoiceNumber}</DialogTitle>
         <DialogDescription>Record one or more payments against this invoice.</DialogDescription>
       </DialogHeader>
 
@@ -670,6 +670,7 @@ function PayInvoiceForm({
 
 interface SubmitResult {
   invoiceId: string
+  invoiceNumber: number | null
   finalStatus: InvoiceStatus
   invoiceTotal: string | null
   receipts: ReceiptDetail[]
@@ -683,7 +684,7 @@ function ResultSummary({ result, onClose }: { result: SubmitResult; onClose: () 
   return (
     <div className="flex flex-col gap-4">
       <DialogHeader>
-        <DialogTitle>Invoice #{result.invoiceId}</DialogTitle>
+        <DialogTitle>Invoice #{result.invoiceNumber}</DialogTitle>
         <DialogDescription>
           <span className={cn('font-medium capitalize', INVOICE_STATUS_TEXT_CLASS[result.finalStatus])}>
             {INVOICE_STATUS_LABEL[result.finalStatus]}
@@ -747,7 +748,7 @@ type Step = 'choose' | 'build' | 'pay'
 
 type SubmitInput =
   | { kind: 'create'; body: CreateInvoiceBody; payments: PaymentRowInput[] }
-  | { kind: 'pay'; invoiceId: string; payments: PaymentRowInput[] }
+  | { kind: 'pay'; invoiceId: string; invoiceNumber: number; payments: PaymentRowInput[] }
 
 interface InvoicePaymentDialogProps {
   client: Pick<ClientDetail, 'id'>
@@ -803,6 +804,7 @@ export function InvoicePaymentDialog({
   const mutation = useMutation({
     mutationFn: async (input: SubmitInput): Promise<SubmitResult> => {
       let invoiceId: string | null = null
+      let invoiceNumber: number | null = null
       let invoiceTotal: string | null = null
       const receipts: ReceiptDetail[] = []
       let closed = false
@@ -811,9 +813,11 @@ export function InvoicePaymentDialog({
         if (input.kind === 'create') {
           const created = await createInvoiceFn(input.body)
           invoiceId = created.id
+          invoiceNumber = created.invoiceNumber
           invoiceTotal = created.total
         } else {
           invoiceId = input.invoiceId
+          invoiceNumber = input.invoiceNumber
         }
 
         for (const payment of input.payments) {
@@ -824,7 +828,8 @@ export function InvoicePaymentDialog({
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Something went wrong'
-        const createdNote = invoiceId != null && input.kind === 'create' ? `Invoice #${invoiceId} was created` : null
+        const createdNote =
+          invoiceNumber != null && input.kind === 'create' ? `Invoice #${invoiceNumber} was created` : null
         const paidNote = receipts.length > 0 ? `${receipts.length} payment(s) were recorded` : null
         const prefix = [createdNote, paidNote].filter(Boolean).join(' and ')
         throw new Error(prefix ? `${prefix}, but ${message[0].toLowerCase()}${message.slice(1)}` : message)
@@ -832,6 +837,7 @@ export function InvoicePaymentDialog({
 
       return {
         invoiceId,
+        invoiceNumber,
         finalStatus: closed ? 'closed' : 'open',
         invoiceTotal,
         receipts,
@@ -912,7 +918,12 @@ export function InvoicePaymentDialog({
           <PayInvoiceForm
             invoice={targetInvoice}
             onSubmit={(payments) =>
-              mutation.mutate({ kind: 'pay', invoiceId: targetInvoice.id, payments })
+              mutation.mutate({
+                kind: 'pay',
+                invoiceId: targetInvoice.id,
+                invoiceNumber: targetInvoice.invoiceNumber,
+                payments,
+              })
             }
             onCancel={closeAndReset}
             onBack={

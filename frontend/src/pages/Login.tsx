@@ -15,7 +15,7 @@ function errorMessage(err: unknown): string {
 }
 
 function Login() {
-  const { user, loading, setUser } = useAuth()
+  const { user, loading, setMe } = useAuth()
   const navigate = useNavigate()
   const [signInError, setSignInError] = useState<string | null>(null)
 
@@ -23,13 +23,13 @@ function Login() {
     (idToken: string) => {
       setSignInError(null)
       loginWithGoogle(idToken)
-        .then((loggedInUser) => {
-          setUser(loggedInUser)
-          navigate('/home', { replace: true })
+        .then((me) => {
+          setMe(me)
+          navigate(me.org ? '/home' : '/select-org', { replace: true })
         })
         .catch((err) => setSignInError(errorMessage(err)))
     },
-    [navigate, setUser],
+    [navigate, setMe],
   )
 
   const { buttonRef, error: scriptError } = useGoogleSignIn(handleCredential)

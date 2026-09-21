@@ -4,7 +4,7 @@ import app from "../app"
 import { ROW_ID_PATTERN } from "../db/ids"
 import { createPolicyAttachment, storeGeneratedPolicyAttachment } from "../repositories"
 import { putObject } from "../storage/r2"
-import { MISSING_ROW_ID, TestContext } from "./testHelpers"
+import { MISSING_ROW_ID, runInOrg, TestContext } from "./testHelpers"
 
 // The auto-link tests at the bottom create invoices and payments, which upload
 // generated PDFs. Mocked so tests don't need real R2 credentials.
@@ -22,14 +22,16 @@ afterEach(() => {
 let fileCounter = 0
 async function makeAttachment(orgId: string, policyId: string, createdBy: string) {
   fileCounter += 1
-  return createPolicyAttachment(orgId, {
-    policyId,
-    fileName: `doc-${fileCounter}.pdf`,
-    storageKey: `policy-attachments/${policyId}/${Date.now()}-${fileCounter}.pdf`,
-    mimeType: "application/pdf",
-    sizeBytes: 100,
-    createdBy,
-  })
+  return runInOrg(orgId, () =>
+    createPolicyAttachment(orgId, {
+      policyId,
+      fileName: `doc-${fileCounter}.pdf`,
+      storageKey: `policy-attachments/${policyId}/${Date.now()}-${fileCounter}.pdf`,
+      mimeType: "application/pdf",
+      sizeBytes: 100,
+      createdBy,
+    })
+  )
 }
 
 interface LinkRow {
@@ -424,17 +426,20 @@ describe("auto-linked generated documents", () => {
     const user = await ctx.user("logatt-auto-nolog")
     const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
-    const attachment = await storeGeneratedPolicyAttachment(await ctx.orgId(), {
-      policyId: policy.id,
-      pdf: Buffer.from("%PDF-1.4"),
-      fileName: "Orphan.pdf",
-      keySlug: "orphan",
-      description: null,
-      sourceType: "policy_change",
-      sourceId: policy.id,
-      createdBy: user.id,
-      linkToLogId: MISSING_ROW_ID,
-    })
+    const orgId = await ctx.orgId()
+    const attachment = await runInOrg(orgId, () =>
+      storeGeneratedPolicyAttachment(orgId, {
+        policyId: policy.id,
+        pdf: Buffer.from("%PDF-1.4"),
+        fileName: "Orphan.pdf",
+        keySlug: "orphan",
+        description: null,
+        sourceType: "policy_change",
+        sourceId: policy.id,
+        createdBy: user.id,
+        linkToLogId: MISSING_ROW_ID,
+      })
+    )
 
     expect(attachment.id).toMatch(ROW_ID_PATTERN)
     expect(await links(policy.id, cookie)).toEqual([])

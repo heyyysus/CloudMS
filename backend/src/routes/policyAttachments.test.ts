@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
 import { attachmentKeyPrefix, createPolicyAttachment } from "../repositories"
 import { getPresignedDownloadUrl, headObject } from "../storage/r2"
-import { MISSING_ROW_ID, TestContext } from "./testHelpers"
+import { MISSING_ROW_ID, runInOrg, TestContext } from "./testHelpers"
 
 // getPresignedDownloadUrl and headObject are mocked so tests don't need real
 // R2 credentials; asserting on the download call's args is how these tests
@@ -46,14 +46,17 @@ describe("GET /policy-attachments/:id/link", () => {
     const user = await ctx.user("attach-link-baddisp")
     const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
-    const attachment = await createPolicyAttachment(await ctx.orgId(), {
-      policyId: policy.id,
-      fileName: "test.pdf",
-      storageKey: `policy-attachments/${policy.id}/test.pdf`,
-      mimeType: "application/pdf",
-      sizeBytes: 100,
-      createdBy: user.id,
-    })
+    const orgId = await ctx.orgId()
+    const attachment = await runInOrg(orgId, () =>
+      createPolicyAttachment(orgId, {
+        policyId: policy.id,
+        fileName: "test.pdf",
+        storageKey: `policy-attachments/${policy.id}/test.pdf`,
+        mimeType: "application/pdf",
+        sizeBytes: 100,
+        createdBy: user.id,
+      })
+    )
 
     const res = await request(app)
       .get(`/policy-attachments/${attachment.id}/link?disposition=bogus`)
@@ -65,14 +68,17 @@ describe("GET /policy-attachments/:id/link", () => {
     const user = await ctx.user("attach-link-inline")
     const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
-    const attachment = await createPolicyAttachment(await ctx.orgId(), {
-      policyId: policy.id,
-      fileName: "test.pdf",
-      storageKey: `policy-attachments/${policy.id}/test.pdf`,
-      mimeType: "application/pdf",
-      sizeBytes: 100,
-      createdBy: user.id,
-    })
+    const orgId = await ctx.orgId()
+    const attachment = await runInOrg(orgId, () =>
+      createPolicyAttachment(orgId, {
+        policyId: policy.id,
+        fileName: "test.pdf",
+        storageKey: `policy-attachments/${policy.id}/test.pdf`,
+        mimeType: "application/pdf",
+        sizeBytes: 100,
+        createdBy: user.id,
+      })
+    )
 
     const res = await request(app)
       .get(`/policy-attachments/${attachment.id}/link`)
@@ -89,14 +95,17 @@ describe("GET /policy-attachments/:id/link", () => {
     const user = await ctx.user("attach-link-download")
     const cookie = await ctx.cookie(user.id)
     const policy = await ctx.policy()
-    const attachment = await createPolicyAttachment(await ctx.orgId(), {
-      policyId: policy.id,
-      fileName: "declarations-page.pdf",
-      storageKey: `policy-attachments/${policy.id}/declarations-page.pdf`,
-      mimeType: "application/pdf",
-      sizeBytes: 100,
-      createdBy: user.id,
-    })
+    const orgId = await ctx.orgId()
+    const attachment = await runInOrg(orgId, () =>
+      createPolicyAttachment(orgId, {
+        policyId: policy.id,
+        fileName: "declarations-page.pdf",
+        storageKey: `policy-attachments/${policy.id}/declarations-page.pdf`,
+        mimeType: "application/pdf",
+        sizeBytes: 100,
+        createdBy: user.id,
+      })
+    )
 
     const res = await request(app)
       .get(`/policy-attachments/${attachment.id}/link?disposition=attachment`)
@@ -180,14 +189,16 @@ describe("wrong-org", () => {
     const other = await ctx.org()
     const otherUser = await ctx.user("attach-wrongorg-other", "staff", other.id)
     const theirPolicy = await ctx.policy({ orgId: other.id })
-    const theirAttachment = await createPolicyAttachment(other.id, {
-      policyId: theirPolicy.id,
-      fileName: "theirs.pdf",
-      storageKey: `${attachmentKeyPrefix(other.id, theirPolicy.id)}theirs.pdf`,
-      mimeType: "application/pdf",
-      sizeBytes: 100,
-      createdBy: otherUser.id,
-    })
+    const theirAttachment = await runInOrg(other.id, () =>
+      createPolicyAttachment(other.id, {
+        policyId: theirPolicy.id,
+        fileName: "theirs.pdf",
+        storageKey: `${attachmentKeyPrefix(other.id, theirPolicy.id)}theirs.pdf`,
+        mimeType: "application/pdf",
+        sizeBytes: 100,
+        createdBy: otherUser.id,
+      })
+    )
 
     const list = await request(app)
       .get(`/policy-attachments?policyId=${theirPolicy.id}`)

@@ -132,3 +132,10 @@
   — passes.
 - No backend/frontend suites run: this issue touches only `.github/**`,
   `pipeline/**`, and `.claude/agents/orchestrator.md`.
+
+## Docs
+
+No doc changes needed — this is pipeline/CI infrastructure only (GitHub Actions
+and the orchestrator agent prompt), with no route/API, auth/session, UI, or
+setup/env/deploy changes for `docs/API.md`, `docs/AUTH_SESSIONS_EXPLAINED.md`,
+`docs/frontend-ui-design.md`, or `README.md` to reflect.

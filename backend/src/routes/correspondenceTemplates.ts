@@ -48,8 +48,8 @@ correspondenceTemplatesRouter.get(
   "/correspondence-templates",
   requireAuth,
   requireRole("staff"),
-  async (_req: Request, res: Response) => {
-    const templates = await listCorrespondenceTemplates()
+  async (req: Request, res: Response) => {
+    const templates = await listCorrespondenceTemplates(req.orgId!)
     res.json({ templates, mergeFields: CORRESPONDENCE_MERGE_FIELDS })
   }
 )
@@ -72,7 +72,7 @@ correspondenceTemplatesRouter.post(
       return
     }
 
-    const template = await createCorrespondenceTemplate({
+    const template = await createCorrespondenceTemplate(req.orgId!, {
       key: keyFromName(name),
       name,
       subject,
@@ -104,7 +104,7 @@ correspondenceTemplatesRouter.patch(
       return
     }
 
-    const template = await updateCorrespondenceTemplate(id, {
+    const template = await updateCorrespondenceTemplate(req.orgId!, id, {
       name,
       subject,
       body,
@@ -126,7 +126,7 @@ correspondenceTemplatesRouter.delete(
     const id = parseId(req.params.id, res)
     if (id === undefined) return
 
-    const deleted = await deleteCorrespondenceTemplate(id)
+    const deleted = await deleteCorrespondenceTemplate(req.orgId!, id)
     if (!deleted) {
       res.status(404).json({ error: "Template not found" })
       return

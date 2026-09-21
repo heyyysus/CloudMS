@@ -180,7 +180,7 @@ export const updateVehicleBody = createVehicleBody.partial()
 // the session user), never accepted from the client. Logs are immutable, so
 // there is no update body.
 export const createPolicyLogBody = insertPolicyLogSchema
-  .omit({ id: true, createdAt: true, logNumber: true, authorId: true })
+  .omit({ id: true, orgId: true, createdAt: true, logNumber: true, authorId: true })
   .extend({
     policyId: idParam,
     body: z.string().trim().min(1).max(5000),

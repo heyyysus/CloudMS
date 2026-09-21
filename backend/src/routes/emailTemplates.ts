@@ -26,7 +26,7 @@ emailTemplatesRouter.get(
       return
     }
 
-    const template = await findEmailTemplateByKey(key)
+    const template = await findEmailTemplateByKey(req.orgId!, key)
     if (!template) {
       res.status(404).json({ error: "Unknown template" })
       return
@@ -65,12 +65,11 @@ emailTemplatesRouter.put(
       return
     }
 
-    const template = await upsertEmailTemplate({
+    const template = await upsertEmailTemplate(req.orgId!, {
       key,
       subject,
       body,
       updatedBy: req.user!.id,
-      orgId: req.orgId!,
     })
     res.json({ template, mergeFields })
   }

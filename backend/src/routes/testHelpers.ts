@@ -18,6 +18,7 @@ import {
   users,
   vehicles,
 } from "../db/schema"
+import { WELCOME_TEMPLATE_KEY } from "../emails"
 import {
   addDriverToPolicy,
   addEmailToClient,
@@ -33,6 +34,7 @@ import {
   createSession,
   createUser,
   createVehicle,
+  upsertEmailTemplate,
 } from "../repositories"
 import type {
   NewAutoPolicy,
@@ -122,7 +124,10 @@ export class TestContext {
 
   // Always inserts a fresh organization - the way to get a second, distinct
   // org for a cross-org test. The very first call also becomes the context's
-  // default org (see defaultOrg()).
+  // default org (see defaultOrg()). Seeds a welcome template too, mirroring
+  // what bootstrap.ts/seed/run.ts do for a real organization - without one,
+  // sendWelcomeEmail (invite, resend-welcome, restore) 500s for every org
+  // this context mints.
   async org(): Promise<Organization> {
     const [o] = await db
       .insert(organizations)
@@ -130,6 +135,12 @@ export class TestContext {
       .returning()
     this.orgIds.push(o.id)
     this.defaultOrgId ??= o.id
+    await upsertEmailTemplate(o.id, {
+      key: WELCOME_TEMPLATE_KEY,
+      subject: "Welcome to CloudMS, {{name}}",
+      body: "Hi {{name}}, {{inviterName}} has invited you as {{role}}. Sign in at {{appUrl}}.",
+      updatedBy: null,
+    })
     return o
   }
 
@@ -266,35 +277,48 @@ export class TestContext {
     return addEmailToClient(orgId ?? (await this.defaultOrg()), clientId, email)
   }
 
-  async template(overrides: { name?: string; subject?: string; body?: string } = {}) {
-    const name = overrides.name ?? unique("Template ")
-    const t = await createCorrespondenceTemplate({
+  async template(
+    overrides: { name?: string; subject?: string; body?: string; orgId?: string } = {}
+  ) {
+    const { orgId, ...rest } = overrides
+    const resolvedOrgId = orgId ?? (await this.defaultOrg())
+    const name = rest.name ?? unique("Template ")
+    const t = await createCorrespondenceTemplate(resolvedOrgId, {
       key: unique("correspondence-test-"),
       name,
-      subject: overrides.subject ?? "Your policy {{policyNumber}}",
-      body:
-        overrides.body ?? "Hi {{clientFirstName}}, your policy expires {{policyExpirationDate}}.",
+      subject: rest.subject ?? "Your policy {{policyNumber}}",
+      body: rest.body ?? "Hi {{clientFirstName}}, your policy expires {{policyExpirationDate}}.",
       updatedBy: null,
     })
     this.templateIds.push(t.id)
     return t
   }
 
-  // offsetDays is random by default because reminder_rules is unique on
-  // (trigger, offset_days) *globally*, and vitest runs test files in parallel
-  // workers - two files both picking a natural-looking 30 would collide. Tests
-  // that need the planner to match pass an offset and then build the policy
-  // with isoDaysFromToday(offset), which lines the two up.
+  // reminder_rules is now unique per org (trigger, offset_days), so two test
+  // files in different orgs can no longer collide on a natural-looking
+  // offset. offsetDays stays random by default anyway - it's also what keeps
+  // a parallel worker's planner run from matching this test's policies, which
+  // the org scope alone wouldn't prevent within the same org. Tests that need
+  // the planner to match pass an offset and then build the policy with
+  // isoDaysFromToday(offset), which lines the two up.
   async reminderRule(
-    overrides: { offsetDays?: number; templateId?: string; enabled?: boolean; name?: string } = {}
+    overrides: {
+      offsetDays?: number
+      templateId?: string
+      enabled?: boolean
+      name?: string
+      orgId?: string
+    } = {}
   ): Promise<ReminderRule> {
-    const templateId = overrides.templateId ?? (await this.template()).id
-    const rule = await createReminderRule({
-      name: overrides.name ?? unique("Rule "),
+    const { orgId, ...rest } = overrides
+    const resolvedOrgId = orgId ?? (await this.defaultOrg())
+    const templateId = rest.templateId ?? (await this.template({ orgId: resolvedOrgId })).id
+    const rule = await createReminderRule(resolvedOrgId, {
+      name: rest.name ?? unique("Rule "),
       trigger: "policy_expiration",
-      offsetDays: overrides.offsetDays ?? randomInt(100_000, 1_000_000),
+      offsetDays: rest.offsetDays ?? randomInt(100_000, 1_000_000),
       templateId,
-      enabled: overrides.enabled ?? true,
+      enabled: rest.enabled ?? true,
       updatedBy: null,
     })
     this.ruleIds.push(rule.id)
@@ -373,6 +397,11 @@ export class TestContext {
       // is never in templateIds. Sweep by org here too, or the FK from
       // email_templates.org_id blocks the delete below.
       await db.delete(emailTemplates).where(inArray(emailTemplates.orgId, this.orgIds))
+      // The userIds sweep above only catches email_log rows triggered by a
+      // tracked user; a send triggered by the automation user (scheduler
+      // tests) is not, so sweep by org too, or the FK from email_log.org_id
+      // blocks the delete below.
+      await db.delete(emailLog).where(inArray(emailLog.orgId, this.orgIds))
       // A nested "new" driver spec on a policy create/update (routes/policies.ts,
       // autoPolicies.ts's linkPolicyDrivers) creates its person+driver rows
       // server-side, so their ids never reach personIds above. Sweep both by

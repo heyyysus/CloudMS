@@ -30,8 +30,8 @@ reminderRulesRouter.get(
   "/reminder-rules",
   requireAuth,
   requireRole("staff"),
-  async (_req: Request, res: Response) => {
-    res.json({ rules: await listReminderRules() })
+  async (req: Request, res: Response) => {
+    res.json({ rules: await listReminderRules(req.orgId!) })
   }
 )
 
@@ -48,14 +48,14 @@ reminderRulesRouter.post(
 
     // Kind-scoped lookup, so the singleton welcome invite can never be wired
     // up as a client-facing reminder.
-    const template = await findCorrespondenceTemplateById(parsed.data.templateId)
+    const template = await findCorrespondenceTemplateById(req.orgId!, parsed.data.templateId)
     if (!template) {
       res.status(404).json({ error: "Template not found" })
       return
     }
 
     try {
-      const rule = await createReminderRule({ ...parsed.data, updatedBy: req.user!.id })
+      const rule = await createReminderRule(req.orgId!, { ...parsed.data, updatedBy: req.user!.id })
       res.status(201).json(rule)
     } catch (err) {
       if (isPgUniqueViolation(err, "reminder_rules_trigger_offset_unique")) {
@@ -82,7 +82,7 @@ reminderRulesRouter.patch(
     }
 
     if (parsed.data.templateId !== undefined) {
-      const template = await findCorrespondenceTemplateById(parsed.data.templateId)
+      const template = await findCorrespondenceTemplateById(req.orgId!, parsed.data.templateId)
       if (!template) {
         res.status(404).json({ error: "Template not found" })
         return
@@ -90,7 +90,10 @@ reminderRulesRouter.patch(
     }
 
     try {
-      const rule = await updateReminderRule(id, { ...parsed.data, updatedBy: req.user!.id })
+      const rule = await updateReminderRule(req.orgId!, id, {
+        ...parsed.data,
+        updatedBy: req.user!.id,
+      })
       if (!rule) {
         res.status(404).json({ error: "Rule not found" })
         return
@@ -114,7 +117,7 @@ reminderRulesRouter.delete(
     const id = parseId(req.params.id, res)
     if (id === undefined) return
 
-    if (!(await deleteReminderRule(id))) {
+    if (!(await deleteReminderRule(req.orgId!, id))) {
       res.status(404).json({ error: "Rule not found" })
       return
     }
@@ -131,7 +134,7 @@ reminderRulesRouter.get("/scheduled-emails", requireAuth, async (req: Request, r
     res.status(400).json({ error: firstIssue(parsed.error) })
     return
   }
-  const scheduled = await listScheduledEmails({ statuses: parsed.data.status })
+  const scheduled = await listScheduledEmails(req.orgId!, { statuses: parsed.data.status })
   res.json({ scheduled })
 })
 
@@ -143,7 +146,7 @@ reminderRulesRouter.post(
     const id = parseId(req.params.id, res)
     if (id === undefined) return
 
-    const cancelled = await cancelScheduledEmail(id)
+    const cancelled = await cancelScheduledEmail(req.orgId!, id)
     if (cancelled) {
       req.log.info({ scheduledEmailId: id, actorId: req.user?.id }, "scheduled reminder cancelled")
       res.json(cancelled)
@@ -152,7 +155,7 @@ reminderRulesRouter.post(
 
     // The update matched nothing, which means either no such row or one that
     // isn't pending any more. Re-read to tell those apart.
-    const existing = await findScheduledEmailById(id)
+    const existing = await findScheduledEmailById(req.orgId!, id)
     if (!existing) {
       res.status(404).json({ error: "Scheduled email not found" })
       return
@@ -171,7 +174,7 @@ reminderRulesRouter.post(
   requireAuth,
   requireRole("admin"),
   async (req: Request, res: Response) => {
-    const result = await runReminderTickNow()
+    const result = await runReminderTickNow(req.orgId!)
     req.log.info({ ...result, actorId: req.user?.id }, "reminder tick (manual)")
     res.json(result)
   }

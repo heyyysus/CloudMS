@@ -1,6 +1,6 @@
 import { and, eq, lt, sql } from "drizzle-orm"
-import { db } from "../db"
-import { autoPolicies, reminderRules, scheduledEmails } from "../db/schema"
+import { adminDb } from "../db"
+import { reminderRules, scheduledEmails } from "../db/schema"
 import {
   buildCorrespondenceMergeValues,
   correspondenceSentLogBody,
@@ -11,6 +11,7 @@ import { logger } from "../logger"
 import {
   createPolicyLog,
   findCorrespondenceTemplateById,
+  findOrganizationById,
   getClientWithDetails,
   getPolicyWithDetails,
   listEmailsByClientId,
@@ -31,24 +32,29 @@ export interface DispatchResult {
 // at-least-once rather than at-most-once: a container that died *after* Resend
 // accepted the message will send it again here. For a renewal reminder a rare
 // duplicate beats a rare miss.
-async function releaseStaleClaims(claimTimeoutMs: number): Promise<number> {
+async function releaseStaleClaims(claimTimeoutMs: number, orgId?: string): Promise<number> {
   const cutoff = new Date(Date.now() - claimTimeoutMs)
-  const released = await db
+  const filters = [
+    eq(scheduledEmails.status, "sending"),
+    lt(scheduledEmails.claimedAt, cutoff),
+    orgId !== undefined ? eq(scheduledEmails.orgId, orgId) : undefined,
+  ].filter((f) => f !== undefined)
+  const released = await adminDb
     .update(scheduledEmails)
     .set({ status: "pending", claimedAt: null, updatedAt: new Date() })
-    .where(and(eq(scheduledEmails.status, "sending"), lt(scheduledEmails.claimedAt, cutoff)))
+    .where(and(...filters))
     .returning({ id: scheduledEmails.id })
   return released.length
 }
 
-// snake_case because db.execute returns raw driver rows, not drizzle-mapped
-// ones. The index signature satisfies db.execute's Record<string, unknown>
-// constraint.
+// snake_case because adminDb.execute returns raw driver rows, not
+// drizzle-mapped ones. The index signature satisfies adminDb.execute's
+// Record<string, unknown> constraint.
 interface ClaimedRow extends Record<string, unknown> {
   id: string
   rule_id: string
   policy_id: string
-  org_id: string | null
+  org_id: string
   attempts: number
 }
 
@@ -56,8 +62,11 @@ interface ClaimedRow extends Record<string, unknown> {
 // happen outside any transaction. FOR UPDATE SKIP LOCKED is what lets every
 // replica dispatch at once: a row another container is claiming is simply
 // invisible here, so no coordination is needed beyond Postgres.
-async function claimBatch(batchSize: number): Promise<ClaimedRow[]> {
-  const claimed = await db.execute<ClaimedRow>(sql`
+//
+// orgId narrows the claim to one organization's queue - used by the manual
+// tick, so it can't reap or send another org's rows.
+async function claimBatch(batchSize: number, orgId?: string): Promise<ClaimedRow[]> {
+  const claimed = await adminDb.execute<ClaimedRow>(sql`
     update scheduled_emails
     set status = 'sending',
         claimed_at = now() at time zone 'UTC',
@@ -69,6 +78,7 @@ async function claimBatch(batchSize: number): Promise<ClaimedRow[]> {
       -- against one rather than against now() directly, which would be read in
       -- whatever TimeZone the session happens to be set to.
       where status = 'pending' and scheduled_for <= now() at time zone 'UTC'
+        ${orgId !== undefined ? sql`and org_id = ${orgId}` : sql``}
       order by scheduled_for
       for update skip locked
       limit ${batchSize}
@@ -83,31 +93,17 @@ async function claimBatch(batchSize: number): Promise<ClaimedRow[]> {
 // rather than retried three times to the same end.
 class UnsendableError extends Error {}
 
-// scheduled_emails.org_id is nullable until #121 threads it through the
-// planner (sub-issue 7); until then every row is planned with a null org, so
-// falling back to the policy's own org (rather than skipping) is what keeps
-// existing reminders sendable in the meantime.
-async function resolveOrgId(row: ClaimedRow): Promise<string> {
-  if (row.org_id !== null) return row.org_id
-  const [policy] = await db
-    .select({ orgId: autoPolicies.orgId })
-    .from(autoPolicies)
-    .where(eq(autoPolicies.id, row.policy_id))
-  if (!policy?.orgId) throw new UnsendableError("Cannot resolve organization for this policy")
-  return policy.orgId
-}
-
 async function sendOne(row: ClaimedRow): Promise<void> {
-  const orgId = await resolveOrgId(row)
+  const orgId = row.org_id
 
   const automation = await getAutomationUser()
 
-  const rule = await db.query.reminderRules.findFirst({
+  const rule = await adminDb.query.reminderRules.findFirst({
     where: eq(reminderRules.id, row.rule_id),
   })
   if (!rule) throw new UnsendableError("Reminder rule no longer exists")
 
-  const template = await findCorrespondenceTemplateById(rule.templateId)
+  const template = await findCorrespondenceTemplateById(orgId, rule.templateId)
   if (!template) throw new UnsendableError("Correspondence template no longer exists")
 
   const policy = await getPolicyWithDetails(orgId, row.policy_id)
@@ -121,11 +117,15 @@ async function sendOne(row: ClaimedRow): Promise<void> {
   const onFile = await listEmailsByClientId(orgId, policy.clientId)
   if (onFile.length === 0) throw new UnsendableError("Client has no email address on file")
 
-  const values = buildCorrespondenceMergeValues({ client, policy, agent: agencyIdentity() })
+  const org = await findOrganizationById(orgId)
+  if (!org) throw new UnsendableError("Organization no longer exists")
+
+  const values = buildCorrespondenceMergeValues({ client, policy, agent: agencyIdentity(org) })
 
   // Writes one email_log row per recipient and rethrows mail errors, which is
   // exactly what the retry logic below wants.
   const result = await sendCorrespondenceEmail({
+    orgId,
     template,
     values,
     to: onFile.map((e) => e.email),
@@ -133,7 +133,7 @@ async function sendOne(row: ClaimedRow): Promise<void> {
     triggeredBy: automation.id,
   })
 
-  await db
+  await adminDb
     .update(scheduledEmails)
     .set({
       status: "sent",
@@ -164,11 +164,13 @@ async function sendOne(row: ClaimedRow): Promise<void> {
 }
 
 // Sends every reminder that is due. Safe to call concurrently on any number of
-// containers.
-export async function dispatchReminders(): Promise<DispatchResult> {
+// containers. orgId narrows both the stale-claim reaper and the claim itself
+// to one organization - used by the manual tick, so it can't touch another
+// org's queue.
+export async function dispatchReminders(orgId?: string): Promise<DispatchResult> {
   const cfg = reminderConfig()
-  const released = await releaseStaleClaims(cfg.claimTimeoutMs)
-  const rows = await claimBatch(cfg.batchSize)
+  const released = await releaseStaleClaims(cfg.claimTimeoutMs, orgId)
+  const rows = await claimBatch(cfg.batchSize, orgId)
 
   let sent = 0
   let failed = 0
@@ -182,7 +184,7 @@ export async function dispatchReminders(): Promise<DispatchResult> {
         // A config problem, not a delivery failure. Hand the attempt back so a
         // missing RESEND_API_KEY doesn't quietly burn every reminder's retries
         // before anyone notices it isn't set.
-        await db
+        await adminDb
           .update(scheduledEmails)
           .set({
             status: "pending",
@@ -202,7 +204,7 @@ export async function dispatchReminders(): Promise<DispatchResult> {
 
       if (!permanent && !(err instanceof MailSendError)) throw err
 
-      await db
+      await adminDb
         .update(scheduledEmails)
         .set({
           status: permanent || exhausted ? "failed" : "pending",

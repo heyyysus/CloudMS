@@ -222,10 +222,11 @@ afterEach(async () => {
 })
 
 // Creates a correspondence template directly, bypassing the admin-only POST
-// route so these tests can run as staff.
-async function makeTemplate(overrides: Partial<typeof TEMPLATE_BODY> = {}) {
+// route so these tests can run as staff. orgId defaults to the context's own
+// org, since every caller here has already minted one via makeSendFixture.
+async function makeTemplate(overrides: Partial<typeof TEMPLATE_BODY> = {}, orgId?: string) {
   const body = { ...TEMPLATE_BODY, ...overrides }
-  const template = await createCorrespondenceTemplate({
+  const template = await createCorrespondenceTemplate(orgId ?? (await ctx.orgId()), {
     key: `correspondence-test-${randomUUID().slice(0, 8)}`,
     ...body,
     updatedBy: null,
@@ -378,6 +379,7 @@ describe("POST /policies/:policyId/send-correspondence", () => {
     expect(rows.every((r) => r.status === "sent")).toBe(true)
     expect(rows.every((r) => r.templateKey === template.key)).toBe(true)
     expect(rows.every((r) => r.resendId === "msg_corr_2")).toBe(true)
+    expect(rows.every((r) => r.orgId === template.orgId)).toBe(true)
   })
 
   it("appends exactly one policy log entry with the full sent email", async () => {
@@ -427,11 +429,24 @@ describe("POST /policies/:policyId/send-correspondence", () => {
     expect(res.status).toBe(404)
   })
 
+  it("returns 404 when templateId belongs to another org", async () => {
+    const { cookie, policy } = await makeSendFixture("send-404wrongorg")
+    const otherOrg = await ctx.org()
+    const theirTemplate = await makeTemplate({}, otherOrg.id)
+
+    const res = await request(app)
+      .post(`/policies/${policy.id}/send-correspondence`)
+      .set("Cookie", cookie)
+      .send({ templateId: theirTemplate.id, to: ["jane@example.com"] })
+
+    expect(res.status).toBe(404)
+  })
+
   // The welcome template is kind-scoped out of the correspondence lookup, so
   // the invite email can never be aimed at a client.
   it("returns 404 when templateId points at the welcome template", async () => {
     const { cookie, policy } = await makeSendFixture("send-welcome")
-    const welcome = await findEmailTemplateByKey(WELCOME_TEMPLATE_KEY)
+    const welcome = await findEmailTemplateByKey(await ctx.orgId(), WELCOME_TEMPLATE_KEY)
     expect(welcome).toBeDefined()
 
     const res = await request(app)

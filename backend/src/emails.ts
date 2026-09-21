@@ -73,11 +73,12 @@ export interface SendWelcomeEmailResult {
 // row it already created; a missing template or a logging failure is a
 // broken-install condition and is left to propagate as a 500.
 export async function sendWelcomeEmail(
+  orgId: string,
   user: User,
   invitedBy: User,
   role: UserRole
 ): Promise<SendWelcomeEmailResult> {
-  const template = await findEmailTemplateByKey(WELCOME_TEMPLATE_KEY)
+  const template = await findEmailTemplateByKey(orgId, WELCOME_TEMPLATE_KEY)
   if (!template) {
     throw new Error(`Email template "${WELCOME_TEMPLATE_KEY}" is missing`)
   }
@@ -96,7 +97,7 @@ export async function sendWelcomeEmail(
 
   try {
     const result = await sendEmail({ to: [user.email], subject, html, text })
-    await createEmailLogEntry({
+    await createEmailLogEntry(orgId, {
       recipient: user.email,
       templateKey: WELCOME_TEMPLATE_KEY,
       subject,
@@ -114,7 +115,7 @@ export async function sendWelcomeEmail(
     } else {
       throw err
     }
-    await createEmailLogEntry({
+    await createEmailLogEntry(orgId, {
       recipient: user.email,
       templateKey: WELCOME_TEMPLATE_KEY,
       subject,
@@ -238,13 +239,14 @@ export interface SendCorrespondenceEmailResult {
 // email_log row so the recipient index answers "did we ever email this
 // person?" regardless of which header they were on.
 export async function sendCorrespondenceEmail(input: {
+  orgId: string
   template: { key: string; subject: string; body: string }
   values: Record<string, string>
   to: string[]
   cc: string[]
   triggeredBy: string
 }): Promise<SendCorrespondenceEmailResult> {
-  const { template, values, to, cc, triggeredBy } = input
+  const { orgId, template, values, to, cc, triggeredBy } = input
 
   const subject = renderTemplate(template.subject, values)
   const text = renderTemplate(template.body, values)
@@ -256,7 +258,7 @@ export async function sendCorrespondenceEmail(input: {
     error?: string
   }) => {
     for (const recipient of [...to, ...cc]) {
-      await createEmailLogEntry({
+      await createEmailLogEntry(orgId, {
         recipient,
         templateKey: template.key,
         subject,

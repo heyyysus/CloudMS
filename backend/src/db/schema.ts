@@ -123,9 +123,9 @@ export const emailTemplates = pgTable(
   "email_templates",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     key: varchar("key", { length: 64 }).notNull(),
     // Admin-facing label for correspondence templates; null for the welcome row.
     name: varchar("name", { length: 120 }),
@@ -148,9 +148,9 @@ export const emailLog = pgTable(
   "email_log",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     recipient: varchar("recipient", { length: 255 }).notNull(),
     // Plain varchar, not an FK to email_templates.key - the log must survive
     // template renames/deletes.
@@ -179,9 +179,9 @@ export const reminderRules = pgTable(
   "reminder_rules",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     name: varchar("name", { length: 120 }).notNull(),
     trigger: reminderTriggerEnum("trigger").notNull(),
     // Days before the trigger date. A negative value sends after it (-7 is a
@@ -199,7 +199,7 @@ export const reminderRules = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    unique("reminder_rules_trigger_offset_unique").on(table.trigger, table.offsetDays),
+    unique("reminder_rules_trigger_offset_unique").on(table.orgId, table.trigger, table.offsetDays),
     index("reminder_rules_org_id_idx").on(table.orgId),
   ]
 )
@@ -220,9 +220,9 @@ export const scheduledEmails = pgTable(
   "scheduled_emails",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     ruleId: rowIdFk("rule_id")
       .notNull()
       .references(() => reminderRules.id, { onDelete: "cascade" }),
@@ -264,9 +264,9 @@ export const persons = pgTable(
   "persons",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     firstName: varchar("first_name", { length: 100 }).notNull(),
     lastName: varchar("last_name", { length: 100 }).notNull(),
     dateOfBirth: date("date_of_birth").notNull(),
@@ -291,9 +291,9 @@ export const drivers = pgTable(
   "drivers",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     personId: rowIdFk("person_id")
       .notNull()
       .unique()
@@ -311,9 +311,9 @@ export const clients = pgTable(
   "clients",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     namedInsuredId: rowIdFk("named_insured_id")
       .notNull()
       .references(() => persons.id),
@@ -348,9 +348,9 @@ export const clientPhones = pgTable(
   "client_phones",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     clientId: rowIdFk("client_id")
       .notNull()
       .references(() => clients.id, { onDelete: "cascade" }),
@@ -368,9 +368,9 @@ export const clientEmails = pgTable(
   "client_emails",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     clientId: rowIdFk("client_id")
       .notNull()
       .references(() => clients.id, { onDelete: "cascade" }),
@@ -391,9 +391,9 @@ export const carriers = pgTable(
   "carriers",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     name: varchar("name", { length: 150 }).notNull(),
     naic: varchar("naic", { length: 10 }).notNull(),
     isActive: boolean("is_active").notNull().default(true),
@@ -415,9 +415,9 @@ export const autoPolicies = pgTable(
   "auto_policies",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     clientId: rowIdFk("client_id")
       .notNull()
       .references(() => clients.id),
@@ -455,9 +455,9 @@ export const vehicles = pgTable(
   "vehicles",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     policyId: rowIdFk("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
@@ -490,9 +490,9 @@ export const policyDrivers = pgTable(
   "policy_drivers",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     policyId: rowIdFk("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
@@ -516,9 +516,9 @@ export const policyLogs = pgTable(
   "policy_logs",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     policyId: rowIdFk("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
@@ -555,9 +555,9 @@ export const policyAttachments = pgTable(
   "policy_attachments",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     policyId: rowIdFk("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),
@@ -595,9 +595,9 @@ export const policyLogAttachments = pgTable(
   "policy_log_attachments",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     logId: rowIdFk("log_id")
       .notNull()
       .references(() => policyLogs.id, { onDelete: "cascade" }),
@@ -673,9 +673,9 @@ export const invoices = pgTable(
   "invoices",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     // Allocated per organization from organizations.next_invoice_number,
     // inside the creating transaction (see
     // repositories/organizations.ts#allocateInvoiceNumberInTx).
@@ -713,9 +713,9 @@ export const invoiceItems = pgTable(
   "invoice_items",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     invoiceId: rowIdFk("invoice_id")
       .notNull()
       .references(() => invoices.id, { onDelete: "cascade" }),
@@ -738,9 +738,9 @@ export const payments = pgTable(
   "payments",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     invoiceId: rowIdFk("invoice_id")
       .notNull()
       .references(() => invoices.id, { onDelete: "cascade" }),
@@ -778,9 +778,9 @@ export const receipts = pgTable(
   "receipts",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     // Allocated per organization from organizations.next_receipt_number,
     // inside the creating transaction (see
     // repositories/organizations.ts#allocateReceiptNumberInTx).
@@ -826,9 +826,9 @@ export const trustLedger = pgTable(
   "trust_ledger",
   {
     id: rowIdPk(),
-    // Nullable until #121 restores NOT NULL once every insert passes an
-    // explicit org id.
-    orgId: rowIdFk("org_id").references(() => organizations.id),
+    orgId: rowIdFk("org_id")
+      .notNull()
+      .references(() => organizations.id),
     policyId: rowIdFk("policy_id")
       .notNull()
       .references(() => autoPolicies.id, { onDelete: "cascade" }),

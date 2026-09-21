@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm"
-import { db } from "../db"
+import { adminDb } from "../db"
 import { users } from "../db/schema"
 import type { User } from "../types"
 
@@ -15,7 +15,7 @@ let cached: User | undefined
 // lookup since the row never changes within a process.
 export async function getAutomationUser(): Promise<User> {
   if (cached) return cached
-  const found = await db.query.users.findFirst({
+  const found = await adminDb.query.users.findFirst({
     where: eq(users.email, AUTOMATION_USER_EMAIL),
   })
   if (!found) {

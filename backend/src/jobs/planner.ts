@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm"
-import { db } from "../db"
+import { adminDb } from "../db"
 import { reminderConfig } from "./config"
 
 // A constant, arbitrary key. Every container using the same number is the
@@ -15,21 +15,32 @@ export interface PlanResult {
 }
 
 // Anything that can run a statement - the pool, or a transaction handle.
-type Executor = Pick<typeof db, "execute">
+type Executor = Pick<typeof adminDb, "execute">
 
 // Turns enabled rules into scheduled_emails rows for the policies they match,
-// unconditionally.
+// unconditionally. Runs through adminDb by default - the scheduler has no
+// request and therefore no per-request org context, so it is responsible for
+// its own org join below rather than relying on RLS (sub-issue 8).
 //
 // One INSERT ... SELECT ... ON CONFLICT DO NOTHING, which is what makes this
 // safe to run as often as anyone likes and from as many places at once: the
 // unique on (rule_id, policy_id, occurrence_date) means a re-plan writes
 // nothing. Correctness never depends on the advisory lock below.
-export async function planDueReminders(executor: Executor = db): Promise<number> {
+//
+// orgId narrows the plan to one organization's rules - used by the manual
+// tick, which plans and dispatches for the caller's org only. Left undefined,
+// every organization's due rules are planned, which is what the timer path
+// wants.
+export async function planDueReminders(
+  executor: Executor = adminDb,
+  orgId?: string
+): Promise<number> {
   const cfg = reminderConfig()
 
   const inserted = await executor.execute(sql`
-    insert into scheduled_emails (rule_id, policy_id, occurrence_date, scheduled_for)
-    select r.id,
+    insert into scheduled_emails (org_id, rule_id, policy_id, occurrence_date, scheduled_for)
+    select r.org_id,
+           r.id,
            p.id,
            p.expiration_date,
            -- The first AT TIME ZONE reads the wall-clock send time *as* agency
@@ -41,7 +52,9 @@ export async function planDueReminders(executor: Executor = db): Promise<number>
            (((p.expiration_date - r.offset_days) + make_interval(hours => ${cfg.sendHour}))
              at time zone ${cfg.timeZone}) at time zone 'UTC'
     from reminder_rules r
-    join auto_policies p on p.status = 'active'
+    -- The whole cross-tenant fix: without this, a rule in org A would queue
+    -- reminders against org B's policies.
+    join auto_policies p on p.org_id = r.org_id and p.status = 'active'
     where r.enabled
       and r.trigger = 'policy_expiration'
       and (p.expiration_date - r.offset_days)
@@ -50,6 +63,7 @@ export async function planDueReminders(executor: Executor = db): Promise<number>
       and exists (
         select 1 from client_emails ce where ce.client_id = p.client_id
       )
+      ${orgId !== undefined ? sql`and r.org_id = ${orgId}` : sql``}
     -- Holds each matched rule against concurrent deletion. Without it an admin
     -- deleting a rule between this SELECT and the FK check aborts the whole
     -- plan with a foreign key violation; deletes are rare enough that making
@@ -71,7 +85,7 @@ export async function planDueReminders(executor: Executor = db): Promise<number>
 // by commit, rollback, or the connection dying, so a container killed mid-plan
 // cannot strand it.
 export async function planReminders(): Promise<PlanResult> {
-  return db.transaction(async (tx) => {
+  return adminDb.transaction(async (tx) => {
     const lock = await tx.execute<{ locked: boolean }>(
       sql`select pg_try_advisory_xact_lock(${PLANNER_LOCK_KEY}) as locked`
     )

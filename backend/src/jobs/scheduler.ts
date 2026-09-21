@@ -16,13 +16,14 @@ export async function runReminderTick(): Promise<TickResult> {
   return { plan, dispatch }
 }
 
-// The same pass for a caller who asked for it explicitly. Skips the election:
-// an admin who clicks Run now wants a plan, not "another container was
-// already planning, so nothing happened". Safe to overlap with a timer tick -
-// planning is idempotent and dispatch claims rows with SKIP LOCKED.
-export async function runReminderTickNow(): Promise<TickResult> {
-  const created = await planDueReminders()
-  const dispatch = await dispatchReminders()
+// The same pass for a caller who asked for it explicitly, scoped to their own
+// organization. Skips the election: an admin who clicks Run now wants a plan,
+// not "another container was already planning, so nothing happened". Safe to
+// overlap with a timer tick - planning is idempotent and dispatch claims rows
+// with SKIP LOCKED.
+export async function runReminderTickNow(orgId: string): Promise<TickResult> {
+  const created = await planDueReminders(undefined, orgId)
+  const dispatch = await dispatchReminders(orgId)
   return { plan: { planned: true, created }, dispatch }
 }
 

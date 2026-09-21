@@ -53,10 +53,9 @@ function toActivity(row: ScheduledEmailWithContext): PolicyActivity {
 // Returns completed activities alongside upcoming ones, so the tab shows the
 // reminder history rather than emptying out the moment everything has sent.
 //
-// listScheduledEmails itself is not org-scoped until #121 (scheduled_emails
-// rows are still planned with org_id null), so the cross-tenant read is closed
-// here instead: resolve the policy through the already-org-scoped
-// findAutoPolicyById and 404 before ever looking at its scheduled emails.
+// findAutoPolicyById is still what produces the 404 for a missing policy;
+// listScheduledEmails is org-scoped in its own right too, so a policy id that
+// somehow resolved in another org still couldn't surface that org's rows.
 policyActivitiesRouter.get(
   "/policies/:policyId/activities",
   requireAuth,
@@ -70,7 +69,7 @@ policyActivitiesRouter.get(
       return
     }
 
-    const scheduled = await listScheduledEmails({ policyId })
+    const scheduled = await listScheduledEmails(req.orgId!, { policyId })
     res.json({ activities: scheduled.map(toActivity) })
   }
 )

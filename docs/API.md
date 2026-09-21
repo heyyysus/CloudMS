@@ -925,15 +925,17 @@ can send at once without two of them sending the same message. Running several
 app containers needs no extra configuration.
 
 A rule is `enabled = false` when created, so nothing is ever sent before an
-admin has read the rule back and turned it on. Rules are unique on
-`(trigger, offsetDays)` — two rules at the same offset would send a client two
-emails the same morning.
+admin has read the rule back and turned it on. Rules, templates and the queue
+are all organization-scoped; rules are unique per organization on
+`(trigger, offsetDays)` — two rules at the same offset in the same
+organization would send a client two emails the same morning.
 
 Sends are attributed to a bootstrapped `automation@cloudms.local` user
 (`isActive: false`, so it can never sign in), which is what `policy_logs`
 requires for its non-null author and what `email_log.triggered_by` records.
 `{{agentName}}` is the one merge field that resolves differently than on a
-manual send: with no logged-in agent, it renders `AGENCY_NAME`.
+manual send: with no logged-in agent, it renders the sending organization's
+`name`.
 
 | Method | Path | Role | Notes |
 |---|---|---|---|

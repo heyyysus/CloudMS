@@ -68,3 +68,11 @@ None — implemented exactly what plan.md scoped.
 - `grep -nE '"[a-zA-Z]*[Ii]d": ?[0-9]+' docs/API.md` → no matches.
 - Parsed all 13 JSON code blocks in `docs/API.md` with `JSON.parse` → all valid.
 - No backend/frontend files touched, so backend/frontend typecheck/lint/test/build were not run (docs-only diff, no test changes per plan.md).
+
+## Docs
+
+No doc changes needed: this diff only catches PROJECT.md and docs/API.md up
+to already-shipped code (no new behavior or API surface). Checked
+docs/AUTH_SESSIONS_EXPLAINED.md, docs/frontend-ui-design.md, and README.md —
+all three already document org binding/picker/switcher and multi-tenancy
+correctly.

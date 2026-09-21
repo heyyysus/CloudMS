@@ -174,9 +174,18 @@ both touch every table's columns.
   imports is a `Proxy` that resolves to that stored transaction when one is
   open and to the plain `app`-role pool otherwise, so none of the ~40
   existing `import { db } from "../db"` call sites changed. The transaction
-  commits when the response finishes sending (on `res`'s `"close"` event, so
-  it also covers an aborted connection), which means one in-flight request
-  now pins one pooled connection for its full duration, including any
+  commits before the response reaches the client: `requireAuth` intercepts
+  `res.end` (the common final call behind `res.json`/`res.send`/the error
+  handler's 500), lets the handler run to completion, and only hands the
+  captured response to the real `res.end` once `COMMIT` has returned — an
+  aborted connection (`res.end` never called) still resolves via `"close"`,
+  so the transaction is never left open. This matters because a client that
+  gets a response and immediately issues a second request (a UI refetching
+  after a create, or the test suite) would otherwise be able to start that
+  second request's transaction before the first one's `COMMIT` landed, and
+  under READ COMMITTED it would then read its own prior write as missing. One
+  in-flight request now pins one pooled connection for its full duration,
+  including any
   external I/O the handler does; `DB_POOL_MAX` (default 20, `.env.example`)
   is the resulting concurrency cap, sized against Postgres's own
   `max_connections`. A repository or route calling `db.transaction(...)`
@@ -209,16 +218,14 @@ both touch every table's columns.
   assert every one of them has an entry, so a new route without cross-tenant
   coverage fails the build.
 
-  A commit landing after the response is already on the wire is a known,
-  accepted trade-off: a `201` can reach the client moments before `COMMIT`
-  returns, so a commit failure that only shows up then (a lost connection, a
-  serialization failure) means the client was told about a write that did
-  not durably happen. The alternative — a pinned connection with
-  session-level `SET` and autocommit per statement — gives up request
-  atomicity to close that gap, which is worse. A pg error a handler lets
-  escape aborts the transaction; Postgres turns the subsequent `COMMIT` into
-  a no-op `ROLLBACK` without raising, so the request's earlier writes are
-  correctly discarded and `requireAuth`'s wrapper just logs it.
+  A commit failure (a lost connection, a serialization failure) is handled
+  by never flushing a response at all rather than sending one that claims a
+  write succeeded: `requireAuth`'s wrapper logs the error and leaves the
+  connection to time out, which is a better failure mode than a `201` for a
+  write that never durably happened. A pg error a handler lets escape aborts
+  the transaction the same way; Postgres turns the subsequent `COMMIT` into a
+  no-op `ROLLBACK` without raising, so the request's earlier writes are
+  correctly discarded and nothing is sent to the client either.
 
 ## Organization settings replace environment variables
 

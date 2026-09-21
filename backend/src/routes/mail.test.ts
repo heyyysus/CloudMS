@@ -379,6 +379,7 @@ describe("POST /policies/:policyId/send-correspondence", () => {
     expect(rows.every((r) => r.status === "sent")).toBe(true)
     expect(rows.every((r) => r.templateKey === template.key)).toBe(true)
     expect(rows.every((r) => r.resendId === "msg_corr_2")).toBe(true)
+    expect(rows.every((r) => r.orgId === template.orgId)).toBe(true)
   })
 
   it("appends exactly one policy log entry with the full sent email", async () => {
@@ -424,6 +425,19 @@ describe("POST /policies/:policyId/send-correspondence", () => {
       .post(`/policies/${policy.id}/send-correspondence`)
       .set("Cookie", cookie)
       .send({ templateId: MISSING_ROW_ID, to: ["jane@example.com"] })
+
+    expect(res.status).toBe(404)
+  })
+
+  it("returns 404 when templateId belongs to another org", async () => {
+    const { cookie, policy } = await makeSendFixture("send-404wrongorg")
+    const otherOrg = await ctx.org()
+    const theirTemplate = await makeTemplate({}, otherOrg.id)
+
+    const res = await request(app)
+      .post(`/policies/${policy.id}/send-correspondence`)
+      .set("Cookie", cookie)
+      .send({ templateId: theirTemplate.id, to: ["jane@example.com"] })
 
     expect(res.status).toBe(404)
   })

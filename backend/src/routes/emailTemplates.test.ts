@@ -2,6 +2,7 @@ import request from "supertest"
 import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
 import { WELCOME_TEMPLATE_KEY } from "../emails"
+import { findEmailTemplateByKey } from "../repositories"
 import { TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
@@ -91,6 +92,26 @@ describe("GET/PUT /email-templates/:key", () => {
       expect(res.status).toBe(200)
       expect(res.body.template.subject).toBe("Hi {{name}}")
       expect(res.body.template.updatedBy).toBe(user.id)
+    })
+
+    // Every org gets its own welcome row (see TestContext.org()); a PUT in
+    // one org must never edit another org's.
+    it("only ever touches the caller's own org's welcome template", async () => {
+      const user = await ctx.user("tmpl-org-a", "admin")
+      const cookie = await ctx.cookie(user.id)
+      const otherOrg = await ctx.org()
+      const otherTemplate = await findEmailTemplateByKey(otherOrg.id, WELCOME_TEMPLATE_KEY)
+
+      const res = await request(app)
+        .put(`/email-templates/${WELCOME_TEMPLATE_KEY}`)
+        .set("Cookie", cookie)
+        .send({ subject: "Hi {{name}} from A", body: "Body" })
+
+      expect(res.status).toBe(200)
+      expect(res.body.template.orgId).toBe(await ctx.orgId())
+
+      const stillOther = await findEmailTemplateByKey(otherOrg.id, WELCOME_TEMPLATE_KEY)
+      expect(stillOther!.subject).toBe(otherTemplate!.subject)
     })
   })
 })

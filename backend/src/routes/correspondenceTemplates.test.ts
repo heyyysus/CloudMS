@@ -61,6 +61,23 @@ describe("correspondence templates", () => {
       expect(res.body.mergeFields).toEqual(expect.arrayContaining([...CORRESPONDENCE_MERGE_FIELDS]))
       expect(res.body.templates.map((t: { id: string }) => t.id)).toContain(created.body.id)
     })
+
+    it("omits another org's templates", async () => {
+      const cookie = await adminCookie("corr-list-wrongorg")
+      const otherOrg = await ctx.org()
+      const otherAdmin = await ctx.user("corr-list-other", "admin", otherOrg.id)
+      const otherCookie = await ctx.cookie(otherAdmin.id, otherOrg.id)
+      const theirs = await request(app)
+        .post("/correspondence-templates")
+        .set("Cookie", otherCookie)
+        .send(VALID_BODY)
+      templateIds.push(theirs.body.id)
+
+      const res = await request(app).get("/correspondence-templates").set("Cookie", cookie)
+
+      expect(res.status).toBe(200)
+      expect(res.body.templates.map((t: { id: string }) => t.id)).not.toContain(theirs.body.id)
+    })
   })
 
   describe("POST /correspondence-templates", () => {
@@ -157,6 +174,25 @@ describe("correspondence templates", () => {
 
       expect(res.status).toBe(403)
     })
+
+    it("returns 404 for another org's template", async () => {
+      const cookie = await adminCookie("corr-update-wrongorg")
+      const otherOrg = await ctx.org()
+      const otherAdmin = await ctx.user("corr-update-other", "admin", otherOrg.id)
+      const otherCookie = await ctx.cookie(otherAdmin.id, otherOrg.id)
+      const theirs = await request(app)
+        .post("/correspondence-templates")
+        .set("Cookie", otherCookie)
+        .send(VALID_BODY)
+      templateIds.push(theirs.body.id)
+
+      const res = await request(app)
+        .patch(`/correspondence-templates/${theirs.body.id}`)
+        .set("Cookie", cookie)
+        .send({ ...VALID_BODY, name: "Hijacked" })
+
+      expect(res.status).toBe(404)
+    })
   })
 
   it("never lists the welcome template (kind-scoped)", async () => {
@@ -210,6 +246,24 @@ describe("correspondence templates", () => {
         .set("Cookie", cookie)
 
       expect(res.status).toBe(403)
+    })
+
+    it("returns 404 for another org's template", async () => {
+      const cookie = await adminCookie("corr-delete-wrongorg")
+      const otherOrg = await ctx.org()
+      const otherAdmin = await ctx.user("corr-delete-other", "admin", otherOrg.id)
+      const otherCookie = await ctx.cookie(otherAdmin.id, otherOrg.id)
+      const theirs = await request(app)
+        .post("/correspondence-templates")
+        .set("Cookie", otherCookie)
+        .send(VALID_BODY)
+      templateIds.push(theirs.body.id)
+
+      const res = await request(app)
+        .delete(`/correspondence-templates/${theirs.body.id}`)
+        .set("Cookie", cookie)
+
+      expect(res.status).toBe(404)
     })
   })
 })

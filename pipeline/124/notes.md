@@ -33,12 +33,21 @@
      work landed" (assertions only). `always()` also fires on cancel and the 90-minute
      timeout, not just a step failure — `cancel-in-progress: true` made those lose
      uncommitted work today.
-   - `agent-planner`, `agent-plan-reviewer`, `agent-docs`: each stage's commit step
-     gained `if: always()` and now branches on `stop_reason` — success commits as
-     before; anything else checkpoints what exists as a `wip: <stage> stopped before
+   - `agent-planner`, `agent-plan-reviewer`: each stage's commit step gained
+     `if: always()` and now branches on `stop_reason` — success commits as before;
+     anything else checkpoints what exists as a `wip: <stage> stopped before
      finishing (stop reason: ...)` commit and then **fails the step**, so the
-     "Advance state" / "Open PR" step that follows (no `always()`) is skipped and a
-     partial `plan.md`/`review.md`/docs commit can never be mistaken for a finished one.
+     "Advance state" step that follows (no `always()`) is skipped and a partial
+     `plan.md`/`review.md` can never be mistaken for a finished one.
+   - `agent-docs`: same `if: always()` checkpoint, but it **does not fail the step**.
+     The planner and plan reviewer hard-fail because the next stage consumes their
+     artifact, so a partial `plan.md` drives a bad implementation. The docs stage's
+     only consumer is the PR review, which reads the diff either way, so failing
+     there would strand the issue on `needs-human` and cost a human round for
+     documentation a reviewer was going to read regardless. Instead it sets
+     `docs_incomplete`, "Open PR" runs as normal, and a dedicated
+     `Report an incomplete docs run` step posts the same `report-failure` body —
+     stop reason, tail, run URL, and the WIP sha when one was made.
    - `agent-pr-review`, `agent-pr-fixer`: no artifact to checkpoint (read-only /
      pushes only on success); failure block just rewired to `report-failure`.
      `agent-pr-fixer`'s existing "Report a run that did not finish" step (a soft,
@@ -87,6 +96,9 @@
   usually *in* the tool result, e.g. a failed test's stderr). Redaction + the 500
   char/line cap + the 4000 char total cap is the mitigation the plan actually
   specified for the leak risk; I didn't also special-case tool-result content.
+- **Plan step 7 said all three stages fail the step; `agent-docs` does not.** See
+  item 4 above for the reasoning. Raised by review round 2 on this PR, which
+  reversed round 1's finding on the same line.
 - Left the pre-existing double-comment pattern alone: every stage's "ineligible"
   branch already posts its own explanatory comment and exits 1, which also trips the
   new `report-failure` block below it, so an ineligible run now gets two comments
@@ -128,6 +140,10 @@
 - After the patch was applied: YAML parse and `bash -n` re-run over all nine workflow
   files and both composite actions against the pushed branch — clean, and the renderer
   test re-run there passes 17/17.
+- `agent-docs`'s "Commit docs" step run directly against a stubbed `git` for both
+  unclean-stop cases: with staged changes it exits 0 and sets `wip_sha` +
+  `docs_incomplete`; with nothing staged it exits 0 and sets `docs_incomplete` only,
+  so `report-failure` cannot claim a WIP commit that was never made.
 - No backend/frontend suites run: this issue touches only `.github/**`,
   `pipeline/**`, and `.claude/agents/orchestrator.md`.
 
@@ -144,8 +160,10 @@ Five advisory findings, all fixed on this branch.
    `set -e` and exits 0 explicitly). Verified: with the old `head -c … > file` form, the
    test's *"a mid-line cut still ends with a newline"* check fails.
 2. **The docs stage could advance a half-written run.** Its `elif` committed `wip:` and
-   exited 0, so "Open PR" still ran and the issue moved to `pipeline:pr-open`. It now
-   pushes the checkpoint and `exit 1`s, like the planner and the plan reviewer.
+   exited 0, so "Open PR" still ran and the issue moved to `pipeline:pr-open`. Fixed
+   then by failing the step — and re-opened by round 2, which pointed out that the
+   hard fail strands the issue instead. Settled as: checkpoint, carry on, and report
+   through `report-failure`. See item 4 under *Implemented*.
 3. **`agent-trigger` and `agent-triage` always said "step unknown".** Both pass
    `github.token` to `report-failure`, whose jobs-API call needs `actions: read`; their
    `permissions:` blocks granted only `issues`/`contents`. Both now grant it, and
@@ -163,6 +181,22 @@ Five advisory findings, all fixed on this branch.
 Findings 2, 3 and 5's `ci.yml` job were workflow edits, so they lived in
 `workflow-changes.patch` rather than the tree. That patch is now applied, so the test
 does run in CI.
+
+## Review round 2 (21 Sep)
+
+1. **The docs hard-fail was a policy change nobody asked for** — reversed, see round 1
+   item 2 and *Implemented* item 4.
+2. **The incomplete path reported nothing.** Exiting 0 meant `if: failure()` never
+   fired, so `wip_sha` had no consumer and the issue got a hand-rolled comment with no
+   failed step, no tail and no run URL. Replaced with a `Report an incomplete docs run`
+   step calling `report-failure`, gated on `success()` so it cannot double up with the
+   `failure()` block.
+3. **The "Open PR" tee comment was wrong.** `report-failure` prefers `claude-run`'s
+   `tail` and only reads `stage.log` when that is empty — which happens when there is
+   no execution file at all. The tee earns its place on that narrower case; the comment
+   now says so.
+4. **The reversal lived only in an inline comment.** This section, *Implemented* item 4
+   and `plan.md` approach 7 now record it.
 
 ## Docs
 

@@ -1,9 +1,7 @@
 import request from "supertest"
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
 import { WELCOME_TEMPLATE_KEY } from "../emails"
-import { findEmailTemplateByKey, upsertEmailTemplate } from "../repositories"
-import type { EmailTemplate } from "../types"
 import { TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
@@ -51,25 +49,11 @@ describe("GET/PUT /email-templates/:key", () => {
     )
   })
 
+  // Each test below mints its own org via ctx.user(), which seeds that org's
+  // own welcome template (see TestContext.org()); the outer afterEach's
+  // ctx.cleanup() tears the whole org down, so there is nothing shared across
+  // tests to save and restore here.
   describe("PUT", () => {
-    let saved: EmailTemplate | undefined
-
-    beforeEach(async () => {
-      saved = await findEmailTemplateByKey(WELCOME_TEMPLATE_KEY)
-    })
-
-    afterEach(async () => {
-      if (saved) {
-        await upsertEmailTemplate({
-          key: saved.key,
-          subject: saved.subject,
-          body: saved.body,
-          updatedBy: saved.updatedBy,
-          orgId: saved.orgId!,
-        })
-      }
-    })
-
     it("returns 400 for an unknown merge field", async () => {
       const user = await ctx.user("tmpl-badfield", "admin")
       const cookie = await ctx.cookie(user.id)

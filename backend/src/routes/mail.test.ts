@@ -222,10 +222,11 @@ afterEach(async () => {
 })
 
 // Creates a correspondence template directly, bypassing the admin-only POST
-// route so these tests can run as staff.
-async function makeTemplate(overrides: Partial<typeof TEMPLATE_BODY> = {}) {
+// route so these tests can run as staff. orgId defaults to the context's own
+// org, since every caller here has already minted one via makeSendFixture.
+async function makeTemplate(overrides: Partial<typeof TEMPLATE_BODY> = {}, orgId?: string) {
   const body = { ...TEMPLATE_BODY, ...overrides }
-  const template = await createCorrespondenceTemplate({
+  const template = await createCorrespondenceTemplate(orgId ?? (await ctx.orgId()), {
     key: `correspondence-test-${randomUUID().slice(0, 8)}`,
     ...body,
     updatedBy: null,
@@ -431,7 +432,7 @@ describe("POST /policies/:policyId/send-correspondence", () => {
   // the invite email can never be aimed at a client.
   it("returns 404 when templateId points at the welcome template", async () => {
     const { cookie, policy } = await makeSendFixture("send-welcome")
-    const welcome = await findEmailTemplateByKey(WELCOME_TEMPLATE_KEY)
+    const welcome = await findEmailTemplateByKey(await ctx.orgId(), WELCOME_TEMPLATE_KEY)
     expect(welcome).toBeDefined()
 
     const res = await request(app)

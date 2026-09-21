@@ -33,7 +33,6 @@ beforeEach(() => {
   resetAutomationUserCache()
   process.env.RESEND_API_KEY = "re_test"
   process.env.MAIL_FROM = "Cloud CMS <noreply@example.com>"
-  process.env.AGENCY_NAME = "Test Agency"
 })
 
 afterEach(async () => {
@@ -379,7 +378,8 @@ describe("dispatchReminders", () => {
     expect(policyLogs[0].author.email).toBe(AUTOMATION_USER_EMAIL)
   })
 
-  it("renders the agency name into {{agentName}}, since there is no agent", async () => {
+  it("renders the organization's name into {{agentName}}, since there is no agent", async () => {
+    const org = await ctx.org()
     const fetchMock = stubResend()
     await dueReminder(212_002, { subject: "From {{agentName}}", body: "Regards, {{agentName}}" })
 
@@ -387,8 +387,8 @@ describe("dispatchReminders", () => {
 
     const [, requestInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     const body = JSON.parse(requestInit.body as string)
-    expect(body.subject).toBe("From Test Agency")
-    expect(body.text).toBe("Regards, Test Agency")
+    expect(body.subject).toBe(`From ${org.name}`)
+    expect(body.text).toBe(`Regards, ${org.name}`)
   })
 
   it("returns the row to pending and records the error when Resend fails", async () => {
@@ -597,7 +597,7 @@ describe("reminder rules", () => {
     // client merge fields, so it must never be wireable as client-facing.
     it("refuses to point a rule at the welcome template", async () => {
       const cookie = await cookieFor("rr-welcome")
-      const welcome = await findEmailTemplateByKey(WELCOME_TEMPLATE_KEY)
+      const welcome = await findEmailTemplateByKey(await ctx.orgId(), WELCOME_TEMPLATE_KEY)
 
       const res = await request(app)
         .post("/reminder-rules")

@@ -1,9 +1,9 @@
-import { eq, inArray } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { db } from "./db"
-import { emailLog, users } from "./db/schema"
+import { emailLog } from "./db/schema"
 import { extractMergeFields, renderTemplate, sendWelcomeEmail } from "./emails"
-import { makeTestUser } from "./routes/testHelpers"
+import { makeTestUser, TestContext } from "./routes/testHelpers"
 import type { User } from "./types"
 
 describe("extractMergeFields", () => {
@@ -39,16 +39,12 @@ describe("renderTemplate", () => {
 
 describe("sendWelcomeEmail", () => {
   const ORIGINAL_ENV = { ...process.env }
-  const createdUserIds: string[] = []
+  const ctx = new TestContext()
 
   afterEach(async () => {
     vi.unstubAllGlobals()
     process.env = { ...ORIGINAL_ENV }
-    if (createdUserIds.length) {
-      await db.delete(emailLog).where(inArray(emailLog.triggeredBy, createdUserIds))
-      await db.delete(users).where(inArray(users.id, createdUserIds))
-      createdUserIds.length = 0
-    }
+    await ctx.cleanup()
   })
 
   function configureMail() {
@@ -66,19 +62,21 @@ describe("sendWelcomeEmail", () => {
     return fetchMock
   }
 
-  async function makeUsers(): Promise<{ invitee: User; admin: User }> {
+  async function makeUsers(): Promise<{ invitee: User; admin: User; orgId: string }> {
+    const orgId = await ctx.orgId()
     const invitee = await makeTestUser("emails-invitee")
     const admin = await makeTestUser("emails-admin")
-    createdUserIds.push(invitee.id, admin.id)
-    return { invitee, admin }
+    ctx.track("user", invitee.id)
+    ctx.track("user", admin.id)
+    return { invitee, admin, orgId }
   }
 
   it("sends the email and logs a sent entry", async () => {
     configureMail()
     const fetchMock = stubResend({ id: "msg_1" })
-    const { invitee, admin } = await makeUsers()
+    const { invitee, admin, orgId } = await makeUsers()
 
-    const result = await sendWelcomeEmail(invitee, admin, "staff")
+    const result = await sendWelcomeEmail(orgId, invitee, admin, "staff")
 
     expect(result).toEqual({ status: "sent", resendId: "msg_1" })
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -92,9 +90,9 @@ describe("sendWelcomeEmail", () => {
   it("logs a failed entry and returns a failure result when mail isn't configured", async () => {
     delete process.env.RESEND_API_KEY
     delete process.env.MAIL_FROM
-    const { invitee, admin } = await makeUsers()
+    const { invitee, admin, orgId } = await makeUsers()
 
-    const result = await sendWelcomeEmail(invitee, admin, "staff")
+    const result = await sendWelcomeEmail(orgId, invitee, admin, "staff")
 
     expect(result.status).toBe("failed")
     const [logRow] = await db.select().from(emailLog).where(eq(emailLog.recipient, invitee.email))

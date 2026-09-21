@@ -18,6 +18,7 @@ import {
   users,
   vehicles,
 } from "../db/schema"
+import { WELCOME_TEMPLATE_KEY } from "../emails"
 import {
   addDriverToPolicy,
   addEmailToClient,
@@ -33,6 +34,7 @@ import {
   createSession,
   createUser,
   createVehicle,
+  upsertEmailTemplate,
 } from "../repositories"
 import type {
   NewAutoPolicy,
@@ -122,7 +124,10 @@ export class TestContext {
 
   // Always inserts a fresh organization - the way to get a second, distinct
   // org for a cross-org test. The very first call also becomes the context's
-  // default org (see defaultOrg()).
+  // default org (see defaultOrg()). Seeds a welcome template too, mirroring
+  // what bootstrap.ts/seed/run.ts do for a real organization - without one,
+  // sendWelcomeEmail (invite, resend-welcome, restore) 500s for every org
+  // this context mints.
   async org(): Promise<Organization> {
     const [o] = await db
       .insert(organizations)
@@ -130,6 +135,12 @@ export class TestContext {
       .returning()
     this.orgIds.push(o.id)
     this.defaultOrgId ??= o.id
+    await upsertEmailTemplate(o.id, {
+      key: WELCOME_TEMPLATE_KEY,
+      subject: "Welcome to CloudMS, {{name}}",
+      body: "Hi {{name}}, {{inviterName}} has invited you as {{role}}. Sign in at {{appUrl}}.",
+      updatedBy: null,
+    })
     return o
   }
 

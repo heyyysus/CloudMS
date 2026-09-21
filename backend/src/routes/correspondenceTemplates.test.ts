@@ -11,7 +11,10 @@ const ctx = new TestContext()
 const templateIds: string[] = []
 
 afterEach(async () => {
-  for (const id of templateIds.splice(0)) await deleteCorrespondenceTemplate(id)
+  if (templateIds.length) {
+    const orgId = await ctx.orgId()
+    for (const id of templateIds.splice(0)) await deleteCorrespondenceTemplate(orgId, id)
+  }
   await ctx.cleanup()
 })
 

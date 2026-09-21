@@ -1,5 +1,5 @@
 import { and, eq, lt, sql } from "drizzle-orm"
-import { adminDb } from "../db"
+import { adminDb, runInOrg } from "../db"
 import { reminderRules, scheduledEmails } from "../db/schema"
 import {
   buildCorrespondenceMergeValues,
@@ -93,74 +93,82 @@ async function claimBatch(batchSize: number, orgId?: string): Promise<ClaimedRow
 // rather than retried three times to the same end.
 class UnsendableError extends Error {}
 
+// The scheduler has no request, so no requireAuth middleware ever opens the
+// org-scoped transaction that RLS's policies key off of (see rls.ts /
+// context.ts). Everything below that touches a tenant table through the
+// repository layer (which reads/writes via `db`, not `adminDb`) is wrapped in
+// runInOrg for that reason - without it, every one of these calls would 404
+// or silently write nothing once RLS is enabled.
 async function sendOne(row: ClaimedRow): Promise<void> {
   const orgId = row.org_id
 
   const automation = await getAutomationUser()
 
-  const rule = await adminDb.query.reminderRules.findFirst({
-    where: eq(reminderRules.id, row.rule_id),
-  })
-  if (!rule) throw new UnsendableError("Reminder rule no longer exists")
-
-  const template = await findCorrespondenceTemplateById(orgId, rule.templateId)
-  if (!template) throw new UnsendableError("Correspondence template no longer exists")
-
-  const policy = await getPolicyWithDetails(orgId, row.policy_id)
-  if (!policy) throw new UnsendableError("Policy no longer exists")
-
-  const client = await getClientWithDetails(orgId, policy.clientId)
-  if (!client) throw new UnsendableError("Client no longer exists")
-
-  // Resolved now rather than stored at plan time, so an address corrected
-  // between planning and sending is the one actually used.
-  const onFile = await listEmailsByClientId(orgId, policy.clientId)
-  if (onFile.length === 0) throw new UnsendableError("Client has no email address on file")
-
-  const org = await findOrganizationById(orgId)
-  if (!org) throw new UnsendableError("Organization no longer exists")
-
-  const values = buildCorrespondenceMergeValues({ client, policy, agent: agencyIdentity(org) })
-
-  // Writes one email_log row per recipient and rethrows mail errors, which is
-  // exactly what the retry logic below wants.
-  const result = await sendCorrespondenceEmail({
-    orgId,
-    template,
-    values,
-    to: onFile.map((e) => e.email),
-    cc: [],
-    triggeredBy: automation.id,
-  })
-
-  await adminDb
-    .update(scheduledEmails)
-    .set({
-      status: "sent",
-      resendId: result.resendId,
-      subject: result.subject,
-      sentAt: new Date(),
-      lastError: null,
-      updatedAt: new Date(),
+  await runInOrg(orgId, async () => {
+    const rule = await adminDb.query.reminderRules.findFirst({
+      where: eq(reminderRules.id, row.rule_id),
     })
-    .where(eq(scheduledEmails.id, row.id))
+    if (!rule) throw new UnsendableError("Reminder rule no longer exists")
 
-  // Best-effort, matching routes/mail.ts: the mail is already gone, so a
-  // logging failure must not undo a successful send.
-  try {
-    await createPolicyLog(orgId, {
-      policyId: row.policy_id,
-      authorId: automation.id,
-      body: correspondenceSentLogBody({
-        to: onFile.map((e) => e.email),
-        cc: [],
+    const template = await findCorrespondenceTemplateById(orgId, rule.templateId)
+    if (!template) throw new UnsendableError("Correspondence template no longer exists")
+
+    const policy = await getPolicyWithDetails(orgId, row.policy_id)
+    if (!policy) throw new UnsendableError("Policy no longer exists")
+
+    const client = await getClientWithDetails(orgId, policy.clientId)
+    if (!client) throw new UnsendableError("Client no longer exists")
+
+    // Resolved now rather than stored at plan time, so an address corrected
+    // between planning and sending is the one actually used.
+    const onFile = await listEmailsByClientId(orgId, policy.clientId)
+    if (onFile.length === 0) throw new UnsendableError("Client has no email address on file")
+
+    const org = await findOrganizationById(orgId)
+    if (!org) throw new UnsendableError("Organization no longer exists")
+
+    const values = buildCorrespondenceMergeValues({ client, policy, agent: agencyIdentity(org) })
+
+    // Writes one email_log row per recipient and rethrows mail errors, which is
+    // exactly what the retry logic below wants.
+    const result = await sendCorrespondenceEmail({
+      orgId,
+      template,
+      values,
+      to: onFile.map((e) => e.email),
+      cc: [],
+      triggeredBy: automation.id,
+    })
+
+    await adminDb
+      .update(scheduledEmails)
+      .set({
+        status: "sent",
+        resendId: result.resendId,
         subject: result.subject,
-        body: result.body,
-      }),
-    })
-  } catch (err) {
-    logger.error({ err, scheduledEmailId: row.id }, "Failed to write reminder policy log")
-  }
+        sentAt: new Date(),
+        lastError: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(scheduledEmails.id, row.id))
+
+    // Best-effort, matching routes/mail.ts: the mail is already gone, so a
+    // logging failure must not undo a successful send.
+    try {
+      await createPolicyLog(orgId, {
+        policyId: row.policy_id,
+        authorId: automation.id,
+        body: correspondenceSentLogBody({
+          to: onFile.map((e) => e.email),
+          cc: [],
+          subject: result.subject,
+          body: result.body,
+        }),
+      })
+    } catch (err) {
+      logger.error({ err, scheduledEmailId: row.id }, "Failed to write reminder policy log")
+    }
+  })
 }
 
 // Sends every reminder that is due. Safe to call concurrently on any number of

@@ -39,8 +39,12 @@ Actions log to learn a fact the run already knew.
 `area:infra`, and `risk:high` per the triage rules, which means no auto-merge.
 `enhancement` and `agent` are right.
 
-**The coder cannot push `.github/workflows/`.** Those eight edits go to
+**The coder cannot push `.github/workflows/`.** Those eight edits went to
 `pipeline/124/workflow-changes.patch` for a human to apply, exactly as #137 did.
+**That has since happened: the patch was applied by hand, the eight workflow
+edits are real commits on this branch, and the patch file is deleted. Every
+reference below that names it records the plan as written, not a step still to
+run.**
 `.github/actions/**` is *not* under the `workflows` scope, so put every line of
 real logic there and keep the patch to thin call-sites.
 
@@ -50,11 +54,11 @@ real logic there and keep the patch to thin call-sites.
 |---|---|
 | `.github/actions/report-failure/action.yml` | **new** composite: builds the body, posts the comment, writes the step summary |
 | `.github/actions/claude-run/action.yml` | new `tail` output (rendered transcript tail); add stop reason to the summary table |
-| `.github/actions/report-failure/testdata/execution-sample.json` | fixture for the tail renderer |
-| `.github/workflows/agent-{coder,docs,planner,plan-reviewer,pr-review,pr-fixer,trigger,triage}.yml` | call `report-failure`; checkpoint steps (**patch file**) |
+| `.github/actions/claude-run/testdata/execution-sample.json` | fixture for the tail renderer (moved here from `report-failure/`, which never ran it) |
+| `.github/workflows/agent-{coder,docs,planner,plan-reviewer,pr-review,pr-fixer,trigger,triage}.yml` | call `report-failure`; checkpoint steps (applied directly) |
 | `pipeline/README.md` | what a failure comment contains; "Resuming / intervening" |
 | `.claude/agents/orchestrator.md` | §7: stop reason is in the comment, stop reading run logs |
-| `pipeline/124/workflow-changes.patch` | the eight workflow edits |
+| ~~`pipeline/124/workflow-changes.patch`~~ | the eight workflow edits — applied, and the file removed |
 
 ## Approach
 
@@ -130,7 +134,9 @@ same wall). Verify with, in order:
    a `result` event with `"subtype": "error_max_turns"`. Run the renderer over
    it and assert: ≤20 lines, the token is redacted, the subtype is reported.
    Record the exact command in `pipeline/124/notes.md`.
-4. `git apply --check pipeline/124/workflow-changes.patch` before committing it.
+4. ~~`git apply --check pipeline/124/workflow-changes.patch` before committing it.~~
+   Done — the patch is applied and the file is gone. `render-tail.test.sh` now
+   covers item 3 and runs in CI on any change under `.github/actions/**`.
 
 The end-to-end check is the next real failure after merge — its comment should
 show the stop reason and a tail. If you want one on demand, temporarily set a

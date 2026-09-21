@@ -10,14 +10,19 @@ name: agent-pr-fixer
 # agent-pr-review, whose completion re-triggers this. The fixer counts its own
 # marker comments and escalates on the third round rather than looping.
 #
-# Two ways in. `workflow_run` is the normal one. `issues: labeled` on
+# Three ways in. `workflow_run` is the normal one. `issues: labeled` on
 # `pipeline:pr-reviewed` exists so the orchestrator's recovery primitive —
 # remove the state label, add it back — can actually re-fire this stage; a
 # workflow_run-only trigger left `pipeline:pr-reviewed` as the one state its
 # hourly sweep could detect but not recover. Both paths fire on a normal
 # review (agent-pr-review adds the label with the PAT, which does emit
 # events), so the resolve step below refuses a second round on a head that has
-# already had one.
+# already had one. `workflow_dispatch` takes the branch name, for re-firing a
+# round by hand.
+#
+# The stage stands down on `needs-human`: the label used to be something it only
+# ever added, so an issue a person had been asked to take could still be merged
+# by the next round.
 #
 # Postgres and a full install are present because a fix that has not been run
 # is a guess. The whole point of this stage is to stop pushing those.
@@ -33,6 +38,11 @@ on:
     types: [completed]
   issues:
     types: [labeled]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "The agent/issue-<n> branch to run a round on."
+        required: true
 
 permissions:
   contents: write
@@ -44,7 +54,8 @@ permissions:
 # against each other and the duplicate-round guard never sees the first round.
 concurrency:
   group: >-
-    agent-pr-fixer-${{ github.event_name == 'issues'
+    agent-pr-fixer-${{ github.event_name == 'workflow_dispatch' && inputs.branch
+    || github.event_name == 'issues'
     && format('agent/issue-{0}', github.event.issue.number)
     || github.event.workflow_run.head_branch }}
   cancel-in-progress: false
@@ -56,6 +67,7 @@ jobs:
       && startsWith(github.event.workflow_run.head_branch, 'agent/issue-'))
       || (github.event_name == 'issues'
       && github.event.label.name == 'pipeline:pr-reviewed')
+      || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     services:
@@ -75,7 +87,8 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
       BRANCH: >-
-        ${{ github.event_name == 'issues'
+        ${{ github.event_name == 'workflow_dispatch' && inputs.branch
+        || github.event_name == 'issues'
         && format('agent/issue-{0}', github.event.issue.number)
         || github.event.workflow_run.head_branch }}
       DATABASE_ADMIN_URL: postgresql://postgres:password@localhost:5432/myapp
@@ -93,6 +106,16 @@ jobs:
           case "$issue" in ''|*[!0-9]*) echo "Branch $BRANCH carries no issue number."; \
             echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0;; esac
 
+          # `needs-human` means a person was asked to take this one. The stage
+          # only ever *added* that label before, so a PR whose issue was
+          # escalated was still merged the moment anything re-fired a review.
+          issue_labels=$(gh issue view "$issue" -R "$GITHUB_REPOSITORY" \
+                         --json labels -q '.labels[].name' || true)
+          if grep -qxF "needs-human" <<< "$issue_labels"; then
+            echo "Issue #$issue carries \`needs-human\`; standing down." >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
           # Covers a deleted branch too: deleting the head closes the PR.
           pr=$(gh pr list -R "$GITHUB_REPOSITORY" --head "$BRANCH" --state open \
                --json number -q '.[0].number // ""')
@@ -105,14 +128,24 @@ jobs:
 
           # Only act on a review of the commit that is actually at the head. A
           # stale verdict describes code nobody is looking at any more.
+          #
+          # The verdict filter is not cosmetic: agent-pr-review posts a
+          # verdict-less "No reviewable changes since the last review." comment
+          # carrying this same marker whenever the head has not moved, and a
+          # plain `last` let that shadow the real review at the same SHA.
           review=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${pr}/comments" --paginate \
-                   --jq "[.[] | select(.body | contains(\"<!-- pipeline-reviewed: ${head} -->\"))] | last | .body // \"\"")
+                   --jq "[.[] | select(.body | contains(\"<!-- pipeline-reviewed: ${head} -->\"))
+                             | select(.body | contains(\"PIPELINE-VERDICT:\"))] | last | .body // \"\"")
           if [[ -z "$review" ]]; then
-            echo "No review for $head on #$pr; waiting for one." >> "$GITHUB_STEP_SUMMARY"
+            echo "No verdict-carrying review for $head on #$pr; waiting for one." \
+              >> "$GITHUB_STEP_SUMMARY"
             echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          verdict=$(grep -oE 'PIPELINE-VERDICT: *(clean|advisory|blocking-security)' <<< "$review" \
-                    | tail -1 | awk '{print $2}')
+          # Non-fatal on purpose: `set -e` with `pipefail` turns grep's exit 1 on
+          # a malformed verdict into a silent dead stage, before the
+          # `${verdict:-unparseable}` fallback below ever runs.
+          verdict=$({ grep -oE 'PIPELINE-VERDICT: *(clean|advisory|blocking-security)' <<< "$review" \
+                      || true; } | tail -1 | awk '{print $2}')
 
           # One round per review, whichever event got here first. The two
           # triggers both fire on a normal review, and the label path fires
@@ -120,7 +153,8 @@ jobs:
           # collect duplicate rounds and burn its three-round budget on
           # re-reads of the same verdict.
           reviewed_at=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${pr}/comments" --paginate \
-                        --jq "[.[] | select(.body | contains(\"<!-- pipeline-reviewed: ${head} -->\"))] | last | .created_at // \"\"")
+                        --jq "[.[] | select(.body | contains(\"<!-- pipeline-reviewed: ${head} -->\"))
+                                  | select(.body | contains(\"PIPELINE-VERDICT:\"))] | last | .created_at // \"\"")
           last_round_at=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${pr}/comments" --paginate \
                           --jq '[.[] | select(.body | contains("<!-- pr-fixer round -->"))] | last | .created_at // ""')
           if [[ -n "$last_round_at" && "$last_round_at" > "$reviewed_at" ]]; then

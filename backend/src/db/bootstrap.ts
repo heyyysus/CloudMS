@@ -52,16 +52,8 @@ async function main() {
       .insert(orgMemberships)
       .values({ userId: adminUser.id, orgId: defaultOrgId, role: "admin" })
       .onConflictDoNothing({ target: [orgMemberships.userId, orgMemberships.orgId] })
+    console.log("Ensured default-org membership exists")
   }
-  const [automationUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, AUTOMATION_USER_EMAIL))
-  await db
-    .insert(orgMemberships)
-    .values({ userId: automationUser.id, orgId: defaultOrgId, role: "staff" })
-    .onConflictDoNothing({ target: [orgMemberships.userId, orgMemberships.orgId] })
-  console.log("Ensured default-org memberships exist")
 
   await db
     .insert(emailTemplates)

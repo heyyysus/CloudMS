@@ -1,7 +1,12 @@
 name: agent-triage
 
 # Haiku classifies every issue opened by a CODEOWNER: one type label
-# (bug/enhancement/documentation/question) + one area label. Never applies `agent`.
+# (bug/enhancement/documentation/question), one area label, and one risk label.
+# Never applies `agent`.
+#
+# Risk is decided here, once, by the cheapest model rather than re-derived by the
+# orchestrator on every run. It feeds two later decisions: how small the issue
+# should be scoped, and whether a finished PR may be auto-merged.
 
 on:
   issues:
@@ -44,7 +49,22 @@ jobs:
           Vite/React frontend in frontend/, infra = CI, docker, nginx, deploy scripts).
 
           Reply with ONLY a single line of JSON, no prose, no code fence:
-          {"type": <one of "bug","enhancement","documentation","question">, "area": <one of "backend","frontend","infra">}
+          {"type": <one of "bug","enhancement","documentation","question">, "area": <one of "backend","frontend","infra">, "risk": <one of "low","medium","high">}
+
+          Risk is about how expensive a mistake would be to discover late or undo, not
+          about how much work it is:
+
+          - "high": changes database schema or migrations; touches auth, sessions, or
+            row-level security; alters how money is recorded (invoices, payments,
+            receipts, trust ledger); edits .github/workflows; or bumps dependencies.
+            Anything that could corrupt or expose data across organizations is high.
+          - "medium": new or changed API routes, repositories, or background jobs;
+            refactors spanning several modules; anything altering a response shape the
+            frontend already consumes.
+          - "low": documentation, comments, tests, copy, styling, or a change confined
+            to one component or one function with no data or contract change.
+
+          When a change spans categories, use the highest that applies.
 
           Title: $TITLE
 
@@ -75,9 +95,13 @@ jobs:
           json=$(grep -oE '\{[^}]*\}' <<< "$RESULT" | head -1 || true); [[ -n "$json" ]] || json="{}"
           type=$(jq -r '.type // ""' <<< "$json")
           area=$(jq -r '.area // ""' <<< "$json")
+          risk=$(jq -r '.risk // ""' <<< "$json")
           labels=()
           case "$type" in bug|enhancement|documentation|question) labels+=("$type");; esac
           case "$area" in backend|frontend|infra) labels+=("area:$area");; esac
+          # An unparseable or missing risk is left unlabelled rather than guessed at:
+          # a wrong "low" would licence an auto-merge nobody intended.
+          case "$risk" in low|medium|high) labels+=("risk:$risk");; esac
           if [[ ${#labels[@]} -eq 0 ]]; then echo "No usable classification: $RESULT"; exit 0; fi
           args=(); for l in "${labels[@]}"; do args+=(--add-label "$l"); done
           gh issue edit "$ISSUE" "${args[@]}"

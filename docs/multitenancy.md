@@ -45,10 +45,12 @@ are decisions still to be made.
   migrations with `drizzle-kit push`, so there is no backfill migration.
   #130 dropped the column's temporary `NOT NULL DEFAULT 1` (a leftover from
   when ids were sequential integers and `1` meant something) in favor of a
-  plain nullable `varchar(22)`, with no backfill; #121 restores `NOT NULL`
-  once every insert path passes an explicit `orgId`. Until then, `db:push`
-  against a database that already has rows needs no organization to exist
-  first - the column is nullable, not defaulted.
+  plain nullable `varchar(22)`, with no backfill. **Done (#121):** `org_id`
+  is `NOT NULL` again, with no default, on every tenant table - a one-off
+  `db:backfill-org` script assigns any legacy `NULL` row to the default
+  organization (or derives it from the row's parent) before `drizzle-kit
+  push` emits the `SET NOT NULL`, so an insert without `org_id` now fails at
+  the database rather than landing invisibly.
 - **Multiple users can belong to one organization, and one user can belong to
   multiple organizations** via an `org_memberships` table (`user_id`, `org_id`,
   `role`, `is_active`, unique on `(user_id, org_id)`) rather than an `org_id`
@@ -85,9 +87,10 @@ still gets a valid id, plus a Drizzle `$defaultFn` (Node's
 in-memory row before `.returning()` completes. A flat random id was chosen
 over a composite `<org>-<sequence>` key: the latter still leaks per-org
 volume to anyone in that org and adds a second read (or a cached counter) on
-every insert for no benefit once the id is opaque anyway. `org_id` itself is
-nullable until #121 (see *Data model* above) - unrelated to the id format,
-but landing in the same migration since both touch every table's columns.
+every insert for no benefit once the id is opaque anyway. `org_id` itself was
+nullable in the same migration, and restored to `NOT NULL` by #121 (see *Data
+model* above) - unrelated to the id format, but the two landed together since
+both touch every table's columns.
 
 ## Request scoping
 
@@ -117,13 +120,19 @@ but landing in the same migration since both touch every table's columns.
   forward. Attachment storage keys are now prefixed `org/<org_id>/policies/...`;
   attachments uploaded before this change keep their old
   `policy-attachments/...` key and are not migrated.
-- **Not done yet (#121):** email templates, reminder rules, scheduled emails,
-  the reminder planner/scheduler, and storage keys still don't take an
-  `orgId` - since #130 dropped `org_id`'s temporary `DEFAULT 1`, every row
-  created through those still-unscoped routes lands with `org_id NULL`
-  regardless of which org's session created it, rather than in a single
-  default organization. The *session's* org and the org those rows land in
-  are deliberately different things until #121 lands.
+- **Done (#121):** email templates, email log, reminder rules, and scheduled
+  emails take an explicit `orgId` and filter every read/write by it, exactly
+  like the #119/#120 halves. The reminder planner's `INSERT ... SELECT` joins
+  `reminder_rules` to `auto_policies` within the same organization
+  (`p.org_id = r.org_id`), which is what stops a rule in one org from
+  queuing reminders against another org's policies; the dispatcher and
+  manual `POST /reminders/tick` carry the same org filter. The automation
+  user that authors these sends stays a single global row with no
+  memberships, looked up through `adminDb`, and never determines the `org_id`
+  written - that always comes from the policy or rule the send concerns.
+  `organizations.name` replaces `AGENCY_NAME` in `{{agentName}}`. Storage keys
+  were already scoped in #120, not left for #121 as an earlier draft of this
+  document said.
 - **Repositories take an explicit `orgId`.** All of them, so the compiler
   enforces scoping and a forgotten filter is a type error, not a data leak.
   The comment at the top of `backend/src/repositories/index.ts` anticipated
@@ -132,19 +141,27 @@ but landing in the same migration since both touch every table's columns.
   `SET LOCAL app.org_id` at the start of each request transaction, and an RLS
   policy on every tenant table. This is defense in depth against a missed
   `where`, not the primary mechanism. The non-superuser `app` role already
-  exists (the API, the scheduler and the test suite all connect as it) —
-  only `SET LOCAL app.org_id` and the policies themselves remain.
+  exists (the API and the test suite connect as it) — only `SET LOCAL
+  app.org_id` and the policies themselves remain. **Since #121,** the
+  reminder planner and dispatcher run through `adminDb` (the owner role)
+  instead, because a background job has no request to hang `SET LOCAL
+  app.org_id` off of; until RLS lands, their own `p.org_id = r.org_id`-style
+  joins are what prevents cross-tenant reads, not a database-level backstop.
+  See `backend/src/db/index.ts`'s comment.
 
 ## Organization settings replace environment variables
 
 Anything that is really a property of the agency moves from the process
-environment to columns on `organizations`: `AGENCY_NAME`, `MAIL_FROM`,
-`MAIL_REPLY_TO`, `REMINDER_TIMEZONE`, `REMINDER_SEND_HOUR`, and the
-reminder planning window. Outbound email sends from a shared platform domain
-with the agency's reply-to; per-agency sending domains are a later problem.
-Process-level configuration that stays in the environment: `DATABASE_URL`,
-`GOOGLE_CLIENT_ID`, `RESEND_API_KEY`, `R2_*`, `APP_URL`, logging, and the
-scheduler's tick and batch tuning.
+environment to columns on `organizations`. **Done (#121):** `organizations.name`
+replaces `AGENCY_NAME`, which no longer exists as an environment variable.
+**Remains:** `MAIL_FROM`, `MAIL_REPLY_TO`, `REMINDER_TIMEZONE`,
+`REMINDER_SEND_HOUR`, and the reminder planning window stay process-wide for
+now - #121 explicitly left these for a later issue, since none of them can
+change per request the way `agentName` does. Outbound email sends from a
+shared platform domain with the agency's reply-to; per-agency sending domains
+are a later problem. Process-level configuration that stays in the
+environment: `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `RESEND_API_KEY`, `R2_*`,
+`APP_URL`, logging, and the scheduler's tick and batch tuning.
 
 Object storage keys are generated server-side as `org/<org_id>/...`, so an
 attachment can never be addressed across organizations. The reminder planner
@@ -192,16 +209,21 @@ created automatically by a migration.
    sequential `serial` ids, and `org_id` dropped to nullable (no default) -
    see *Row ids* above. Runs before the next step so repositories, tests and
    the frontend are rewritten for the new id type once, not twice.
-4. Thread `orgId` through every repository and route; `requireAuth` attaches
-   the organization; `TestContext` gets a per-context organization. **Auth
-   half done:** the session carries the org and `requireAuth`/`TestContext`
-   enforce and provide it (see *Request scoping* above). **Done (#119, #120):**
-   people, clients, carriers, policies, vehicles, search, logs, attachments,
-   and accounting documents take an explicit `orgId`. **Remains (#121):**
-   email templates, reminder rules, scheduled emails, and storage keys.
+4. **Done.** Thread `orgId` through every repository and route; `requireAuth`
+   attaches the organization; `TestContext` gets a per-context organization.
+   The session carries the org and `requireAuth`/`TestContext` enforce and
+   provide it (see *Request scoping* above). **Done (#119, #120):** people,
+   clients, carriers, policies, vehicles, search, logs, attachments, and
+   accounting documents take an explicit `orgId`. **Done (#121):** email
+   templates, email log, reminder rules, scheduled emails, and the reminder
+   planner/dispatcher take an explicit `orgId`; `org_id` is `NOT NULL` again
+   on every tenant table.
 5. **Done (#120):** per-organization invoice and receipt numbers.
 6. Organization settings columns; move the agency-level environment variables
-   onto them; scope the reminder planner per organization.
+   onto them; scope the reminder planner per organization. **Partially done
+   (#121):** `organizations.name` replaces `AGENCY_NAME`. `MAIL_REPLY_TO`,
+   `REMINDER_TIMEZONE`, `REMINDER_SEND_HOUR` and per-organization planner
+   scoping remain.
 7. Organization creation and invite flow; retire `ADMIN_EMAIL`.
 8. Demo org: flag, demo sign-in, org-scoped reseed, guardrail settings, banner.
 9. Row-level security backstop (#122).

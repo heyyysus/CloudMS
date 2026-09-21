@@ -63,3 +63,9 @@ None. Implemented exactly what plan.md scoped.
 - Render harness described above: both cases pass.
 - `git apply --check`: patch applies cleanly to `origin/main`'s workflow file.
 - No backend or frontend files touched — those suites not run, per plan scope.
+
+## Docs
+
+No doc changes needed — the fix only changes `agent-docs.yml`'s PR-body
+generation (internal pipeline tooling), not user-facing app behaviour or the
+API surface.

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
 import { WELCOME_TEMPLATE_KEY } from "../emails"
 import { findEmailTemplateByKey } from "../repositories"
-import { TestContext } from "./testHelpers"
+import { runInOrg, TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 
@@ -100,7 +100,9 @@ describe("GET/PUT /email-templates/:key", () => {
       const user = await ctx.user("tmpl-org-a", "admin")
       const cookie = await ctx.cookie(user.id)
       const otherOrg = await ctx.org()
-      const otherTemplate = await findEmailTemplateByKey(otherOrg.id, WELCOME_TEMPLATE_KEY)
+      const otherTemplate = await runInOrg(otherOrg.id, () =>
+        findEmailTemplateByKey(otherOrg.id, WELCOME_TEMPLATE_KEY)
+      )
 
       const res = await request(app)
         .put(`/email-templates/${WELCOME_TEMPLATE_KEY}`)
@@ -110,7 +112,9 @@ describe("GET/PUT /email-templates/:key", () => {
       expect(res.status).toBe(200)
       expect(res.body.template.orgId).toBe(await ctx.orgId())
 
-      const stillOther = await findEmailTemplateByKey(otherOrg.id, WELCOME_TEMPLATE_KEY)
+      const stillOther = await runInOrg(otherOrg.id, () =>
+        findEmailTemplateByKey(otherOrg.id, WELCOME_TEMPLATE_KEY)
+      )
       expect(stillOther!.subject).toBe(otherTemplate!.subject)
     })
   })

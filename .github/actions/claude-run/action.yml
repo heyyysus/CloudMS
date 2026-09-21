@@ -38,6 +38,14 @@ outputs:
     value: ${{ steps.parse.outputs.stop_reason }}
   conclusion:
     value: ${{ steps.claude.outputs.conclusion }}
+  tail:
+    description: >-
+      Plain-text tail of the transcript (last ~20 events, secrets redacted, capped at ~4000
+      chars) for a failure comment to quote. Empty when there is no execution file.
+    value: ${{ steps.parse.outputs.tail }}
+  tail_file:
+    description: Path to the same tail, as a file. Empty when there is no execution file.
+    value: ${{ steps.parse.outputs.tail_file }}
 
 runs:
   using: composite
@@ -67,6 +75,8 @@ runs:
         if [[ -z "${EXEC_FILE:-}" || ! -f "$EXEC_FILE" ]]; then
           echo "result=" >> "$GITHUB_OUTPUT"
           echo "stop_reason=" >> "$GITHUB_OUTPUT"
+          echo "tail=" >> "$GITHUB_OUTPUT"
+          echo "tail_file=" >> "$GITHUB_OUTPUT"
           echo "### $STAGE ($MODEL): no execution file" >> "$GITHUB_STEP_SUMMARY"
           exit 0
         fi
@@ -78,13 +88,57 @@ runs:
         out_tok=$(jq -r '.usage.output_tokens // 0' <<< "$res")
         cost=$(jq -r '.total_cost_usd // "n/a"' <<< "$res")
         turns=$(jq -r '.num_turns // "n/a"' <<< "$res")
-        echo "stop_reason=$(jq -r '.subtype // ""' <<< "$res")" >> "$GITHUB_OUTPUT"
+        stop_reason=$(jq -r '.subtype // ""' <<< "$res")
+        echo "stop_reason=$stop_reason" >> "$GITHUB_OUTPUT"
         {
           echo "### $STAGE ($MODEL)"
-          echo "| turns | input | cache read | cache write | output | cost (USD) |"
-          echo "|---|---|---|---|---|---|"
-          echo "| $turns | $in_tok | $cr_tok | $cw_tok | $out_tok | $cost |"
+          echo "| turns | input | cache read | cache write | output | cost (USD) | stop reason |"
+          echo "|---|---|---|---|---|---|---|"
+          echo "| $turns | $in_tok | $cr_tok | $cw_tok | $out_tok | $cost | ${stop_reason:-n/a} |"
         } >> "$GITHUB_STEP_SUMMARY"
+
+        # Plain-text transcript tail for a failure comment to quote: one line per event, newest
+        # last. Prefer assistant text and command lines over full tool results (Risks #1 in
+        # pipeline/124/plan.md) — a tool result is the likeliest place a leaked secret would show
+        # up, so it is truncated and redacted same as everything else, not the main content.
+        tail_file="$RUNNER_TEMP/claude-tail.txt"
+        jq -r '
+          [ .[] |
+            (
+              if .type == "assistant" then
+                (.message.content // []) | map(
+                  if .type == "text" then "[assistant] " + ((.text // "") | split("\n")[0])
+                  elif .type == "tool_use" then
+                    "[tool] " + .name + ": " + (
+                      ((.input.command // .input.file_path // .input.pattern // "") | tostring)
+                      | split("\n")[0]
+                    )
+                  else empty end
+                )
+              elif .type == "user" then
+                (.message.content // []) | map(
+                  if .type == "tool_result" then
+                    "[tool-result] " + (
+                      (if (.content | type) == "string" then .content
+                       else ((.content // []) | map(.text // "") | join(" ")) end)
+                      | split("\n")[0]
+                    )
+                  else empty end
+                )
+              else [] end
+            )
+          ] | flatten | .[]
+        ' "$EXEC_FILE" \
+          | tail -n 20 \
+          | cut -c1-500 \
+          | sed -E 's/gh[pousr]_[A-Za-z0-9]{20,}/[REDACTED]/g; s/sk-ant-[A-Za-z0-9_-]{20,}/[REDACTED]/g' \
+          | head -c 4000 > "$tail_file"
+        echo "tail_file=$tail_file" >> "$GITHUB_OUTPUT"
+        {
+          echo "tail<<__CLAUDE_TAIL__"
+          cat "$tail_file"
+          echo "__CLAUDE_TAIL__"
+        } >> "$GITHUB_OUTPUT"
         # On a max-turns stop the SDK returns an empty result; fall back to the last assistant text
         # so a cap hit keeps whatever Claude had written.
         text=$(jq -r '.result // ""' <<< "$res")

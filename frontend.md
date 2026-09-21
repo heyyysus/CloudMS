@@ -8,6 +8,12 @@ Backend response shape (from `backend/src/auth/routes.ts`):
 `PublicUser = { id: number; email: string; name: string | null; role: "admin" | "staff" }`
 Errors: `400 {error:"idToken is required"}`, `401 {error:"Invalid Google token"}`, `403 {error:"Account not authorized"}`.
 
+> Update (multi-tenant rollout): `/auth/google`, `/auth/me` and `/auth/org` now
+> return `{ user, org, memberships }` instead of a bare `{ user }`, and `id`s
+> are opaque strings rather than numbers. See `docs/multitenancy.md` for the
+> current shape and rollout; this file otherwise still describes the original
+> single-tenant build.
+
 ## What the user must provide (prerequisites)
 
 1. **`frontend/.env`** with `VITE_GOOGLE_CLIENT_ID=<same value as GOOGLE_CLIENT_ID in backend/.env>`. Already gitignored by the root `.gitignore` (`.env` matches at any depth). A committed `frontend/.env.example` documents it.

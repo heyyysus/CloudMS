@@ -19,14 +19,14 @@ depth — this doc assumes that context and focuses on the resource routes.
   code: "ORG_REQUIRED" }` from every route below, regardless of resource —
   see the **Auth for frontend clients** section.
 - **Tenancy**: the session's organization never appears in a URL, header, or
-  body. As of #119, people, clients, carriers, policies, vehicles, and search
-  are scoped to the session's organization: a row belonging to another
-  organization answers exactly as a missing row does — `404` on
-  get/patch/delete, absent from lists and search results — never `403` and
-  never a distinguishable error message. A carrier's NAIC and a policy's
-  policy number are unique per organization rather than globally, so two
-  agencies can hold the same NAIC or policy number. Logs, attachments, and
-  accounting documents are not yet scoped — see
+  body. As of #119 and #120, people, clients, carriers, policies, vehicles,
+  search, policy logs, policy attachments, and accounting documents (invoices,
+  payments, receipts) are all scoped to the session's organization: a row
+  belonging to another organization answers exactly as a missing row does —
+  `404` on get/patch/delete, absent from lists and search results — never
+  `403` and never a distinguishable error message. A carrier's NAIC and a
+  policy's policy number are unique per organization rather than globally, so
+  two agencies can hold the same NAIC or policy number. See
   [`multitenancy.md`](./multitenancy.md) for the rollout plan.
 - **Roles**: `staff` and `admin`. Admins pass every `requireRole` check
   (admin-bypass), so the tables below only call out where a route is

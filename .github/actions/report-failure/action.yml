@@ -1,0 +1,100 @@
+name: Report pipeline stage failure
+description: >-
+  Posts why a pipeline stage failed — the failed step, the Claude stop reason, a
+  redacted tail of the stage's output, the run URL, and how to resume — as an issue
+  or PR comment and in the job summary. Never lets a broken reporter mask the real
+  failure: every external call is best-effort.
+
+inputs:
+  stage:
+    description: Stage name, e.g. "coder", "pr-review"
+    required: true
+  stop_reason:
+    description: >-
+      The Claude SDK result subtype (claude-run's `stop_reason` output), e.g.
+      "error_max_turns". Empty when the stage failed before or without running Claude.
+    default: ""
+  target:
+    description: Where to post the comment — "issue", "pr", or "none" (job summary only)
+    required: true
+  number:
+    description: Issue or PR number. Required unless target is "none".
+    default: ""
+  resume:
+    description: One line of prose telling a human how to resume this stage.
+    required: true
+  tail:
+    description: >-
+      Pre-rendered transcript tail (claude-run's `tail` output). When empty, this
+      action falls back to $RUNNER_TEMP/stage.log if a step wrote one.
+    default: ""
+  wip_sha:
+    description: SHA of a WIP checkpoint commit made before failing, if any.
+    default: ""
+  github_token:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - id: report
+      if: always()
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        STAGE: ${{ inputs.stage }}
+        STOP_REASON: ${{ inputs.stop_reason }}
+        TARGET: ${{ inputs.target }}
+        NUMBER: ${{ inputs.number }}
+        RESUME: ${{ inputs.resume }}
+        TAIL_IN: ${{ inputs.tail }}
+        WIP_SHA: ${{ inputs.wip_sha }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        # No `set -e`: this step reports a failure that already happened, so a
+        # problem in the reporting itself must degrade, never abort or replace it.
+
+        # First step in the current job whose conclusion is "failure" (an in-progress
+        # job already reports conclusions for its finished steps). Falls back to
+        # "step unknown" if the API lags or the run was cancelled before this ran.
+        jobs_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs" 2>/dev/null || echo '{}')
+        failed_step=$(jq -r --arg job "$GITHUB_JOB" '
+          ((.jobs // []) | map(select(.name == $job)) | first // {})
+          | ((.steps // []) | map(select(.conclusion == "failure")) | first.name) // empty
+        ' <<< "$jobs_json" 2>/dev/null || true)
+        failed_step="${failed_step:-step unknown}"
+
+        tail="$TAIL_IN"
+        if [[ -z "$tail" && -f "${RUNNER_TEMP}/stage.log" ]]; then
+          tail=$(tail -n 20 "${RUNNER_TEMP}/stage.log" \
+            | cut -c1-500 \
+            | sed -E 's/gh[pousr]_[A-Za-z0-9]{20,}/[REDACTED]/g; s/sk-ant-[A-Za-z0-9_-]{20,}/[REDACTED]/g' \
+            | head -c 4000 || true)
+        fi
+
+        {
+          echo "$RESUME"
+          echo
+          echo "**$STAGE stage failed** — step \"$failed_step\", stop reason \`${STOP_REASON:-unknown}\`."
+          echo "Run: $RUN_URL"
+          if [[ -n "$WIP_SHA" ]]; then
+            echo "WIP commit: \`$WIP_SHA\` — partial work is not lost."
+          fi
+          if [[ -n "$tail" ]]; then
+            echo
+            echo "<details><summary>Last ~20 lines of output</summary>"
+            echo
+            echo '```'
+            printf '%s\n' "$tail"
+            echo '```'
+            echo "</details>"
+          fi
+        } > "${RUNNER_TEMP}/failure.md"
+
+        case "$TARGET" in
+          issue) gh issue comment "$NUMBER" --body-file "${RUNNER_TEMP}/failure.md" || true ;;
+          pr)    gh pr comment "$NUMBER" --body-file "${RUNNER_TEMP}/failure.md" || true ;;
+          none)  : ;;
+        esac
+
+        cat "${RUNNER_TEMP}/failure.md" >> "$GITHUB_STEP_SUMMARY" || true

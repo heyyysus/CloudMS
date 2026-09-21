@@ -172,6 +172,10 @@ jobs:
                 echo '```'
                 echo "gh pr checkout $BRANCH"
                 echo "git apply $PATCH"
+                # git rm too: once applied, the patch is a duplicate of the real file, and
+                # leaving it on the branch would merge a stale copy onto main and keep
+                # flipping later bodies to Refs.
+                echo "git rm $PATCH"
                 echo "git add -A .github/workflows && git commit -m 'apply workflow patch for #$ISSUE' && git push"
                 echo '```'
                 echo

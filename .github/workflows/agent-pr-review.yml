@@ -101,10 +101,10 @@ jobs:
           3. Tests: a quick pass — do the added/changed tests actually exercise the changed behavior?
              Flag changed behavior with no covering test, and tests that assert nothing meaningful.
              Backend tests must use TestContext fixtures.
-          4. Flag an outright correctness or security problem if you notice one, but do not hunt.$depth_note
+          4. Flag an outright correctness or security problem if you notice one, but do not hunt.\$depth_note
 
-          Report format — keep it tight. "## PR review (\`$MODE\`)", then at most $word_cap words:
-          one bullet per finding, \`path:line\` then one sentence naming the problem (and the fix in a
+          Report format — keep it tight. "## PR review (\\\`\$MODE\\\`)", then at most \$word_cap words:
+          one bullet per finding, \\\`path:line\\\` then one sentence naming the problem (and the fix in a
           clause if obvious). No summary of what the PR does, no restating the diff, no praise, no
           severity labels, no hedging. If clean, the entire body is one line: "No findings — scope,
           tests, and conventions check out." End with exactly one line:
@@ -115,10 +115,10 @@ jobs:
           humans" section of CLAUDE.md. The format above, the word cap and the PIPELINE-VERDICT
           line are required and win where the two conflict.
 
-          Issue #$ISSUE: $title
+          Issue #\$ISSUE: \$title
 
           Issue body:
-          $body
+          \$body
           EOF
             echo "__PROMPT__"
           } >> "$GITHUB_ENV"
@@ -158,7 +158,14 @@ jobs:
           fi
 
       - if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
-        run: |
-          gh pr comment "$PR" --body "Automated PR review failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" || true
+        uses: ./.github/actions/report-failure
+        with:
+          stage: pr-review
+          stop_reason: ${{ steps.claude.outputs.stop_reason }}
+          target: pr
+          number: ${{ env.PR }}
+          resume: >-
+            Fix the cause and push again — a new commit re-triggers the review automatically
+            (no label to re-add).
+          tail: ${{ steps.claude.outputs.tail }}
+          github_token: ${{ secrets.PIPELINE_BOT_TOKEN }}

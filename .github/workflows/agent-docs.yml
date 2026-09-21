@@ -103,19 +103,40 @@ jobs:
           github_token: ${{ github.token }}
 
       - name: Commit docs
+        id: commit
+        if: always()
+        env:
+          STOP_REASON: ${{ steps.claude.outputs.stop_reason }}
         run: |
           set -euo pipefail
-          # Anything outside docs/, README.md and notes.md is discarded: the docs stage may not touch code.
+          # always() so a cancellation or the 10-minute timeout doesn't throw away docs the
+          # stage wrote but never got to commit. Anything outside docs/, README.md and
+          # notes.md is discarded: the docs stage may not touch code.
           git add docs README.md "pipeline/$ISSUE/notes.md"
           git checkout -- . 2>/dev/null || true
           git clean -fd -e docs -e README.md >/dev/null 2>&1 || true
-          if ! git diff --cached --quiet -- docs README.md; then
-            git commit -m "docs: update for #$ISSUE" -- docs README.md
+          if [[ "$STOP_REASON" == "success" ]]; then
+            if ! git diff --cached --quiet -- docs README.md; then
+              git commit -m "docs: update for #$ISSUE" -- docs README.md
+            fi
+            if ! git diff --cached --quiet; then
+              git commit -m "pipeline: docs notes for #$ISSUE"
+            fi
+            git push origin "$BRANCH"
+          else
+            # Claude didn't finish cleanly (or the run was cancelled before we know why):
+            # whatever it had written still goes on the branch, tagged as WIP rather than
+            # as a real docs commit. Then fail the step — like the planner and the plan
+            # reviewer — so "Open PR" is skipped and a half-written docs run can never
+            # advance the issue to pipeline:pr-open.
+            if ! git diff --cached --quiet; then
+              git commit -q -m "wip: docs stopped before finishing (stop reason: ${STOP_REASON:-unknown})"
+              echo "wip_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+              git push origin "$BRANCH"
+            fi
+            echo "Docs stage did not finish cleanly (stop reason: ${STOP_REASON:-unknown})"
+            exit 1
           fi
-          if ! git diff --cached --quiet; then
-            git commit -m "pipeline: docs notes for #$ISSUE"
-          fi
-          git push origin "$BRANCH"
 
       - name: Open PR
         env:
@@ -146,4 +167,16 @@ jobs:
           GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
         run: |
           gh issue edit "$ISSUE" --remove-label "pipeline:docs" --add-label "needs-human" || true
-          gh issue comment "$ISSUE" --body "Docs stage failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" || true
+
+      - if: failure()
+        uses: ./.github/actions/report-failure
+        with:
+          stage: docs
+          stop_reason: ${{ steps.claude.outputs.stop_reason }}
+          target: issue
+          number: ${{ env.ISSUE }}
+          resume: >-
+            Fix the cause, remove `needs-human`, and re-add `pipeline:docs` to retry.
+          tail: ${{ steps.claude.outputs.tail }}
+          wip_sha: ${{ steps.commit.outputs.wip_sha }}
+          github_token: ${{ secrets.PIPELINE_BOT_TOKEN }}

@@ -20,6 +20,41 @@ describe("GET /clients", () => {
     expect(res.status).toBe(200)
     expect(res.body.some((c: { id: string }) => c.id === client.id)).toBe(true)
   })
+
+  it("returns hydrated rows", async () => {
+    const user = await ctx.user("clients-list-shape")
+    const cookie = await ctx.cookie(user.id)
+    const person = await ctx.person({ firstName: "Jane", lastName: "Doe" })
+    const client = await ctx.client({ namedInsuredId: person.id })
+    await ctx.clientEmail(client.id, "jane@example.com")
+
+    const res = await request(app).get("/clients").set("Cookie", cookie)
+    expect(res.status).toBe(200)
+    const row = res.body.find((c: { id: string }) => c.id === client.id)
+    expect(row.namedInsured.firstName).toBe("Jane")
+    expect(row.secondNamedInsured).toBeNull()
+    expect(row.emails[0].email).toBe("jane@example.com")
+    expect(Array.isArray(row.phones)).toBe(true)
+  })
+
+  it("orders by last name then first name", async () => {
+    const user = await ctx.user("clients-list-order")
+    const cookie = await ctx.cookie(user.id)
+    const suffix = Math.random().toString(36).slice(2)
+    const aaa = await ctx.person({ firstName: "First", lastName: `Aaa-${suffix}` })
+    const zzz = await ctx.person({ firstName: "First", lastName: `Zzz-${suffix}` })
+    const clientA = await ctx.client({ namedInsuredId: aaa.id })
+    const clientZ = await ctx.client({ namedInsuredId: zzz.id })
+
+    const res = await request(app).get("/clients").set("Cookie", cookie)
+    expect(res.status).toBe(200)
+    const ids = res.body.map((c: { id: string }) => c.id)
+    const indexA = ids.indexOf(clientA.id)
+    const indexZ = ids.indexOf(clientZ.id)
+    expect(indexA).toBeGreaterThanOrEqual(0)
+    expect(indexZ).toBeGreaterThanOrEqual(0)
+    expect(indexA).toBeLessThan(indexZ)
+  })
 })
 
 describe("GET /clients/:id", () => {
@@ -48,10 +83,18 @@ describe("GET /clients/:id", () => {
     const user = await ctx.user("clients-wrongorg", "admin")
     const cookie = await ctx.cookie(user.id)
     const other = await ctx.org()
-    const client = await ctx.client({ orgId: other.id })
+    const suffix = Math.random().toString(36).slice(2)
+    const theirPerson = await ctx.person({ orgId: other.id, lastName: `Wrongorg-${suffix}` })
+    const client = await ctx.client({ orgId: other.id, namedInsuredId: theirPerson.id })
 
     const list = await request(app).get("/clients").set("Cookie", cookie)
     expect(list.body.some((c: { id: string }) => c.id === client.id)).toBe(false)
+
+    const searched = await request(app)
+      .get(`/clients?q=${theirPerson.lastName}`)
+      .set("Cookie", cookie)
+    expect(searched.status).toBe(200)
+    expect(searched.body.some((c: { id: string }) => c.id === client.id)).toBe(false)
     expect((await request(app).get(`/clients/${client.id}`).set("Cookie", cookie)).status).toBe(404)
     expect(
       (

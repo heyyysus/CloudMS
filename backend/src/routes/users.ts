@@ -99,7 +99,7 @@ usersRouter.post(
       membership = await createMembership({ userId: user.id, orgId: req.orgId!, role })
     }
 
-    const emailResult = await sendWelcomeEmail(user, req.user!, role)
+    const emailResult = await sendWelcomeEmail(req.orgId!, user, req.user!, role)
 
     req.log.info(
       { invitedUserId: user.id, actorId: req.user?.id, emailStatus: emailResult.status },
@@ -203,7 +203,7 @@ usersRouter.post(
       return
     }
 
-    const emailResult = await sendWelcomeEmail(user, req.user!, membership.role)
+    const emailResult = await sendWelcomeEmail(req.orgId!, user, req.user!, membership.role)
 
     req.log.info(
       { targetUserId: id, actorId: req.user?.id, emailStatus: emailResult.status },
@@ -284,7 +284,7 @@ usersRouter.post(
       ? ((await updateMembership(existingMembership.id, { isActive: true })) as OrgMembership)
       : await createMembership({ userId: id, orgId: req.orgId!, role: defaultRole })
 
-    const emailResult = await sendWelcomeEmail(user, req.user!, membership.role)
+    const emailResult = await sendWelcomeEmail(req.orgId!, user, req.user!, membership.role)
 
     req.log.info(
       { targetUserId: id, actorId: req.user?.id, emailStatus: emailResult.status },

@@ -18,7 +18,9 @@ interface Address {
 }
 
 interface Draft {
-  personSpecs: NewPerson[]
+  // orgId is added at insert time (seedHouseholds below), once for every
+  // person across every household, rather than threaded through here.
+  personSpecs: Omit<NewPerson, "orgId">[]
   namedIdx: number
   secondIdx: number | null
   driverIdxs: number[]
@@ -74,7 +76,7 @@ function buildDraft(): Draft {
   ])
 
   const lastName = faker.person.lastName()
-  const personSpecs: NewPerson[] = []
+  const personSpecs: Omit<NewPerson, "orgId">[] = []
   const driverIdxs: number[] = []
 
   const namedGender = pickGender()

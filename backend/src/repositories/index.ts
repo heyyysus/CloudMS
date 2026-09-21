@@ -1,16 +1,17 @@
 // Repositories are pure data access - no req, no auth awareness. Authorization
 // belongs at the controller/route layer, which will check req.user (once auth
 // middleware exists) before or after calling into these functions. Don't thread
-// an actor/context param through every repository call in anticipation of that;
-// every tenant table now carries org_id (see docs/multitenancy.md rollout step
-// 2). `persons`, `drivers`, `clients`, `clientPhones`, `clientEmails`,
-// `carriers`, `autoPolicies`, `policyDrivers`, `vehicles` and `search` take a
-// caller-supplied orgId and scope every read/write to it (rollout step 3,
-// sub-issue 4 part 1); `policyLogs`, `policyAttachments`,
-// `policyLogAttachments`, `invoices`, `payments`, `receipts` and `trustLedger`
-// do the same (sub-issue 4 part 2, #120), with `invoices.invoiceNumber` /
-// `receipts.receiptNumber` allocated per organization; email, reminders and
-// the scheduler pick this up in sub-issue 7 (#121).
+// an actor/context param through every repository call in anticipation of that.
+//
+// Every tenant-table repository takes a caller-supplied orgId as its first
+// parameter and scopes every read/write to it, so a row in another
+// organization answers exactly like a missing row (see
+// docs/multitenancy.md's rollout). Five repositories are deliberately
+// exempt, because what they wrap isn't a tenant table: `users` (global,
+// keyed by email at login), `sessions` (a session carries an org, it isn't
+// scoped by one - see schema.ts), `organizations` and `orgMemberships`
+// (these define what an org *is*, not something an org owns), and `errors`
+// (no data access at all).
 
 export * from "./autoPolicies"
 export * from "./carriers"

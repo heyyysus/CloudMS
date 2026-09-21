@@ -158,7 +158,7 @@ mailRouter.post(
 
     // Scoped to kind = "correspondence" by the repository, so the welcome
     // invite template can never be aimed at a client.
-    const template = await findCorrespondenceTemplateById(templateId)
+    const template = await findCorrespondenceTemplateById(req.orgId!, templateId)
     if (!template) {
       res.status(404).json({ error: "Template not found" })
       return
@@ -172,6 +172,7 @@ mailRouter.post(
 
     try {
       const result = await sendCorrespondenceEmail({
+        orgId: req.orgId!,
         template,
         values: resolved.values,
         to,

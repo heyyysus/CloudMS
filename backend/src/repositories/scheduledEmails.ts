@@ -32,12 +32,16 @@ export interface ScheduledEmailWithContext {
 // The one query behind both views: the admin's agency-wide queue and a single
 // policy's Activities tab. They differ only by this filter, so they stay one
 // function rather than two that can drift apart.
-export async function listScheduledEmails(options: {
-  policyId?: string
-  statuses?: ScheduledEmailStatus[]
-  limit?: number
-}): Promise<ScheduledEmailWithContext[]> {
+export async function listScheduledEmails(
+  orgId: string,
+  options: {
+    policyId?: string
+    statuses?: ScheduledEmailStatus[]
+    limit?: number
+  } = {}
+): Promise<ScheduledEmailWithContext[]> {
   const filters = [
+    eq(scheduledEmails.orgId, orgId),
     options.policyId !== undefined ? eq(scheduledEmails.policyId, options.policyId) : undefined,
     options.statuses && options.statuses.length > 0
       ? inArray(scheduledEmails.status, options.statuses)
@@ -67,7 +71,7 @@ export async function listScheduledEmails(options: {
     .innerJoin(autoPolicies, eq(scheduledEmails.policyId, autoPolicies.id))
     .innerJoin(clients, eq(autoPolicies.clientId, clients.id))
     .innerJoin(persons, eq(clients.namedInsuredId, persons.id))
-    .where(filters.length > 0 ? and(...filters) : undefined)
+    .where(and(...filters))
     // Soonest-first among what hasn't happened, which puts the next reminder
     // at the top of both views.
     .orderBy(
@@ -80,8 +84,14 @@ export async function listScheduledEmails(options: {
   return rows
 }
 
-export async function findScheduledEmailById(id: string): Promise<ScheduledEmail | undefined> {
-  const [row] = await db.select().from(scheduledEmails).where(eq(scheduledEmails.id, id))
+export async function findScheduledEmailById(
+  orgId: string,
+  id: string
+): Promise<ScheduledEmail | undefined> {
+  const [row] = await db
+    .select()
+    .from(scheduledEmails)
+    .where(and(eq(scheduledEmails.id, id), eq(scheduledEmails.orgId, orgId)))
   return row
 }
 
@@ -89,11 +99,20 @@ export async function findScheduledEmailById(id: string): Promise<ScheduledEmail
 // may be mid-flight at Resend, and a sent one is gone. The status guard is in
 // the WHERE rather than a read-then-write so a cancel racing a claim loses
 // cleanly instead of cancelling something already sent.
-export async function cancelScheduledEmail(id: string): Promise<ScheduledEmail | undefined> {
+export async function cancelScheduledEmail(
+  orgId: string,
+  id: string
+): Promise<ScheduledEmail | undefined> {
   const [row] = await db
     .update(scheduledEmails)
     .set({ status: "cancelled", updatedAt: new Date() })
-    .where(and(eq(scheduledEmails.id, id), eq(scheduledEmails.status, "pending")))
+    .where(
+      and(
+        eq(scheduledEmails.id, id),
+        eq(scheduledEmails.orgId, orgId),
+        eq(scheduledEmails.status, "pending")
+      )
+    )
     .returning()
   return row
 }

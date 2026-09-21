@@ -15,6 +15,7 @@ on:
 permissions:
   issues: write
   contents: read
+  actions: read # report-failure reads the jobs API to name the step that failed
 
 concurrency:
   group: agent-triage-${{ github.event.issue.number }}
@@ -105,3 +106,16 @@ jobs:
           if [[ ${#labels[@]} -eq 0 ]]; then echo "No usable classification: $RESULT"; exit 0; fi
           args=(); for l in "${labels[@]}"; do args+=(--add-label "$l"); done
           gh issue edit "$ISSUE" "${args[@]}"
+
+      - if: failure()
+        uses: ./.github/actions/report-failure
+        with:
+          stage: triage
+          stop_reason: ${{ steps.claude.outputs.stop_reason }}
+          target: issue
+          number: ${{ env.ISSUE }}
+          resume: >-
+            Fix the cause and label this issue by hand (type, `area:*`, `risk:*`) — triage
+            only runs once, on open, and this issue is not necessarily in the agent pipeline.
+          tail: ${{ steps.claude.outputs.tail }}
+          github_token: ${{ github.token }}

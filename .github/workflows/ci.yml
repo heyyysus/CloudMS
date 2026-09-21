@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
+      actions: ${{ steps.filter.outputs.actions }}
     steps:
       - uses: actions/checkout@v4
 
@@ -26,6 +27,23 @@ jobs:
               - 'docker-compose.yml'
               - 'docker-compose.build.yml'
               - '.github/workflows/ci.yml'
+            actions:
+              - '.github/actions/**'
+              - '.github/workflows/ci.yml'
+
+  pipeline-actions:
+    needs: changes
+    if: needs.changes.outputs.actions == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # The failure comments the pipeline posts are only as good as this renderer,
+      # and its caps and secret redaction are not exercised by any stage's own tests.
+      - name: claude-run tail renderer
+        run: bash .github/actions/claude-run/render-tail.test.sh
 
   backend:
     needs: changes

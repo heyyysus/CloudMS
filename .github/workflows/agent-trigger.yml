@@ -10,6 +10,7 @@ on:
 permissions:
   issues: write
   contents: read
+  actions: read # report-failure reads the jobs API to name the step that failed
 
 concurrency:
   group: agent-trigger-${{ github.event.issue.number }}-${{ github.event.label.name }}
@@ -48,3 +49,14 @@ jobs:
           fi
           gh issue edit "$ISSUE" --add-label "pipeline:needs-plan"
           gh issue comment "$ISSUE" --body "Agent pipeline started. Stages: plan → plan review → code → docs → PR → PR review. Remove the \`agent\` label to abort."
+
+      - if: failure()
+        uses: ./.github/actions/report-failure
+        with:
+          stage: trigger
+          target: issue
+          number: ${{ env.ISSUE }}
+          resume: >-
+            Fix the cause and re-add the `agent` label to retry. Nothing is labelled yet, so
+            this issue was never in the pipeline — no `needs-human` to remove.
+          github_token: ${{ github.token }}

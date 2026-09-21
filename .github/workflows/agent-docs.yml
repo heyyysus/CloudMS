@@ -126,23 +126,35 @@ jobs:
           else
             # Claude didn't finish cleanly (or the run was cancelled before we know why):
             # whatever it had written still goes on the branch, tagged as WIP rather than
-            # as a real docs commit. Then fail the step — like the planner and the plan
-            # reviewer — so "Open PR" is skipped and a half-written docs run can never
-            # advance the issue to pipeline:pr-open.
+            # as a real docs commit.
+            #
+            # Unlike the planner and the plan reviewer, this does NOT fail the step. Their
+            # artifacts feed the next stage, so a partial plan.md drives a bad
+            # implementation; the docs stage's only consumer is the PR review, which reads
+            # the diff either way. Failing here would strand the issue on `needs-human`
+            # and cost a human round to recover documentation that a reviewer was going to
+            # read regardless. "Open PR" runs, and the flag below makes the shortfall
+            # visible on the issue instead of silent.
             if ! git diff --cached --quiet; then
               git commit -q -m "wip: docs stopped before finishing (stop reason: ${STOP_REASON:-unknown})"
               echo "wip_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
               git push origin "$BRANCH"
             fi
-            echo "Docs stage did not finish cleanly (stop reason: ${STOP_REASON:-unknown})"
-            exit 1
+            echo "docs_incomplete=true" >> "$GITHUB_OUTPUT"
+            echo "Docs stage did not finish cleanly (stop reason: ${STOP_REASON:-unknown}); checkpointed and continuing to the PR." \
+              | tee -a "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Open PR
         env:
           GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
           TITLE: ${{ github.event.issue.title }}
+          DOCS_INCOMPLETE: ${{ steps.commit.outputs.docs_incomplete }}
+          STOP_REASON: ${{ steps.claude.outputs.stop_reason }}
         run: |
+          # Tee'd because report-failure falls back to stage.log: without it a failing
+          # `gh pr create` reported the Claude transcript tail instead of the gh error.
+          exec > >(tee -a "$RUNNER_TEMP/stage.log") 2>&1
           set -euo pipefail
           if gh pr list --head "$BRANCH" --state open --json number -q '.[0].number' | grep -q .; then
             echo "PR already open"
@@ -161,6 +173,9 @@ jobs:
             gh pr create --base main --head "$BRANCH" --title "$TITLE (#$ISSUE)" --body-file "$RUNNER_TEMP/pr-body.md"
           fi
           gh issue edit "$ISSUE" --remove-label "pipeline:docs" --add-label "pipeline:pr-open"
+          if [[ "${DOCS_INCOMPLETE:-}" == "true" ]]; then
+            gh issue comment "$ISSUE" --body "Docs stage stopped early (stop reason: \`${STOP_REASON:-unknown}\`). Its partial work is on \`$BRANCH\` as a \`wip:\` commit and the PR opened anyway — read the docs part of the diff with that in mind."
+          fi
 
       - if: failure()
         env:

@@ -127,3 +127,14 @@ dev database):
   now-removed variable by name remain (`docs/multitenancy.md`); no code or
   `.env.example` references.
 - No `frontend/` changes; none expected per plan.
+
+## Docs
+
+`docs/API.md`, `docs/multitenancy.md`, and `backend/.env.example` were already
+updated for #121 in an earlier commit on this branch (org-scoped rules/queue,
+`org_id NOT NULL` + backfill, `AGENCY_NAME` → `organizations.name`, rollout
+checklist). Reviewed them against the final diff and found nothing stale or
+missing. No changes needed to `README.md`, `docs/AUTH_SESSIONS_EXPLAINED.md`,
+or `docs/frontend-ui-design.md` - no auth/session, UI, or setup-step changes
+in this issue, and `AGENCY_NAME`/`db:backfill-org` aren't referenced in
+`README.md`.

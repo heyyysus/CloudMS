@@ -15,7 +15,7 @@ import { Client } from "pg"
 import request from "supertest"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
-import { db } from "../db"
+import { adminDb, db, runInOrg } from "../db"
 import { emailLog, reminderRules, scheduledEmails } from "../db/schema"
 import { WELCOME_TEMPLATE_KEY } from "../emails"
 import { findEmailTemplateByKey, listPolicyLogsByPolicyId } from "../repositories"
@@ -42,8 +42,11 @@ afterEach(async () => {
   process.env = { ...ORIGINAL_ENV }
 })
 
-async function rowsFor(policyId: string) {
-  return db.select().from(scheduledEmails).where(eq(scheduledEmails.policyId, policyId))
+async function rowsFor(policyId: string, orgId?: string) {
+  const resolvedOrgId = orgId ?? (await ctx.orgId())
+  return runInOrg(resolvedOrgId, () =>
+    db.select().from(scheduledEmails).where(eq(scheduledEmails.policyId, policyId))
+  )
 }
 
 // Builds an active policy whose expiration lines up with `offsetDays`, so the
@@ -116,9 +119,12 @@ describe("planReminders", () => {
     // on today again only if we also move it back, so simulate the next term
     // by setting expiration such that the offset points at today again.
     const { updateAutoPolicy } = await import("../repositories")
-    await updateAutoPolicy(await ctx.orgId(), policy.id, {
-      expirationDate: isoDaysFromToday(112_347 + 365),
-    })
+    const orgId = await ctx.orgId()
+    await runInOrg(orgId, () =>
+      updateAutoPolicy(orgId, policy.id, {
+        expirationDate: isoDaysFromToday(112_347 + 365),
+      })
+    )
     await planDueReminders()
 
     // Still one row: the new occurrence is 365 days out, outside the horizon.
@@ -281,8 +287,8 @@ describe("planReminders", () => {
 
     await planDueReminders()
 
-    const rowsA = await rowsFor(policyA.id)
-    const rowsB = await rowsFor(policyB.id)
+    const rowsA = await rowsFor(policyA.id, orgA.id)
+    const rowsB = await rowsFor(policyB.id, orgB.id)
     expect(rowsA).toHaveLength(1)
     expect(rowsB).toHaveLength(1)
     expect(rowsA[0].ruleId).toBe(ruleA.id)
@@ -340,17 +346,21 @@ async function dueReminder(
 
   await planDueReminders()
 
-  // The planner schedules for the configured hour, which may still be ahead of
-  // now; pull it into the past so the dispatcher considers it due.
-  await db
-    .update(scheduledEmails)
-    .set({ scheduledFor: new Date(Date.now() - 60_000) })
-    .where(eq(scheduledEmails.policyId, policy.id))
+  const orgId = await ctx.orgId()
+  const row = await runInOrg(orgId, async () => {
+    // The planner schedules for the configured hour, which may still be
+    // ahead of now; pull it into the past so the dispatcher considers it due.
+    await db
+      .update(scheduledEmails)
+      .set({ scheduledFor: new Date(Date.now() - 60_000) })
+      .where(eq(scheduledEmails.policyId, policy.id))
 
-  const [row] = await db
-    .select()
-    .from(scheduledEmails)
-    .where(eq(scheduledEmails.policyId, policy.id))
+    const [row] = await db
+      .select()
+      .from(scheduledEmails)
+      .where(eq(scheduledEmails.policyId, policy.id))
+    return row
+  })
   return { client, email, policy, template, rule, row }
 }
 
@@ -377,10 +387,10 @@ function sendTo(
 }
 
 async function rowFor(policyId: string) {
-  const [row] = await db
-    .select()
-    .from(scheduledEmails)
-    .where(eq(scheduledEmails.policyId, policyId))
+  const orgId = await ctx.orgId()
+  const [row] = await runInOrg(orgId, () =>
+    db.select().from(scheduledEmails).where(eq(scheduledEmails.policyId, policyId))
+  )
   return row
 }
 
@@ -401,15 +411,18 @@ describe("dispatchReminders", () => {
     expect(row.resendId).toBe(fetchMock.resendId)
     expect(row.sentAt).not.toBeNull()
 
+    const orgId = await ctx.orgId()
     // One email_log row per recipient, attributed to the automation user.
-    const logged = await db.select().from(emailLog).where(eq(emailLog.resendId, fetchMock.resendId))
+    const logged = await runInOrg(orgId, () =>
+      db.select().from(emailLog).where(eq(emailLog.resendId, fetchMock.resendId))
+    )
     expect(logged).toHaveLength(1)
     expect(logged[0].templateKey).toBe(template.key)
     expect(logged[0].status).toBe("sent")
 
     // And the send shows up in the policy's own history as the full email:
     // recipient, subject, and rendered body (merge fields expanded).
-    const policyLogs = await listPolicyLogsByPolicyId(await ctx.orgId(), policy.id)
+    const policyLogs = await runInOrg(orgId, () => listPolicyLogsByPolicyId(orgId, policy.id))
     expect(policyLogs).toHaveLength(1)
     expect(policyLogs[0].body.split("\n")[0]).toBe(`To: ${email.email}`)
     expect(policyLogs[0].body).toContain(`Subject: Your policy ${policy.policyNumber}`)
@@ -470,7 +483,9 @@ describe("dispatchReminders", () => {
     await ctx.reminderRule({ orgId: orgB.id, offsetDays, templateId: templateB.id })
 
     await planDueReminders()
-    await db
+    // Spans both orgA and orgB in one statement, so this runs on adminDb
+    // (bypassing RLS) rather than under a single-org runInOrg scope.
+    await adminDb
       .update(scheduledEmails)
       .set({ scheduledFor: new Date(Date.now() - 60_000) })
       .where(inArray(scheduledEmails.policyId, [policyA.id, policyB.id]))
@@ -485,8 +500,12 @@ describe("dispatchReminders", () => {
     const bodyB = JSON.parse(initB.body as string)
     expect(bodyB.text).toBe(`Regards, ${orgB.name}`)
 
-    const [logA] = await db.select().from(emailLog).where(eq(emailLog.recipient, emailA.email))
-    const [logB] = await db.select().from(emailLog).where(eq(emailLog.recipient, emailB.email))
+    const [logA] = await runInOrg(orgA.id, () =>
+      db.select().from(emailLog).where(eq(emailLog.recipient, emailA.email))
+    )
+    const [logB] = await runInOrg(orgB.id, () =>
+      db.select().from(emailLog).where(eq(emailLog.recipient, emailB.email))
+    )
     expect(logA.orgId).toBe(orgA.id)
     expect(logB.orgId).toBe(orgB.id)
   })
@@ -538,7 +557,8 @@ describe("dispatchReminders", () => {
     const fetchMock = stubResend()
     const { client, policy } = await dueReminder(212_006)
     const { replaceClientEmails } = await import("../repositories")
-    await replaceClientEmails(await ctx.orgId(), client.id, [])
+    const orgId = await ctx.orgId()
+    await runInOrg(orgId, () => replaceClientEmails(orgId, client.id, []))
 
     await dispatchReminders()
 
@@ -552,10 +572,12 @@ describe("dispatchReminders", () => {
   it("releases a claim left stranded by a dead container", async () => {
     stubResend()
     const { policy } = await dueReminder(212_007)
-    await db
-      .update(scheduledEmails)
-      .set({ status: "sending", claimedAt: new Date(Date.now() - 10 * 60_000) })
-      .where(eq(scheduledEmails.policyId, policy.id))
+    await runInOrg(await ctx.orgId(), () =>
+      db
+        .update(scheduledEmails)
+        .set({ status: "sending", claimedAt: new Date(Date.now() - 10 * 60_000) })
+        .where(eq(scheduledEmails.policyId, policy.id))
+    )
 
     await dispatchReminders()
 
@@ -565,10 +587,12 @@ describe("dispatchReminders", () => {
   it("leaves a freshly claimed row alone", async () => {
     stubResend()
     const { policy } = await dueReminder(212_008)
-    await db
-      .update(scheduledEmails)
-      .set({ status: "sending", claimedAt: new Date() })
-      .where(eq(scheduledEmails.policyId, policy.id))
+    await runInOrg(await ctx.orgId(), () =>
+      db
+        .update(scheduledEmails)
+        .set({ status: "sending", claimedAt: new Date() })
+        .where(eq(scheduledEmails.policyId, policy.id))
+    )
 
     await dispatchReminders()
 
@@ -592,10 +616,12 @@ describe("dispatchReminders", () => {
   it("does not send a reminder that is not due yet", async () => {
     const fetchMock = stubResend()
     const { policy, email } = await dueReminder(212_010)
-    await db
-      .update(scheduledEmails)
-      .set({ scheduledFor: new Date(Date.now() + 60 * 60_000) })
-      .where(eq(scheduledEmails.policyId, policy.id))
+    await runInOrg(await ctx.orgId(), () =>
+      db
+        .update(scheduledEmails)
+        .set({ scheduledFor: new Date(Date.now() + 60 * 60_000) })
+        .where(eq(scheduledEmails.policyId, policy.id))
+    )
 
     await dispatchReminders()
 
@@ -606,10 +632,9 @@ describe("dispatchReminders", () => {
   it("does not send a cancelled reminder", async () => {
     const fetchMock = stubResend()
     const { policy, email } = await dueReminder(212_011)
-    await db
-      .update(scheduledEmails)
-      .set({ status: "cancelled" })
-      .where(eq(scheduledEmails.policyId, policy.id))
+    await runInOrg(await ctx.orgId(), () =>
+      db.update(scheduledEmails).set({ status: "cancelled" }).where(eq(scheduledEmails.policyId, policy.id))
+    )
 
     await dispatchReminders()
 
@@ -635,7 +660,9 @@ function freeOffset(): number {
 // and clear the offset first, so a row left behind by a crashed run can't
 // fail the next one.
 async function routeOffset(offsetDays: number): Promise<number> {
-  await db.delete(reminderRules).where(eq(reminderRules.offsetDays, offsetDays))
+  // Not scoped to a single org - a row left behind by any org's crashed run
+  // must be cleared - so this runs on adminDb rather than under runInOrg.
+  await adminDb.delete(reminderRules).where(eq(reminderRules.offsetDays, offsetDays))
   return offsetDays
 }
 
@@ -707,7 +734,8 @@ describe("reminder rules", () => {
     // client merge fields, so it must never be wireable as client-facing.
     it("refuses to point a rule at the welcome template", async () => {
       const cookie = await cookieFor("rr-welcome")
-      const welcome = await findEmailTemplateByKey(await ctx.orgId(), WELCOME_TEMPLATE_KEY)
+      const orgId = await ctx.orgId()
+      const welcome = await runInOrg(orgId, () => findEmailTemplateByKey(orgId, WELCOME_TEMPLATE_KEY))
 
       const res = await request(app)
         .post("/reminder-rules")
@@ -1025,7 +1053,9 @@ describe("scheduled emails", () => {
   it("409s when the reminder is no longer pending", async () => {
     const cookie = await cookieFor("sched-late", "staff")
     const { row } = await queueOne()
-    await db.update(scheduledEmails).set({ status: "sent" }).where(eq(scheduledEmails.id, row.id))
+    await runInOrg(await ctx.orgId(), () =>
+      db.update(scheduledEmails).set({ status: "sent" }).where(eq(scheduledEmails.id, row.id))
+    )
 
     const res = await request(app)
       .post(`/scheduled-emails/${row.id}/cancel`)
@@ -1061,7 +1091,7 @@ describe("scheduled emails", () => {
     })
     await ctx.reminderRule({ orgId: orgB.id, offsetDays })
     await planDueReminders(undefined, orgB.id)
-    const [theirs] = await rowsFor(policyB.id)
+    const [theirs] = await rowsFor(policyB.id, orgB.id)
 
     const res = await request(app)
       .post(`/scheduled-emails/${theirs.id}/cancel`)
@@ -1105,10 +1135,12 @@ describe("POST /reminders/tick", () => {
     })
     await ctx.reminderRule({ orgId: orgB.id, offsetDays: otherOffset })
     await planDueReminders(undefined, orgB.id)
-    await db
-      .update(scheduledEmails)
-      .set({ scheduledFor: new Date(Date.now() - 60_000) })
-      .where(eq(scheduledEmails.policyId, plannedPolicyB.id))
+    await runInOrg(orgB.id, () =>
+      db
+        .update(scheduledEmails)
+        .set({ scheduledFor: new Date(Date.now() - 60_000) })
+        .where(eq(scheduledEmails.policyId, plannedPolicyB.id))
+    )
 
     // Now add org B's due rule that hasn't been planned yet.
     const offsetDays = freeOffset()
@@ -1124,9 +1156,9 @@ describe("POST /reminders/tick", () => {
 
     expect(res.status).toBe(200)
     // Org B's due-but-unplanned rule produced nothing.
-    expect(await rowsFor(unplannedPolicyB.id)).toHaveLength(0)
+    expect(await rowsFor(unplannedPolicyB.id, orgB.id)).toHaveLength(0)
     // Org B's already-pending row was not claimed or sent.
-    const [stillPending] = await rowsFor(plannedPolicyB.id)
+    const [stillPending] = await rowsFor(plannedPolicyB.id, orgB.id)
     expect(stillPending.status).toBe("pending")
     expect(sentAddresses(fetchMock)).not.toContain(emailB.email)
   })

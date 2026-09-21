@@ -79,6 +79,7 @@ const carrier: Carrier = {
 
 const createdInvoice: Invoice = {
   id: '42',
+  invoiceNumber: 42,
   policyId: '900',
   clientId: '155',
   createdBy: '1',
@@ -110,6 +111,7 @@ const createdInvoice: Invoice = {
 // verify the read-only "Pay" summary still shows it.
 const openInvoice: Invoice = {
   id: '10',
+  invoiceNumber: 10,
   policyId: '900',
   clientId: '155',
   createdBy: '1',
@@ -151,6 +153,7 @@ const openInvoice: Invoice = {
 function receiptFor(overrides: Partial<ReceiptDetail> & { amountApplied: string; changeGiven: string }): ReceiptDetail {
   return {
     id: '500',
+    receiptNumber: 500,
     paymentId: '900',
     invoiceId: '10',
     policyId: '900',

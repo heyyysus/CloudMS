@@ -23,6 +23,7 @@ const carrier: Carrier = {
 
 const openInvoice: Invoice = {
   id: '10',
+  invoiceNumber: 10,
   policyId: '900',
   clientId: '155',
   createdBy: '1',
@@ -67,6 +68,7 @@ const openInvoice: Invoice = {
 const otherPolicyInvoice: Invoice = {
   ...openInvoice,
   id: '11',
+  invoiceNumber: 11,
   policyId: '901',
   status: 'open',
   total: '75.00',

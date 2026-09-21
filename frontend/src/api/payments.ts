@@ -25,6 +25,7 @@ export interface RecordPaymentBody {
 // POST /payments returns the minted receipt, not the payment.
 export interface ReceiptDetail {
   id: string
+  receiptNumber: number
   paymentId: string
   invoiceId: string
   policyId: string

@@ -78,6 +78,7 @@ const carrier: Carrier = {
 
 const closedInvoice: InvoiceDetail = {
   id: '41',
+  invoiceNumber: 41,
   policyId: '900',
   clientId: '223',
   createdBy: '1',
@@ -134,6 +135,7 @@ const closedInvoice: InvoiceDetail = {
   receipts: [
     {
       id: '88',
+      receiptNumber: 88,
       paymentId: '5',
       invoiceId: '41',
       policyId: '900',
@@ -155,6 +157,7 @@ const closedInvoice: InvoiceDetail = {
 const closedInvoiceWithChange: InvoiceDetail = {
   ...closedInvoice,
   id: '43',
+  invoiceNumber: 43,
   payments: [
     {
       ...closedInvoice.payments[0],
@@ -169,6 +172,7 @@ const closedInvoiceWithChange: InvoiceDetail = {
     {
       ...closedInvoice.receipts[0],
       id: '89',
+      receiptNumber: 89,
       paymentId: '6',
       invoiceId: '43',
       changeGiven: '50.00',
@@ -179,6 +183,7 @@ const closedInvoiceWithChange: InvoiceDetail = {
 const openInvoice: InvoiceDetail = {
   ...closedInvoice,
   id: '42',
+  invoiceNumber: 42,
   status: 'open',
   amountPaid: '0.00',
   note: null,
@@ -189,6 +194,7 @@ const openInvoice: InvoiceDetail = {
 const voidedInvoice: InvoiceDetail = {
   ...openInvoice,
   id: '44',
+  invoiceNumber: 44,
   status: 'void',
   voidedAt: TS,
   voidedBy: '1',
@@ -200,6 +206,7 @@ const voidedInvoice: InvoiceDetail = {
 const paidOpenInvoice: InvoiceDetail = {
   ...closedInvoice,
   id: '45',
+  invoiceNumber: 45,
   status: 'open',
   amountPaid: '600.00',
 }

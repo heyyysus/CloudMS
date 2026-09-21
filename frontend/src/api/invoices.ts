@@ -30,6 +30,7 @@ export interface InvoiceItem {
 // total - amountPaid (compute via lib/money's toCents, never string-compare).
 export interface Invoice {
   id: string
+  invoiceNumber: number
   policyId: string
   clientId: string
   createdBy: string
@@ -67,6 +68,7 @@ export interface InvoicePayment {
 
 export interface InvoiceReceipt {
   id: string
+  receiptNumber: number
   paymentId: string
   invoiceId: string
   policyId: string

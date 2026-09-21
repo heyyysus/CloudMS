@@ -60,7 +60,7 @@ CI/CD runs as two GitHub Actions workflows. `ci.yml` typechecks, lints, format-c
 
 **Not yet built** — automated email ships today (see **Correspondence and reminders** above), but automated SMS and AI-assisted features described above don't exist in code yet, and third-party/carrier integration so far is limited to VIN decoding and TurboRater rater-file import. The Home dashboard's client/policy/activity summary cards are still placeholders — the only real content there today is the rater-file drop target — and personal auto remains the only line of business modeled. The domain model's `clientPhones`/`clientEmails` tables already capture the contact data those future features will need.
 
-Multi-tenancy has three pieces left (see `docs/multitenancy.md`):
+Multi-tenancy's remaining pieces (see `docs/multitenancy.md`):
 
 - **Organization creation and first-admin bootstrap.** Inviting a user into an org that already exists ships today as `POST /users/invite`; what's missing is a route that creates the organization and seats its first admin.
 - **Organization settings columns**, to retire the last agency-level environment variables — `MAIL_REPLY_TO`, `REMINDER_TIMEZONE`, `REMINDER_SEND_HOUR` — together with per-organization scoping of the reminder planner.
@@ -71,7 +71,7 @@ Multi-tenancy has three pieces left (see `docs/multitenancy.md`):
 Roughly, in order:
 
 1. Turn the Home dashboard into a real landing page — a client list and search — and wire the frontend test suite into CI.
-2. **Mostly done (#117, #119, #120, #121, #122, #130).** Make the app multitenant so it can be released to more than one agency. Shipped: an `organizations` table, `org_id` on every tenant-owned row, organization-scoped repositories, row-level security as the backstop, per-organization invoice and receipt numbering, and opaque row ids. Remaining: organization settings columns for the last agency-level environment variables (`MAIL_REPLY_TO`, `REMINDER_TIMEZONE`, `REMINDER_SEND_HOUR`) plus per-organization planner scoping, an organization creation and first-admin bootstrap flow, and a demo org that lives in the same deployment. The full plan is `docs/multitenancy.md`.
+2. **Mostly done (#117, #119, #120, #121, #122, #130).** Make the app multitenant so it can be released to more than one agency. Shipped: an `organizations` table, `org_id` on every tenant-owned row, organization-scoped repositories, row-level security as the backstop, per-organization invoice and receipt numbering, and opaque row ids. What is left is listed under **Not yet built** above; the full plan is `docs/multitenancy.md`.
 3. Expand the domain model beyond personal auto to additional lines of business.
 4. Layer in carrier and third-party integrations so data enters the system without manual re-keying.
 5. Add automated SMS communication for renewals, document requests, and policy updates — email is done, see **Correspondence and reminders** above.

@@ -1,5 +1,6 @@
 import { Request, Response, Router } from "express"
 import { requireAuth, requireRole } from "../auth/middleware"
+import { db } from "../db"
 import {
   buildPolicyChangeFormPdf,
   formatChangeSummaryText,
@@ -22,10 +23,14 @@ import {
 import { firstIssue, isPgForeignKeyViolation, isPgUniqueViolation, parseId } from "./helpers"
 import { createPolicyBody, idParam, searchQuery, updatePolicyBody } from "./schemas"
 
-// Best-effort: the policy update has already committed by the time this
-// runs, so nothing in here may throw - every failure (most commonly R2 being
-// unconfigured, but also a bug in this code) is logged and swallowed rather
-// than turning a successful policy update into a failed request.
+// Best-effort: the policy update is not yet committed (it commits when the
+// request's transaction does, at response end - db/context.ts), but this
+// still must not turn a successful policy update into a failed request, so
+// every failure (most commonly R2 being unconfigured, but also a bug in this
+// code) is logged and swallowed rather than thrown. Each DB-touching step
+// below runs in its own savepoint (via db.transaction) precisely so a
+// swallowed failure here can't abort the outer transaction and silently roll
+// back the policy update this function is describing.
 async function recordPolicyChangeForm(
   req: Request,
   before: NonNullable<Awaited<ReturnType<typeof getPolicyWithDetails>>>,
@@ -55,44 +60,55 @@ async function recordPolicyChangeFormUnsafe(
   // write failed, in which case the attachment is simply filed unlinked.
   let changeLogId: string | undefined
   try {
-    const log = await createPolicyLog(req.orgId!, {
-      policyId: after.id,
-      authorId: req.user!.id,
-      body: `Policy updated:\n${formatChangeSummaryText(changes)}`.slice(0, 5000),
-    })
+    // Wrapped in its own savepoint: this whole function runs inside the
+    // request's transaction (db/context.ts), so an uncaught pg error here
+    // (e.g. a truncation/constraint issue) would otherwise abort it and
+    // break every query below - including ones unrelated to the log write -
+    // with "current transaction is aborted" rather than the actual cause.
+    const log = await db.transaction(() =>
+      createPolicyLog(req.orgId!, {
+        policyId: after.id,
+        authorId: req.user!.id,
+        body: `Policy updated:\n${formatChangeSummaryText(changes)}`.slice(0, 5000),
+      })
+    )
     changeLogId = log?.id
   } catch (err) {
     req.log.error(err, "Failed to write policy change log")
   }
 
   try {
-    const client = await getClientWithDetails(req.orgId!, after.clientId)
-    const clientName = client
-      ? `${client.namedInsured.firstName} ${client.namedInsured.lastName}`
-      : "Unknown client"
+    // Same savepoint reasoning as the log write above.
+    await db.transaction(async () => {
+      const client = await getClientWithDetails(req.orgId!, after.clientId)
+      const clientName = client
+        ? `${client.namedInsured.firstName} ${client.namedInsured.lastName}`
+        : "Unknown client"
 
-    const pdf = await buildPolicyChangeFormPdf(
-      {
-        policy: after,
-        clientName,
-        editedBy: req.user!,
-        editedAt: new Date(),
-        // Falls back to today when the caller didn't send one, so the PDF
-        // always has a value even if this route is ever hit without it.
-        endorsementEffectiveDate: endorsementEffectiveDate ?? new Date().toISOString().slice(0, 10),
-      },
-      changes
-    )
-    await storeGeneratedPolicyAttachment(req.orgId!, {
-      policyId: after.id,
-      pdf,
-      fileName: "Policy Change Form.pdf",
-      keySlug: "policy-change-form",
-      description: "Auto-generated summary of this edit",
-      sourceType: "policy_change",
-      sourceId: after.id,
-      createdBy: req.user!.id,
-      linkToLogId: changeLogId,
+      const pdf = await buildPolicyChangeFormPdf(
+        {
+          policy: after,
+          clientName,
+          editedBy: req.user!,
+          editedAt: new Date(),
+          // Falls back to today when the caller didn't send one, so the PDF
+          // always has a value even if this route is ever hit without it.
+          endorsementEffectiveDate:
+            endorsementEffectiveDate ?? new Date().toISOString().slice(0, 10),
+        },
+        changes
+      )
+      await storeGeneratedPolicyAttachment(req.orgId!, {
+        policyId: after.id,
+        pdf,
+        fileName: "Policy Change Form.pdf",
+        keySlug: "policy-change-form",
+        description: "Auto-generated summary of this edit",
+        sourceType: "policy_change",
+        sourceId: after.id,
+        createdBy: req.user!.id,
+        linkToLogId: changeLogId,
+      })
     })
   } catch (err) {
     req.log.error(err, "Failed to generate policy change form attachment")

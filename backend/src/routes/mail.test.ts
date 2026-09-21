@@ -3,7 +3,7 @@ import { eq, inArray } from "drizzle-orm"
 import request from "supertest"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import app from "../app"
-import { db } from "../db"
+import { adminDb, db, runInOrg } from "../db"
 import { emailLog, emailTemplates } from "../db/schema"
 import { CORRESPONDENCE_MERGE_FIELDS, WELCOME_TEMPLATE_KEY } from "../emails"
 import {
@@ -114,7 +114,8 @@ describe("POST /clients/:clientId/send-email", () => {
     const user = await ctx.user("mail-unknownto", "admin")
     const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
-    await addEmailToClient(await ctx.orgId(), client.id, "onfile@example.com")
+    const orgId = await ctx.orgId()
+    await runInOrg(orgId, () => addEmailToClient(orgId, client.id, "onfile@example.com"))
 
     const res = await request(app)
       .post(`/clients/${client.id}/send-email`)
@@ -129,8 +130,9 @@ describe("POST /clients/:clientId/send-email", () => {
     const user = await ctx.user("mail-allon", "admin")
     const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
-    await addEmailToClient(await ctx.orgId(), client.id, "first@example.com")
-    await addEmailToClient(await ctx.orgId(), client.id, "second@example.com")
+    const orgId = await ctx.orgId()
+    await runInOrg(orgId, () => addEmailToClient(orgId, client.id, "first@example.com"))
+    await runInOrg(orgId, () => addEmailToClient(orgId, client.id, "second@example.com"))
     const fetchMock = stubResend({ id: "msg_1" })
 
     const res = await request(app)
@@ -153,8 +155,9 @@ describe("POST /clients/:clientId/send-email", () => {
     const user = await ctx.user("mail-subset", "admin")
     const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
-    await addEmailToClient(await ctx.orgId(), client.id, "First@Example.com")
-    await addEmailToClient(await ctx.orgId(), client.id, "second@example.com")
+    const orgId = await ctx.orgId()
+    await runInOrg(orgId, () => addEmailToClient(orgId, client.id, "First@Example.com"))
+    await runInOrg(orgId, () => addEmailToClient(orgId, client.id, "second@example.com"))
     stubResend({ id: "msg_2" })
 
     const res = await request(app)
@@ -172,7 +175,8 @@ describe("POST /clients/:clientId/send-email", () => {
     const user = await ctx.user("mail-unconfigured", "admin")
     const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
-    await addEmailToClient(await ctx.orgId(), client.id, "onfile@example.com")
+    const orgId = await ctx.orgId()
+    await runInOrg(orgId, () => addEmailToClient(orgId, client.id, "onfile@example.com"))
 
     const res = await request(app)
       .post(`/clients/${client.id}/send-email`)
@@ -187,7 +191,8 @@ describe("POST /clients/:clientId/send-email", () => {
     const user = await ctx.user("mail-5xx", "admin")
     const cookie = await ctx.cookie(user.id)
     const client = await ctx.client()
-    await addEmailToClient(await ctx.orgId(), client.id, "onfile@example.com")
+    const orgId = await ctx.orgId()
+    await runInOrg(orgId, () => addEmailToClient(orgId, client.id, "onfile@example.com"))
     stubResend(
       { name: "rate_limit_exceeded", message: "Too many requests." },
       { ok: false, status: 429 }
@@ -217,7 +222,10 @@ const templateIds: string[] = []
 
 afterEach(async () => {
   if (templateIds.length) {
-    await db.delete(emailTemplates).where(inArray(emailTemplates.id, templateIds.splice(0)))
+    // makeTemplate can mint a template in an org other than ctx's default
+    // (the cross-org test below), so this sweep runs on adminDb rather than
+    // under a single-org runInOrg scope.
+    await adminDb.delete(emailTemplates).where(inArray(emailTemplates.id, templateIds.splice(0)))
   }
 })
 
@@ -226,11 +234,14 @@ afterEach(async () => {
 // org, since every caller here has already minted one via makeSendFixture.
 async function makeTemplate(overrides: Partial<typeof TEMPLATE_BODY> = {}, orgId?: string) {
   const body = { ...TEMPLATE_BODY, ...overrides }
-  const template = await createCorrespondenceTemplate(orgId ?? (await ctx.orgId()), {
-    key: `correspondence-test-${randomUUID().slice(0, 8)}`,
-    ...body,
-    updatedBy: null,
-  })
+  const resolvedOrgId = orgId ?? (await ctx.orgId())
+  const template = await runInOrg(resolvedOrgId, () =>
+    createCorrespondenceTemplate(resolvedOrgId, {
+      key: `correspondence-test-${randomUUID().slice(0, 8)}`,
+      ...body,
+      updatedBy: null,
+    })
+  )
   templateIds.push(template.id)
   return template
 }
@@ -242,7 +253,8 @@ async function makeSendFixture(prefix: string, role: "staff" | "admin" = "staff"
   const cookie = await ctx.cookie(user.id)
   const person = await ctx.person({ firstName: "Jane", lastName: "Doe" })
   const client = await ctx.client({ namedInsuredId: person.id })
-  await addEmailToClient(await ctx.orgId(), client.id, "jane@example.com")
+  const orgId = await ctx.orgId()
+  await runInOrg(orgId, () => addEmailToClient(orgId, client.id, "jane@example.com"))
   const carrier = await ctx.carrier({ name: "Progressive" })
   const policy = await ctx.policy({ clientId: client.id, carrierId: carrier.id })
   return { user, cookie, client, carrier, policy }
@@ -370,7 +382,9 @@ describe("POST /policies/:policyId/send-correspondence", () => {
         cc: ["spouse@example.com", "agent@example.com"],
       })
 
-    const rows = await db.select().from(emailLog).where(eq(emailLog.triggeredBy, user.id))
+    const rows = await runInOrg(await ctx.orgId(), () =>
+      db.select().from(emailLog).where(eq(emailLog.triggeredBy, user.id))
+    )
     expect(rows.map((r) => r.recipient).sort()).toEqual([
       "agent@example.com",
       "jane@example.com",
@@ -393,7 +407,8 @@ describe("POST /policies/:policyId/send-correspondence", () => {
       .set("Cookie", cookie)
       .send({ templateId: template.id, to: ["jane@example.com"], cc: ["spouse@example.com"] })
 
-    const logs = await listPolicyLogsByPolicyId(await ctx.orgId(), policy.id)
+    const orgId = await ctx.orgId()
+    const logs = await runInOrg(orgId, () => listPolicyLogsByPolicyId(orgId, policy.id))
     expect(logs).toHaveLength(1)
     // The log records the actual email: recipients, subject, and rendered body.
     const lines = logs[0].body.split("\n")
@@ -446,7 +461,8 @@ describe("POST /policies/:policyId/send-correspondence", () => {
   // the invite email can never be aimed at a client.
   it("returns 404 when templateId points at the welcome template", async () => {
     const { cookie, policy } = await makeSendFixture("send-welcome")
-    const welcome = await findEmailTemplateByKey(await ctx.orgId(), WELCOME_TEMPLATE_KEY)
+    const orgId = await ctx.orgId()
+    const welcome = await runInOrg(orgId, () => findEmailTemplateByKey(orgId, WELCOME_TEMPLATE_KEY))
     expect(welcome).toBeDefined()
 
     const res = await request(app)
@@ -508,12 +524,15 @@ describe("POST /policies/:policyId/send-correspondence", () => {
 
     expect(res.status).toBe(503)
 
-    const rows = await db.select().from(emailLog).where(eq(emailLog.triggeredBy, user.id))
+    const orgId = await ctx.orgId()
+    const rows = await runInOrg(orgId, () =>
+      db.select().from(emailLog).where(eq(emailLog.triggeredBy, user.id))
+    )
     expect(rows).toHaveLength(1)
     expect(rows[0].status).toBe("failed")
     expect(rows[0].resendId).toBeNull()
     // Nothing was sent, so the policy's history must not claim otherwise.
-    expect(await listPolicyLogsByPolicyId(await ctx.orgId(), policy.id)).toHaveLength(0)
+    expect(await runInOrg(orgId, () => listPolicyLogsByPolicyId(orgId, policy.id))).toHaveLength(0)
   })
 
   it("returns 502 and logs the failure when Resend responds with an error status", async () => {
@@ -529,9 +548,12 @@ describe("POST /policies/:policyId/send-correspondence", () => {
 
     expect(res.status).toBe(502)
 
-    const rows = await db.select().from(emailLog).where(eq(emailLog.triggeredBy, user.id))
+    const orgId = await ctx.orgId()
+    const rows = await runInOrg(orgId, () =>
+      db.select().from(emailLog).where(eq(emailLog.triggeredBy, user.id))
+    )
     expect(rows).toHaveLength(1)
     expect(rows[0].status).toBe("failed")
-    expect(await listPolicyLogsByPolicyId(await ctx.orgId(), policy.id)).toHaveLength(0)
+    expect(await runInOrg(orgId, () => listPolicyLogsByPolicyId(orgId, policy.id))).toHaveLength(0)
   })
 })

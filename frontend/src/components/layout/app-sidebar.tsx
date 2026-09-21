@@ -1,4 +1,4 @@
-import { ChevronRight, Cloud, House, Shield, UserRound, X } from 'lucide-react'
+import { ChevronRight, House, Shield, UserRound, X } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router'
 import {
   Collapsible,
@@ -22,6 +22,8 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar'
 import type { ClientTab } from '@/components/layout/client-tabs'
+import { OrgSwitcher } from '@/components/layout/org-switcher'
+import type { Membership } from '@/api/auth'
 
 const platformItems = [{ title: 'Home', url: '/home', icon: House }]
 
@@ -45,27 +47,33 @@ interface AppSidebarProps {
   openTabs?: ClientTab[]
   onCloseTab?: (id: string) => void
   isAdmin?: boolean
+  orgName?: string | null
+  memberships?: Membership[]
+  activeOrgId?: string | null
+  onSelectOrg?: (orgId: string) => void
 }
 
-export function AppSidebar({ openTabs = [], onCloseTab, isAdmin = false }: AppSidebarProps) {
+export function AppSidebar({
+  openTabs = [],
+  onCloseTab,
+  isAdmin = false,
+  orgName = null,
+  memberships = [],
+  activeOrgId = null,
+  onSelectOrg = () => {},
+}: AppSidebarProps) {
   const location = useLocation()
   const inAdmin = location.pathname.startsWith('/admin')
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <NavLink to="/home">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Cloud className="size-4" />
-                </div>
-                <span className="text-sm font-semibold">CloudMS</span>
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <OrgSwitcher
+          orgName={orgName}
+          memberships={memberships}
+          activeOrgId={activeOrgId}
+          onSelectOrg={onSelectOrg}
+        />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>

@@ -10,9 +10,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { initials } from '@/lib/initials'
-import type { User } from '@/api/auth'
+import type { Role, User } from '@/api/auth'
 
-export function UserMenu({ user }: { user: User }) {
+export function UserMenu({ user, role }: { user: User; role: Role | null }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -26,9 +26,7 @@ export function UserMenu({ user }: { user: User }) {
         <DropdownMenuLabel className="flex flex-col gap-0.5">
           <span className="text-sm font-medium">{user.name ?? user.email}</span>
           <span className="text-xs font-normal text-muted-foreground">{user.email}</span>
-          <span className="text-xs font-normal text-muted-foreground capitalize">
-            {user.role}
-          </span>
+          <span className="text-xs font-normal text-muted-foreground capitalize">{role}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>

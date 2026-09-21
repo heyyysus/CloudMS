@@ -6,8 +6,18 @@ name: agent-pr-fixer
 # is current, builds an environment the fixer can actually run tests in, and
 # hands it to Opus.
 #
-# Rounds are self-limiting: the fixer counts its own marker comments and
-# escalates on the third round rather than looping.
+# Rounds are self-limiting: fixing pushes to the branch, which re-triggers
+# agent-pr-review, whose completion re-triggers this. The fixer counts its own
+# marker comments and escalates on the third round rather than looping.
+#
+# Two ways in. `workflow_run` is the normal one. `issues: labeled` on
+# `pipeline:pr-reviewed` exists so the orchestrator's recovery primitive —
+# remove the state label, add it back — can actually re-fire this stage; a
+# workflow_run-only trigger left `pipeline:pr-reviewed` as the one state its
+# hourly sweep could detect but not recover. Both paths fire on a normal
+# review (agent-pr-review adds the label with the PAT, which does emit
+# events), so the resolve step below refuses a second round on a head that has
+# already had one.
 #
 # Postgres and a full install are present because a fix that has not been run
 # is a guess. The whole point of this stage is to stop pushing those.
@@ -21,6 +31,8 @@ on:
   workflow_run:
     workflows: [agent-pr-review]
     types: [completed]
+  issues:
+    types: [labeled]
 
 permissions:
   contents: write
@@ -28,13 +40,22 @@ permissions:
   pull-requests: write
 
 # One fixer per branch, and never cancelled: it may be mid-merge or mid-push.
+# Both event paths have to resolve to the same group, or they do not serialise
+# against each other and the duplicate-round guard never sees the first round.
 concurrency:
-  group: agent-pr-fixer-${{ github.event.workflow_run.head_branch }}
+  group: >-
+    agent-pr-fixer-${{ github.event_name == 'issues'
+    && format('agent/issue-{0}', github.event.issue.number)
+    || github.event.workflow_run.head_branch }}
   cancel-in-progress: false
 
 jobs:
   fix:
-    if: startsWith(github.event.workflow_run.head_branch, 'agent/issue-')
+    if: >-
+      (github.event_name == 'workflow_run'
+      && startsWith(github.event.workflow_run.head_branch, 'agent/issue-'))
+      || (github.event_name == 'issues'
+      && github.event.label.name == 'pipeline:pr-reviewed')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     services:
@@ -53,15 +74,17 @@ jobs:
           --health-retries 5
     env:
       GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
-      BRANCH: ${{ github.event.workflow_run.head_branch }}
+      BRANCH: >-
+        ${{ github.event_name == 'issues'
+        && format('agent/issue-{0}', github.event.issue.number)
+        || github.event.workflow_run.head_branch }}
       DATABASE_ADMIN_URL: postgresql://postgres:password@localhost:5432/myapp
       DATABASE_URL: postgresql://app:password@localhost:5432/myapp
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_branch }}
-          fetch-depth: 0
-
+      # Resolving runs before checkout, so the label path can bail on a branch
+      # that no longer exists rather than hard-failing on a missing ref. That
+      # is why every `gh` call here passes `-R`: there is no git remote to
+      # infer the repository from yet.
       - name: Resolve PR, review and control flags
         id: ctx
         run: |
@@ -70,13 +93,15 @@ jobs:
           case "$issue" in ''|*[!0-9]*) echo "Branch $BRANCH carries no issue number."; \
             echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0;; esac
 
-          pr=$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number // ""')
+          # Covers a deleted branch too: deleting the head closes the PR.
+          pr=$(gh pr list -R "$GITHUB_REPOSITORY" --head "$BRANCH" --state open \
+               --json number -q '.[0].number // ""')
           if [[ -z "$pr" ]]; then
             echo "No open PR for $BRANCH." >> "$GITHUB_STEP_SUMMARY"
             echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
 
-          head=$(gh pr view "$pr" --json headRefOid -q .headRefOid)
+          head=$(gh pr view "$pr" -R "$GITHUB_REPOSITORY" --json headRefOid -q .headRefOid)
 
           # Only act on a review of the commit that is actually at the head. A
           # stale verdict describes code nobody is looking at any more.
@@ -89,13 +114,28 @@ jobs:
           verdict=$(grep -oE 'PIPELINE-VERDICT: *(clean|advisory|blocking-security)' <<< "$review" \
                     | tail -1 | awk '{print $2}')
 
-          log=$(gh issue list --label "orchestrator:log" --state open --limit 1 \
+          # One round per review, whichever event got here first. The two
+          # triggers both fire on a normal review, and the label path fires
+          # again on every orchestrator recovery, so without this a PR would
+          # collect duplicate rounds and burn its three-round budget on
+          # re-reads of the same verdict.
+          reviewed_at=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${pr}/comments" --paginate \
+                        --jq "[.[] | select(.body | contains(\"<!-- pipeline-reviewed: ${head} -->\"))] | last | .created_at // \"\"")
+          last_round_at=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${pr}/comments" --paginate \
+                          --jq '[.[] | select(.body | contains("<!-- pr-fixer round -->"))] | last | .created_at // ""')
+          if [[ -n "$last_round_at" && "$last_round_at" > "$reviewed_at" ]]; then
+            echo "A fixer round already ran on $head (round comment $last_round_at, review $reviewed_at)." \
+              >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          log=$(gh issue list -R "$GITHUB_REPOSITORY" --label "orchestrator:log" --state open --limit 1 \
                 --json number -q '.[0].number // ""')
           if [[ -z "$log" ]]; then
             echo "No orchestrator:log issue; nothing to control or log to." >> "$GITHUB_STEP_SUMMARY"
             echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          flags=$(gh issue view "$log" --json labels -q '.labels[].name')
+          flags=$(gh issue view "$log" -R "$GITHUB_REPOSITORY" --json labels -q '.labels[].name')
           if grep -qxF "fixer:paused" <<< "$flags"; then
             echo "Paused by \`fixer:paused\` on #$log." >> "$GITHUB_STEP_SUMMARY"
             echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
@@ -120,6 +160,12 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "PR #$pr, issue #$issue, verdict \`${verdict:-unparseable}\`, round $((rounds + 1)), mode \`$mode\`." \
             >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@v4
+        if: steps.ctx.outputs.skip != 'true'
+        with:
+          ref: ${{ env.BRANCH }}
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         if: steps.ctx.outputs.skip != 'true'
@@ -170,11 +216,6 @@ jobs:
             echo "The branch is checked out at the PR head. Dependencies are installed and"
             echo "Postgres is running, so you can run the backend and frontend suites directly."
             echo
-            echo "Push with \`git push origin ${BRANCH}\`. That push carries GITHUB_TOKEN, so"
-            echo "GitHub creates no workflow runs for it: CI and agent-pr-review will NOT re-run"
-            echo "on your commit. Say so plainly in your round comment, and do not wait for a"
-            echo "review that is not coming."
-            echo
             echo "Read the review comment, the issue, and the diff with \`gh\` before deciding."
             echo "Check the changed paths against the deny-list yourself — do not trust the"
             echo "\`risk:\` label alone."
@@ -199,16 +240,12 @@ jobs:
           allowed_tools: "Read,Grep,Glob,Bash,Edit,Write"
           prompt: ${{ env.PROMPT }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          # github.token, because claude-code-action reconfigures git credentials
-          # from this input and PIPELINE_BOT_TOKEN has no `contents: write` — with
-          # the PAT here, `git push` 403s and a round's fix is lost with the runner.
-          # The job's `permissions: contents: write` covers GITHUB_TOKEN, so pushes
-          # land. The cost is that a GITHUB_TOKEN push fires no `synchronize`, so
-          # agent-pr-review does not re-run on its own; the prompt tells the fixer
-          # to say so, and the orchestrator's pipeline:pr-reviewed budget catches
-          # the PR. Grant the PAT `contents: write` and put it back here — then
-          # rounds close without a human.
-          github_token: ${{ github.token }}
+          # The bot token, not github.token: a push made with the default
+          # GITHUB_TOKEN creates no workflow runs, so CI and agent-pr-review
+          # would never re-run and the round would never close. claude-code-action
+          # reconfigures git credentials from this input, so the PAT needs
+          # `contents: write` for the push itself to land.
+          github_token: ${{ secrets.PIPELINE_BOT_TOKEN }}
 
       - name: Report a run that did not finish
         if: steps.ctx.outputs.skip != 'true' && steps.claude.outputs.stop_reason != 'success'
@@ -224,7 +261,7 @@ jobs:
 
           $RUN_URL
 
-          Anything it pushed stands. If it pushed, the PR carries it; agent-pr-review does not
-          re-run on a GITHUB_TOKEN push, so check the head SHA rather than waiting for a verdict.
+          Anything it pushed stands. If it pushed, agent-pr-review runs again and the next
+          round starts from there; if it did not, the PR is unchanged.
           EOF
           gh issue comment "$LOG_ISSUE" --body-file "$RUNNER_TEMP/body.md"

@@ -72,27 +72,53 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   // Everything next() dispatches to - every downstream middleware and route
   // handler - runs on one transaction with app.org_id set, which is what
-  // rls.ts's policies key off of (see db/context.ts's db proxy). The
-  // transaction commits when the response is done, not when this middleware
-  // returns: "close" fires once the response has finished sending, whether
-  // that was a normal res.json() or the error handler's 500, and also fires
-  // on an aborted connection - all three mean there is nothing left for this
-  // request to do.
+  // rls.ts's policies key off of (see db/context.ts's db proxy). The actual
+  // socket write is held back until that transaction commits: res.end is
+  // every response method's (json/send/status().json()/the error handler's
+  // 500) common final call, so intercepting it here lets the handler run to
+  // completion, captures what it tried to send, and only hands that to the
+  // real res.end once COMMIT has returned. Without this, a client that
+  // receives its response and immediately issues a second request (exactly
+  // what a UI does after a create, and what the test suite does constantly)
+  // can have that second request's transaction start before the first one's
+  // COMMIT lands, and under READ COMMITTED it then reads its own prior write
+  // as missing - not a hypothetical, it showed up as real cross-request
+  // flakiness (a void wrongly succeeding because the payment that should
+  // have blocked it wasn't committed yet) once RLS made every request wait
+  // on a real transaction. Held back rather than committing early: an
+  // aborted connection (res.end never called) still resolves via "close" so
+  // the transaction is never left open.
+  const originalEnd = res.end.bind(res)
+  let flush: (() => ReturnType<typeof originalEnd>) | undefined
   await runInOrg(
     req.orgId,
     () =>
       new Promise<void>((resolve) => {
-        res.on("close", resolve)
+        res.end = ((...args: Parameters<typeof res.end>) => {
+          flush = () => originalEnd(...args)
+          resolve()
+          return res
+        }) as typeof res.end
+        res.once("close", resolve)
         next()
       })
-  ).catch((err: unknown) => {
-    // A pg error a handler lets escape aborts the transaction; Postgres
-    // turns the COMMIT above into a no-op ROLLBACK without raising, so this
-    // only fires for a genuine commit failure (lost connection, etc). The
-    // response was already sent by the time COMMIT runs, so there is nothing
-    // left to do but log it.
-    req.log.error(err, "org-scoped request transaction failed to commit")
-  })
+  )
+    .then(() => {
+      // Only reached once COMMIT has returned - fn() resolving just lets the
+      // transaction callback finish, it does not by itself mean the write
+      // landed. flush() is what actually puts bytes on the wire.
+      res.end = originalEnd
+      flush?.()
+    })
+    .catch((err: unknown) => {
+      // A pg error a handler lets escape aborts the transaction; Postgres
+      // turns the COMMIT above into a no-op ROLLBACK without raising, so this
+      // only fires for a genuine commit failure (lost connection, etc).
+      // Nothing was flushed to the client in that case, which is the correct
+      // failure mode - better a hung connection Express's own timeout closes
+      // than a 200 for a write that never landed.
+      req.log.error(err, "org-scoped request transaction failed to commit")
+    })
 }
 
 // Admins pass every role check.

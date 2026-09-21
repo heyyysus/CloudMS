@@ -56,9 +56,9 @@ Accounting follows a trust model: a client pays the agency, the funds sit in the
 
 **Deployment** — Docker Compose orchestrates the stack: nginx, the API container, and Postgres. nginx does double duty — it serves the built frontend as static files and reverse-proxies `/api/v1/` to the API, stripping the prefix. TLS terminates at nginx using a Cloudflare Origin CA certificate with Cloudflare in front of it; Certbot is no longer part of the stack (see `docs/cloudflare-https.md`). This is the one and only deployment: every agency is an organization inside it, and there is no per-agency stack, host, or database (see `docs/multitenancy.md`).
 
-CI/CD runs as two GitHub Actions workflows. `ci.yml` typechecks, lints, format-checks, tests, and builds the backend — path-filtered, so it only runs when backend or infrastructure files change — and deploys to the production host on merge to `main`. `frontend.yml` lints and builds the frontend on changes under `frontend/`, then deploys by rsyncing the built assets to the host and restarting nginx, since the frontend isn't containerized. One gap worth naming: the frontend's Vitest/Storybook suite isn't wired into CI yet — only lint and build run there.
+CI/CD runs as two GitHub Actions workflows. `ci.yml` typechecks, lints, format-checks, tests, and builds the backend — path-filtered, so it only runs when backend or infrastructure files change — and deploys to the production host on merge to `main`. `frontend.yml` lints and builds the frontend on changes under `frontend/`, then deploys by rsyncing the built assets to the host and restarting nginx, since the frontend isn't containerized. The frontend's Vitest/Storybook suite runs there too: `frontend.yml` installs Chromium and runs `npm test` between lint and build.
 
-**Not yet built** — automated email ships today (see **Correspondence and reminders** above), but automated SMS and AI-assisted features described above don't exist in code yet, and third-party/carrier integration so far is limited to VIN decoding and TurboRater rater-file import. The Home dashboard's client/policy/activity summary cards are still placeholders — the only real content there today is the rater-file drop target — and personal auto remains the only line of business modeled. The domain model's `clientPhones`/`clientEmails` tables already capture the contact data those future features will need.
+**Not yet built** — automated email ships today (see **Correspondence and reminders** above), but automated SMS and AI-assisted features described above don't exist in code yet, and third-party/carrier integration so far is limited to VIN decoding and TurboRater rater-file import. The Home dashboard lists the org's clients with a search box and a rater-file drop target; policy and activity summaries are not built. Personal auto remains the only line of business modeled. The domain model's `clientPhones`/`clientEmails` tables already capture the contact data those future features will need.
 
 Multi-tenancy's remaining pieces (see `docs/multitenancy.md`):
 
@@ -70,7 +70,7 @@ Multi-tenancy's remaining pieces (see `docs/multitenancy.md`):
 
 Roughly, in order:
 
-1. Turn the Home dashboard into a real landing page — a client list and search — and wire the frontend test suite into CI.
+1. **Done (#152).** Turn the Home dashboard into a real landing page — a client list and search. The frontend test suite already runs in CI (see **Deployment** above).
 2. **Mostly done (#117, #119, #120, #121, #122, #130).** Make the app multitenant so it can be released to more than one agency. Shipped: an `organizations` table, `org_id` on every tenant-owned row, organization-scoped repositories, row-level security as the backstop, per-organization invoice and receipt numbering, and opaque row ids. What is left is listed under **Not yet built** above; the full plan is `docs/multitenancy.md`.
 3. Expand the domain model beyond personal auto to additional lines of business.
 4. Layer in carrier and third-party integrations so data enters the system without manual re-keying.

@@ -633,7 +633,10 @@ describe("dispatchReminders", () => {
     const fetchMock = stubResend()
     const { policy, email } = await dueReminder(212_011)
     await runInOrg(await ctx.orgId(), () =>
-      db.update(scheduledEmails).set({ status: "cancelled" }).where(eq(scheduledEmails.policyId, policy.id))
+      db
+        .update(scheduledEmails)
+        .set({ status: "cancelled" })
+        .where(eq(scheduledEmails.policyId, policy.id))
     )
 
     await dispatchReminders()
@@ -735,7 +738,9 @@ describe("reminder rules", () => {
     it("refuses to point a rule at the welcome template", async () => {
       const cookie = await cookieFor("rr-welcome")
       const orgId = await ctx.orgId()
-      const welcome = await runInOrg(orgId, () => findEmailTemplateByKey(orgId, WELCOME_TEMPLATE_KEY))
+      const welcome = await runInOrg(orgId, () =>
+        findEmailTemplateByKey(orgId, WELCOME_TEMPLATE_KEY)
+      )
 
       const res = await request(app)
         .post("/reminder-rules")

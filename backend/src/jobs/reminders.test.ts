@@ -10,7 +10,7 @@
 // runs the tests within a file sequentially, so keeping them together is what
 // makes them deterministic.
 import { randomInt, randomUUID } from "crypto"
-import { eq } from "drizzle-orm"
+import { eq, inArray } from "drizzle-orm"
 import { Client } from "pg"
 import request from "supertest"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -249,6 +249,45 @@ describe("planReminders", () => {
     expect(summerRow.scheduledFor.toISOString()).toBe(`${summerTarget}T14:00:00.000Z`)
     expect(winterRow.scheduledFor.toISOString()).toBe(`${winterTarget}T15:00:00.000Z`)
   })
+
+  // The actual cross-tenant fix (planner.ts's p.org_id = r.org_id join):
+  // two organizations, each with a rule and an active policy at the very same
+  // offset, must each get their own reminder rather than 4 rows from a join
+  // that ignores org boundaries.
+  it("never joins a rule to another organization's policy", async () => {
+    const offsetDays = freeOffset()
+    const orgA = await ctx.org()
+    const orgB = await ctx.org()
+
+    const clientA = await ctx.client({ orgId: orgA.id })
+    await ctx.clientEmail(clientA.id, undefined, orgA.id)
+    const policyA = await ctx.policy({
+      orgId: orgA.id,
+      clientId: clientA.id,
+      status: "active",
+      expirationDate: isoDaysFromToday(offsetDays),
+    })
+    const ruleA = await ctx.reminderRule({ orgId: orgA.id, offsetDays })
+
+    const clientB = await ctx.client({ orgId: orgB.id })
+    await ctx.clientEmail(clientB.id, undefined, orgB.id)
+    const policyB = await ctx.policy({
+      orgId: orgB.id,
+      clientId: clientB.id,
+      status: "active",
+      expirationDate: isoDaysFromToday(offsetDays),
+    })
+    const ruleB = await ctx.reminderRule({ orgId: orgB.id, offsetDays })
+
+    await planDueReminders()
+
+    const rowsA = await rowsFor(policyA.id)
+    const rowsB = await rowsFor(policyB.id)
+    expect(rowsA).toHaveLength(1)
+    expect(rowsB).toHaveLength(1)
+    expect(rowsA[0].ruleId).toBe(ruleA.id)
+    expect(rowsB[0].ruleId).toBe(ruleB.id)
+  })
 })
 
 // Shifts an ISO date by `days`, used to build an expiration whose target date
@@ -389,6 +428,67 @@ describe("dispatchReminders", () => {
     const body = JSON.parse(requestInit.body as string)
     expect(body.subject).toBe(`From ${org.name}`)
     expect(body.text).toBe(`Regards, ${org.name}`)
+  })
+
+  // The dispatch half of the two-org scheduler guarantee: each organization's
+  // send is logged under its own org_id and renders its own name, never the
+  // other organization's.
+  it("logs each organization's send under its own org_id", async () => {
+    const fetchMock = stubResend()
+    const orgA = await ctx.org()
+    const orgB = await ctx.org()
+    const offsetDays = freeOffset()
+
+    const clientA = await ctx.client({ orgId: orgA.id })
+    const emailA = await ctx.clientEmail(clientA.id, undefined, orgA.id)
+    const policyA = await ctx.policy({
+      orgId: orgA.id,
+      clientId: clientA.id,
+      status: "active",
+      expirationDate: isoDaysFromToday(offsetDays),
+    })
+    const templateA = await ctx.template({
+      orgId: orgA.id,
+      subject: "From {{agentName}}",
+      body: "Regards, {{agentName}}",
+    })
+    await ctx.reminderRule({ orgId: orgA.id, offsetDays, templateId: templateA.id })
+
+    const clientB = await ctx.client({ orgId: orgB.id })
+    const emailB = await ctx.clientEmail(clientB.id, undefined, orgB.id)
+    const policyB = await ctx.policy({
+      orgId: orgB.id,
+      clientId: clientB.id,
+      status: "active",
+      expirationDate: isoDaysFromToday(offsetDays),
+    })
+    const templateB = await ctx.template({
+      orgId: orgB.id,
+      subject: "From {{agentName}}",
+      body: "Regards, {{agentName}}",
+    })
+    await ctx.reminderRule({ orgId: orgB.id, offsetDays, templateId: templateB.id })
+
+    await planDueReminders()
+    await db
+      .update(scheduledEmails)
+      .set({ scheduledFor: new Date(Date.now() - 60_000) })
+      .where(inArray(scheduledEmails.policyId, [policyA.id, policyB.id]))
+
+    await dispatchReminders()
+
+    const [, initA] = sendTo(fetchMock, emailA.email)
+    const bodyA = JSON.parse(initA.body as string)
+    expect(bodyA.text).toBe(`Regards, ${orgA.name}`)
+
+    const [, initB] = sendTo(fetchMock, emailB.email)
+    const bodyB = JSON.parse(initB.body as string)
+    expect(bodyB.text).toBe(`Regards, ${orgB.name}`)
+
+    const [logA] = await db.select().from(emailLog).where(eq(emailLog.recipient, emailA.email))
+    const [logB] = await db.select().from(emailLog).where(eq(emailLog.recipient, emailB.email))
+    expect(logA.orgId).toBe(orgA.id)
+    expect(logB.orgId).toBe(orgB.id)
   })
 
   it("returns the row to pending and records the error when Resend fails", async () => {
@@ -564,6 +664,16 @@ describe("reminder rules", () => {
       const found = res.body.rules.find((r: { id: string }) => r.id === rule.id)
       expect(found.template.name).toBe("Renewal Notice")
     })
+
+    it("omits another organization's rules", async () => {
+      const cookie = await cookieFor("rr-list-wrongorg")
+      const orgB = await ctx.org()
+      const theirs = await ctx.reminderRule({ orgId: orgB.id })
+
+      const res = await request(app).get("/reminder-rules").set("Cookie", cookie)
+
+      expect(res.body.rules.map((r: { id: string }) => r.id)).not.toContain(theirs.id)
+    })
   })
 
   describe("POST /reminder-rules", () => {
@@ -636,6 +746,47 @@ describe("reminder rules", () => {
         .send({ name: "Way out", offsetDays: 5000, templateId: template.id })
       expect(res.status).toBe(400)
     })
+
+    // The unique is now (org_id, trigger, offset_days), not (trigger,
+    // offset_days) - two organizations picking the same natural offset (e.g.
+    // "30 days out") must not collide.
+    it("allows two organizations to use the same offset", async () => {
+      const cookieA = await cookieFor("rr-dupe-org-a")
+      const templateA = await ctx.template()
+      const offsetDays = await routeOffset(725)
+      const resA = await request(app)
+        .post("/reminder-rules")
+        .set("Cookie", cookieA)
+        .send({ name: "Org A", offsetDays, templateId: templateA.id })
+      expect(resA.status).toBe(201)
+      ctx.track("rule", resA.body.id)
+
+      const orgB = await ctx.org()
+      const userB = await ctx.user("rr-dupe-org-b", "admin", orgB.id)
+      const cookieB = await ctx.cookie(userB.id, orgB.id)
+      const templateB = await ctx.template({ orgId: orgB.id })
+
+      const resB = await request(app)
+        .post("/reminder-rules")
+        .set("Cookie", cookieB)
+        .send({ name: "Org B", offsetDays, templateId: templateB.id })
+
+      expect(resB.status).toBe(201)
+      ctx.track("rule", resB.body.id)
+    })
+
+    it("returns 404 when templateId belongs to another organization", async () => {
+      const cookie = await cookieFor("rr-post-wrongorg")
+      const orgB = await ctx.org()
+      const templateB = await ctx.template({ orgId: orgB.id })
+
+      const res = await request(app)
+        .post("/reminder-rules")
+        .set("Cookie", cookie)
+        .send({ name: "Nope", offsetDays: await routeOffset(726), templateId: templateB.id })
+
+      expect(res.status).toBe(404)
+    })
   })
 
   describe("PATCH /reminder-rules/:id", () => {
@@ -670,9 +821,32 @@ describe("reminder rules", () => {
         .send({ enabled: true })
       expect(res.status).toBe(404)
     })
+
+    it("404s for another organization's rule", async () => {
+      const cookie = await cookieFor("rr-patch-wrongorg")
+      const orgB = await ctx.org()
+      const theirs = await ctx.reminderRule({ orgId: orgB.id })
+
+      const res = await request(app)
+        .patch(`/reminder-rules/${theirs.id}`)
+        .set("Cookie", cookie)
+        .send({ enabled: false })
+
+      expect(res.status).toBe(404)
+    })
   })
 
   describe("DELETE /reminder-rules/:id", () => {
+    it("404s for another organization's rule", async () => {
+      const cookie = await cookieFor("rr-delete-wrongorg")
+      const orgB = await ctx.org()
+      const theirs = await ctx.reminderRule({ orgId: orgB.id })
+
+      const res = await request(app).delete(`/reminder-rules/${theirs.id}`).set("Cookie", cookie)
+
+      expect(res.status).toBe(404)
+    })
+
     it("deletes a rule and its queued reminders", async () => {
       const cookie = await cookieFor("rr-delete")
       const offsetDays = freeOffset()
@@ -810,6 +984,29 @@ describe("scheduled emails", () => {
     expect(res.status).toBe(400)
   })
 
+  it("omits another organization's queue", async () => {
+    const cookie = await cookieFor("sched-list-wrongorg")
+    const orgB = await ctx.org()
+    const offsetDays = freeOffset()
+    const clientB = await ctx.client({ orgId: orgB.id })
+    await ctx.clientEmail(clientB.id, undefined, orgB.id)
+    const policyB = await ctx.policy({
+      orgId: orgB.id,
+      clientId: clientB.id,
+      status: "active",
+      expirationDate: isoDaysFromToday(offsetDays),
+    })
+    await ctx.reminderRule({ orgId: orgB.id, offsetDays })
+    await planDueReminders(undefined, orgB.id)
+
+    const res = await request(app).get("/scheduled-emails?status=pending").set("Cookie", cookie)
+
+    expect(res.status).toBe(200)
+    expect(res.body.scheduled.map((s: { policyId: string }) => s.policyId)).not.toContain(
+      policyB.id
+    )
+  })
+
   it("cancels a pending reminder", async () => {
     const cookie = await cookieFor("sched-cancel", "staff")
     const { row } = await queueOne()
@@ -847,6 +1044,32 @@ describe("scheduled emails", () => {
       .send({})
     expect(res.status).toBe(404)
   })
+
+  // Cross-org must 404, not 409 - a pending row in another org has to look
+  // exactly like a missing one, not like a row whose status already moved on.
+  it("404s, not 409, for another organization's reminder", async () => {
+    const cookie = await cookieFor("sched-cancel-wrongorg", "staff")
+    const orgB = await ctx.org()
+    const offsetDays = freeOffset()
+    const clientB = await ctx.client({ orgId: orgB.id })
+    await ctx.clientEmail(clientB.id, undefined, orgB.id)
+    const policyB = await ctx.policy({
+      orgId: orgB.id,
+      clientId: clientB.id,
+      status: "active",
+      expirationDate: isoDaysFromToday(offsetDays),
+    })
+    await ctx.reminderRule({ orgId: orgB.id, offsetDays })
+    await planDueReminders(undefined, orgB.id)
+    const [theirs] = await rowsFor(policyB.id)
+
+    const res = await request(app)
+      .post(`/scheduled-emails/${theirs.id}/cancel`)
+      .set("Cookie", cookie)
+      .send({})
+
+    expect(res.status).toBe(404)
+  })
 })
 
 describe("POST /reminders/tick", () => {
@@ -861,5 +1084,50 @@ describe("POST /reminders/tick", () => {
     expect(res.status).toBe(200)
     expect(res.body.plan).toBeDefined()
     expect(res.body.dispatch).toBeDefined()
+  })
+
+  it("plans and dispatches only the caller's own organization", async () => {
+    const fetchMock = stubResend()
+    const cookie = await cookieFor("tick-scope-a")
+
+    // Org B has an already-planned pending row backdated so it looks due,
+    // planned *before* the due-but-unplanned rule/policy below exist, so that
+    // pre-planning step can't accidentally plan both.
+    const orgB = await ctx.org()
+    const clientB = await ctx.client({ orgId: orgB.id })
+    const emailB = await ctx.clientEmail(clientB.id, undefined, orgB.id)
+    const otherOffset = freeOffset()
+    const plannedPolicyB = await ctx.policy({
+      orgId: orgB.id,
+      clientId: clientB.id,
+      status: "active",
+      expirationDate: isoDaysFromToday(otherOffset),
+    })
+    await ctx.reminderRule({ orgId: orgB.id, offsetDays: otherOffset })
+    await planDueReminders(undefined, orgB.id)
+    await db
+      .update(scheduledEmails)
+      .set({ scheduledFor: new Date(Date.now() - 60_000) })
+      .where(eq(scheduledEmails.policyId, plannedPolicyB.id))
+
+    // Now add org B's due rule that hasn't been planned yet.
+    const offsetDays = freeOffset()
+    const unplannedPolicyB = await ctx.policy({
+      orgId: orgB.id,
+      clientId: clientB.id,
+      status: "active",
+      expirationDate: isoDaysFromToday(offsetDays),
+    })
+    await ctx.reminderRule({ orgId: orgB.id, offsetDays })
+
+    const res = await request(app).post("/reminders/tick").set("Cookie", cookie)
+
+    expect(res.status).toBe(200)
+    // Org B's due-but-unplanned rule produced nothing.
+    expect(await rowsFor(unplannedPolicyB.id)).toHaveLength(0)
+    // Org B's already-pending row was not claimed or sent.
+    const [stillPending] = await rowsFor(plannedPolicyB.id)
+    expect(stillPending.status).toBe("pending")
+    expect(sentAddresses(fetchMock)).not.toContain(emailB.email)
   })
 })

@@ -1,0 +1,220 @@
+name: agent-pr-fixer
+
+# Acts on an agent/issue-* PR the moment agent-pr-review finishes with it:
+# merges, fixes, scraps, or escalates. The rules live in
+# .claude/agents/pr-fixer.md; this workflow resolves the PR, proves the review
+# is current, builds an environment the fixer can actually run tests in, and
+# hands it to Opus.
+#
+# Rounds are self-limiting: fixing pushes to the branch, which re-triggers
+# agent-pr-review, whose completion re-triggers this. The fixer counts its own
+# marker comments and escalates on the third round rather than looping.
+#
+# Postgres and a full install are present because a fix that has not been run
+# is a guess. The whole point of this stage is to stop pushing those.
+#
+# Control lives on the open issue labelled `orchestrator:log`:
+#   fixer:paused → do nothing
+#   fixer:live   → act
+#   neither      → observe-only; log what it would have done
+
+on:
+  workflow_run:
+    workflows: [agent-pr-review]
+    types: [completed]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+# One fixer per branch, and never cancelled: it may be mid-merge or mid-push.
+concurrency:
+  group: agent-pr-fixer-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    if: startsWith(github.event.workflow_run.head_branch, 'agent/issue-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:18.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: myapp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+      DATABASE_ADMIN_URL: postgresql://postgres:password@localhost:5432/myapp
+      DATABASE_URL: postgresql://app:password@localhost:5432/myapp
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          fetch-depth: 0
+
+      - name: Resolve PR, review and control flags
+        id: ctx
+        run: |
+          set -euo pipefail
+          issue="${BRANCH#agent/issue-}"
+          case "$issue" in ''|*[!0-9]*) echo "Branch $BRANCH carries no issue number."; \
+            echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0;; esac
+
+          pr=$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number // ""')
+          if [[ -z "$pr" ]]; then
+            echo "No open PR for $BRANCH." >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          head=$(gh pr view "$pr" --json headRefOid -q .headRefOid)
+
+          # Only act on a review of the commit that is actually at the head. A
+          # stale verdict describes code nobody is looking at any more.
+          review=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${pr}/comments" --paginate \
+                   --jq "[.[] | select(.body | contains(\"<!-- pipeline-reviewed: ${head} -->\"))] | last | .body // \"\"")
+          if [[ -z "$review" ]]; then
+            echo "No review for $head on #$pr; waiting for one." >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          verdict=$(grep -oE 'PIPELINE-VERDICT: *(clean|advisory|blocking-security)' <<< "$review" \
+                    | tail -1 | awk '{print $2}')
+
+          log=$(gh issue list --label "orchestrator:log" --state open --limit 1 \
+                --json number -q '.[0].number // ""')
+          if [[ -z "$log" ]]; then
+            echo "No orchestrator:log issue; nothing to control or log to." >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          flags=$(gh issue view "$log" --json labels -q '.labels[].name')
+          if grep -qxF "fixer:paused" <<< "$flags"; then
+            echo "Paused by \`fixer:paused\` on #$log." >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          mode=observe
+          if grep -qxF "fixer:live" <<< "$flags"; then
+            mode=live
+          fi
+
+          rounds=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${pr}/comments" --paginate \
+                   --jq '[.[] | select(.body | contains("<!-- pr-fixer round -->"))] | length')
+
+          {
+            echo "skip=false"
+            echo "pr=$pr"
+            echo "issue=$issue"
+            echo "head=$head"
+            echo "verdict=${verdict:-unparseable}"
+            echo "log_issue=$log"
+            echo "mode=$mode"
+            echo "rounds=$rounds"
+          } >> "$GITHUB_OUTPUT"
+          echo "PR #$pr, issue #$issue, verdict \`${verdict:-unparseable}\`, round $((rounds + 1)), mode \`$mode\`." \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/setup-node@v4
+        if: steps.ctx.outputs.skip != 'true'
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install and set up database
+        if: steps.ctx.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          (cd backend && npm ci --legacy-peer-deps && npm run db:push && npm run db:bootstrap)
+          (cd frontend && npm ci)
+
+      - name: Build prompt
+        if: steps.ctx.outputs.skip != 'true'
+        env:
+          PR: ${{ steps.ctx.outputs.pr }}
+          ISSUE: ${{ steps.ctx.outputs.issue }}
+          HEAD_SHA: ${{ steps.ctx.outputs.head }}
+          VERDICT: ${{ steps.ctx.outputs.verdict }}
+          LOG_ISSUE: ${{ steps.ctx.outputs.log_issue }}
+          MODE: ${{ steps.ctx.outputs.mode }}
+          ROUNDS: ${{ steps.ctx.outputs.rounds }}
+        run: |
+          set -euo pipefail
+          {
+            echo "PROMPT<<__PROMPT__"
+            cat .claude/agents/pr-fixer.md
+            echo
+            echo "---"
+            echo
+            echo "# This run"
+            echo
+            echo "- Repository: ${GITHUB_REPOSITORY}"
+            echo "- Pull request: #${PR} (branch \`${BRANCH}\`, head \`${HEAD_SHA}\`)"
+            echo "- Issue: #${ISSUE}"
+            echo "- Review verdict for this head: **${VERDICT}**"
+            echo "- Rounds already taken: ${ROUNDS} (you are on round $((ROUNDS + 1)))"
+            echo "- Mode: **${MODE}**"
+            echo "- Log issue: #${LOG_ISSUE}"
+            echo
+            echo "The branch is checked out at the PR head. Dependencies are installed and"
+            echo "Postgres is running, so you can run the backend and frontend suites directly."
+            echo
+            echo "Read the review comment, the issue, and the diff with \`gh\` before deciding."
+            echo "Check the changed paths against the deny-list yourself — do not trust the"
+            echo "\`risk:\` label alone."
+            echo
+            if [[ "$MODE" == "live" ]]; then
+              echo "You are in **live** mode: act, then log what you did."
+            else
+              echo "You are in **observe-only** mode: decide exactly as you would in live mode,"
+              echo "then write that decision to issue #${LOG_ISSUE} with every line prefixed"
+              echo "\`WOULD:\`. Do not edit files, push, merge, close, or relabel anything."
+            fi
+            echo "__PROMPT__"
+          } >> "$GITHUB_ENV"
+
+      - id: claude
+        if: steps.ctx.outputs.skip != 'true'
+        uses: ./.github/actions/claude-run
+        with:
+          stage: pr-fixer
+          model: opus
+          max_turns: 250
+          allowed_tools: "Read,Grep,Glob,Bash,Edit,Write"
+          prompt: ${{ env.PROMPT }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # The bot token, not github.token: a push made with the default
+          # GITHUB_TOKEN creates no workflow runs, so CI and agent-pr-review
+          # would never re-run and the round would never close.
+          github_token: ${{ secrets.PIPELINE_BOT_TOKEN }}
+
+      - name: Report a run that did not finish
+        if: steps.ctx.outputs.skip != 'true' && steps.claude.outputs.stop_reason != 'success'
+        env:
+          LOG_ISSUE: ${{ steps.ctx.outputs.log_issue }}
+          PR: ${{ steps.ctx.outputs.pr }}
+          STOP_REASON: ${{ steps.claude.outputs.stop_reason }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/body.md" <<EOF
+          PR fixer on #${PR} did not finish cleanly (stop reason: \`${STOP_REASON:-unknown}\`).
+
+          $RUN_URL
+
+          Anything it pushed stands. If it pushed, agent-pr-review runs again and the next
+          round starts from there; if it did not, the PR is unchanged.
+          EOF
+          gh issue comment "$LOG_ISSUE" --body-file "$RUNNER_TEMP/body.md"

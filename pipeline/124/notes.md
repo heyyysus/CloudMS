@@ -3,11 +3,14 @@
 ## Implemented
 
 1. **`.github/actions/claude-run/action.yml`** — new `tail` and `tail_file` outputs.
-   The `parse` step renders a plain-text transcript tail from `$EXEC_FILE`: one line
-   per event (`[assistant] ...`, `[tool] Name: ...`, `[tool-result] ...`), `tail -n 20`,
-   truncated to 500 chars/line, secrets redacted (`gh[pousr]_...`, `sk-ant-...`), capped
-   at 4000 chars total. Also added a `stop reason` column to the existing cost table in
+   The `parse` step calls `render-tail.sh` (below) on `$EXEC_FILE` and writes the result
+   to both outputs. Also added a `stop reason` column to the existing cost table in
    `$GITHUB_STEP_SUMMARY`.
+1b. **`.github/actions/claude-run/render-tail.sh`** — the renderer itself: one line per
+   event (`[assistant] ...`, `[tool] Name: ...`, `[tool-result] ...`), `tail -n 20`,
+   500 chars/line, 4000 chars total, secrets redacted (`gh[pousr]_...`,
+   `github_pat_...`, `sk-ant-...`), and always exactly one trailing newline. A separate
+   file, not an inline `run:` block, so a test can run it.
 2. **`.github/actions/report-failure/action.yml`** — new composite action. Inputs:
    `stage`, `stop_reason`, `target` (`issue`/`pr`/`none`), `number`, `resume`, `tail`,
    `wip_sha`, `github_token`. Resolves the failed step from the Actions jobs API
@@ -17,11 +20,14 @@
    `gh pr comment --body-file`, and appends it to `$GITHUB_STEP_SUMMARY`. Every external
    call ends `|| true` (`|| :` for the summary write) and the step itself has no
    `set -e`, so a broken reporter degrades instead of masking the real failure.
-3. **`.github/actions/report-failure/testdata/execution-sample.json`** — fixture:
-   an assistant text event, a `Bash` tool call, a tool result containing a fake
-   `ghp_...` token, and a `result` event with `subtype: "error_max_turns"`.
-4. **All eight workflows** now report on failure via `report-failure` (patch file,
-   see below — this runner's token can't push `.github/workflows/`):
+3. **`.github/actions/claude-run/render-tail.test.sh` + `testdata/execution-sample.json`**
+   — run it with `bash .github/actions/claude-run/render-tail.test.sh`. 17 checks over
+   the fixture (assistant text, a `Bash` tool call, string and block tool results
+   carrying fake `ghp_...`, `github_pat_...` and `sk-ant-...` tokens) plus two
+   synthesised transcripts for the 20-line, 500-char and 4000-char caps and the
+   trailing newline. CI runs it on every change under `.github/actions/**`
+   (`ci.yml`, job `pipeline-actions`).
+4. **All eight workflows** now report on failure via `report-failure`:
    - `agent-coder`: split "Verify work landed" into "Checkpoint uncommitted work"
      (`if: always()`, keeps the `wip:` commit logic, exposes `wip_sha`) and "Verify
      work landed" (assertions only). `always()` also fires on cancel and the 90-minute
@@ -92,14 +98,17 @@
 
 ## For the docs stage / reviewer
 
-- The real `.github/workflows/*.yml` edits live only in
-  `pipeline/124/workflow-changes.patch` (`git apply --check` passes against this
-  branch's HEAD) — the working tree's copies are unchanged from `main`, so they won't
-  show up in `git diff` outside that one file. **A human must
-  `git apply pipeline/124/workflow-changes.patch` on this branch before merge.**
-- `.github/actions/claude-run/action.yml` and `.github/actions/report-failure/**` are
-  real commits (not under `.github/workflows/`), so those are already in the diff
-  normally.
+- The `.github/workflows/*.yml` edits are **real commits on this branch**. They were
+  not, originally: `agent-coder`'s token has no `workflows` scope, so the stage wrote
+  them to `pipeline/124/workflow-changes.patch` and reverted the files. That patch has
+  since been applied and the file removed, so the eight stage edits now show up in
+  `git diff` like anything else and there is nothing left for a human to apply.
+- `.github/actions/claude-run/**` and `.github/actions/report-failure/**` were always
+  real commits (not under `.github/workflows/`).
+- `render-tail.sh` and `render-tail.test.sh` lost their executable bit when the patch
+  was applied through the GitHub contents API, which creates blobs as `100644`. Every
+  call site invokes them as `bash <path>` (`claude-run/action.yml`, `ci.yml`, and the
+  test's own call to the renderer), so nothing depends on the bit.
 - No backend/frontend code touched.
 
 ## Checks run
@@ -114,24 +123,46 @@
 - Extracted every changed `run:` block (workflows and both composite actions) with a
   small `python3`/`yaml` script and ran `bash -n` (syntax) then `shellcheck -s bash`
   on each — all pass, no new warnings beyond the two actionlint already found.
-- Fixture test of the tail renderer, run standalone against
-  `.github/actions/report-failure/testdata/execution-sample.json` using the exact jq
-  filter embedded in `claude-run/action.yml`'s `parse` step, piped through the same
-  `tail -n 20 | cut -c1-500 | sed -E <redact> | head -c 4000` chain:
-  ```
-  jq -r '[.[] | (if .type=="assistant" then (.message.content // [])|map(if .type=="text" then "[assistant] "+((.text//"")|split("\n")[0]) elif .type=="tool_use" then "[tool] "+.name+": "+(((.input.command // .input.file_path // .input.pattern // "")|tostring)|split("\n")[0]) else empty end) elif .type=="user" then (.message.content // [])|map(if .type=="tool_result" then "[tool-result] "+((if (.content|type)=="string" then .content else ((.content // [])|map(.text // "")|join(" ")) end)|split("\n")[0]) else empty end) else [] end)] | flatten | .[]' \
-    .github/actions/report-failure/testdata/execution-sample.json \
-    | tail -n 20 | cut -c1-500 \
-    | sed -E 's/gh[pousr]_[A-Za-z0-9]{20,}/[REDACTED]/g; s/sk-ant-[A-Za-z0-9_-]{20,}/[REDACTED]/g' \
-    | head -c 4000
-  ```
-  Output: 3 lines (≤20 ✓), the `ghp_...` token replaced with `[REDACTED]` (✓), and
-  `jq -r '.subtype' <<< "$(jq -c '[.[]|select(.type=="result")]|last' testdata/execution-sample.json)"`
-  returns `error_max_turns` (✓, the pre-existing subtype extraction, unchanged).
-- `git apply --check pipeline/124/workflow-changes.patch` against this branch's HEAD
-  — passes.
+- `bash .github/actions/claude-run/render-tail.test.sh` — 17/17 pass. Each check was
+  confirmed to fail against the unfixed renderer (see *Review round 1* below).
+- After the patch was applied: YAML parse and `bash -n` re-run over all nine workflow
+  files and both composite actions against the pushed branch — clean, and the renderer
+  test re-run there passes 17/17.
 - No backend/frontend suites run: this issue touches only `.github/**`,
   `pipeline/**`, and `.claude/agents/orchestrator.md`.
+
+## Review round 1 (pr-fixer, 21 Sep)
+
+Five advisory findings, all fixed on this branch.
+
+1. **`$GITHUB_OUTPUT` could break on a long transcript.** `head -c 4000` cut the tail
+   mid-line, so the file had no trailing newline and `cat` ran the `__CLAUDE_TAIL__`
+   delimiter onto the last content line — which fails the `parse` step and loses
+   `stop_reason` for the whole stage, the one thing this issue exists to report.
+   `render-tail.sh` now renders through a command substitution and re-adds exactly one
+   newline; `head`'s SIGPIPE can no longer trip `pipefail` either (the script does not
+   `set -e` and exits 0 explicitly). Verified: with the old `head -c … > file` form, the
+   test's *"a mid-line cut still ends with a newline"* check fails.
+2. **The docs stage could advance a half-written run.** Its `elif` committed `wip:` and
+   exited 0, so "Open PR" still ran and the issue moved to `pipeline:pr-open`. It now
+   pushes the checkpoint and `exit 1`s, like the planner and the plan reviewer.
+3. **`agent-trigger` and `agent-triage` always said "step unknown".** Both pass
+   `github.token` to `report-failure`, whose jobs-API call needs `actions: read`; their
+   `permissions:` blocks granted only `issues`/`contents`. Both now grant it, and
+   `report-failure` says so where the call is made.
+4. **Fine-grained tokens were not redacted.** `gh[pousr]_…` does not match
+   `github_pat_…`, the shape of `PIPELINE_BOT_TOKEN`. Added that pattern to
+   `render-tail.sh` and to `report-failure`'s `stage.log` fallback. Verified: with the
+   old two-pattern regex, the fixture's `github_pat_…` check fails.
+5. **Nothing ran the fixture.** It lived under `report-failure`, which does not use it,
+   and the jq filter it exercised was a copy in `notes.md`. Moved to
+   `.github/actions/claude-run/testdata/`, and `render-tail.test.sh` now runs the real
+   script against it in CI (`ci.yml`, job `pipeline-actions`, on any change under
+   `.github/actions/**`).
+
+Findings 2, 3 and 5's `ci.yml` job were workflow edits, so they lived in
+`workflow-changes.patch` rather than the tree. That patch is now applied, so the test
+does run in CI.
 
 ## Docs
 

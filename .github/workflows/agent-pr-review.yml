@@ -107,6 +107,10 @@ jobs:
           PIPELINE-VERDICT: clean | advisory | blocking-security
           (blocking-security only for an exploitable security problem that must not be merged as-is.)
 
+          Your final message is posted verbatim as a PR comment, so write it to the "Writing for
+          humans" section of CLAUDE.md. The format above, the word cap and the PIPELINE-VERDICT
+          line are required and win where the two conflict.
+
           Issue #$ISSUE: $title
 
           Issue body:

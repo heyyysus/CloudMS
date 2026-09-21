@@ -74,6 +74,10 @@ jobs:
           First read CLAUDE.md and PROJECT.md (goals, current state, roadmap). Then explore only the
           code areas the issue touches. Keep exploration focused; you have a limited turn budget.
 
+          Everything in plan.md is read by a person, and its opening sections are pasted into
+          the PR body, so write it to the "Writing for humans" section of CLAUDE.md. The
+          section headings below are a required format and win where the two conflict.
+
           plan.md format:
           ---
           issue: $ISSUE

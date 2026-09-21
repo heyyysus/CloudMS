@@ -1,6 +1,6 @@
 ---
 issue: 121
-status: in-progress
+status: done
 ---
 # Implementation notes — issue #121
 
@@ -32,6 +32,22 @@ status: in-progress
 - `testHelpers.ts`: `ctx.template()`/`ctx.reminderRule()` take an optional
   `orgId`; `cleanup()` sweeps `email_log` by org (catches automation-user
   sends) alongside the existing `email_templates` org sweep.
+- Tests: wrong-org cases for `GET/POST/PATCH/DELETE /reminder-rules`,
+  `GET /scheduled-emails`, and `POST /scheduled-emails/:id/cancel` (404, not
+  409, for another org's row); a per-org-uniqueness test that two
+  organizations can use the same `(trigger, offsetDays)`; a two-org planner
+  test asserting `planDueReminders()` never joins a rule to another org's
+  policy (2 rows total, not 4, for two orgs sharing an offset); a matching
+  two-org dispatch test asserting each org's `email_log` row carries its own
+  `org_id` and `{{agentName}}` renders its own org's name; a manual-tick
+  test asserting `POST /reminders/tick` only plans/dispatches the caller's
+  org (another org's due-but-unplanned rule produces nothing, and another
+  org's already-pending row is left untouched); and a new
+  `backend/src/db/schema.test.ts` asserting a raw insert into a tenant table
+  with no `org_id` is rejected by the database. `docs/API.md`,
+  `docs/multitenancy.md`, `backend/.env.example` and `backend/src/db/index.ts`'s
+  role-split comment updated for `AGENCY_NAME` removal, `org_id NOT NULL`,
+  and jobs running through `adminDb`.
 
 ## Decisions
 
@@ -70,8 +86,44 @@ status: in-progress
 - The jobs (planner/dispatcher) now run through `adminDb`, the owner role,
   ahead of row-level security (#122/sub-issue 8). Until RLS lands, the
   planner's own `p.org_id = r.org_id` join is what prevents cross-tenant
-  reminders, not a database-level backstop.
+  reminders, not a database-level backstop. Documented in
+  `docs/multitenancy.md` and `backend/src/db/index.ts`'s comment.
+- **Open risk carried over from plan.md, not resolved here:** what the
+  *production* database actually holds in `org_id` needs checking before this
+  backfill runs there. #117 added `org_id NOT NULL DEFAULT 1` when ids were
+  sequential integers; #130 switched ids to opaque 22-char strings and
+  dropped that default. If any production row still holds a stale `'1'`
+  (rather than `NULL`), it is a dangling FK value that `backfillOrgIds.ts` as
+  written will *not* touch (it only ever updates `org_id is null`), and the
+  `SET NOT NULL` in `drizzle-kit push` would then succeed while that row
+  points at a nonexistent organization. Before running this in production,
+  run this pre-flight per tenant table and confirm every value is either
+  `NULL` (which the backfill handles) or a real `organizations.id`:
+  ```sql
+  select org_id, count(*) from <table> group by 1 order by 2 desc;
+  ```
+  This CI/scratch database was created fresh for this task, so it never held
+  a stale `'1'` and this risk did not surface here - it is untested against
+  real production data by this pipeline run.
 
 ## Checks run
 
-(fill in as work proceeds)
+All from `backend/`, against a scratch database created for this task
+(`DATABASE_URL`/`DATABASE_ADMIN_URL` supplied by the runner, not the shared
+dev database):
+
+- `npm run db:backfill-org` (no-op: fresh database, no tables yet) then
+  `npm run db:push` then `npm run db:bootstrap` - clean push, no leftover
+  interactive prompts once the database was fresh.
+- `npm run typecheck` - clean.
+- `npm run lint` - clean.
+- `npm run format` / `npm run format:check` - clean (two files needed
+  reformatting, fixed).
+- `npm test` - 469 tests passed, 35 files, including the new wrong-org,
+  per-org-uniqueness, two-org scheduler, manual-tick-scope, and
+  `org_id NOT NULL` coverage.
+- `npm run build` - clean.
+- `grep -rn AGENCY_NAME --exclude-dir=pipeline .` - only doc mentions of the
+  now-removed variable by name remain (`docs/multitenancy.md`); no code or
+  `.env.example` references.
+- No `frontend/` changes; none expected per plan.

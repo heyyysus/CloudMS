@@ -156,7 +156,9 @@ whether `q` was passed.
 - Plain `GET /clients` returns every client in the org, ordered by the
   named insured's last name then first name.
 - `GET /clients?q=` returns the same shape but filtered to the query match
-  and capped at 50 results (see below) — order is relevance, not name.
+  and capped at 50 results (see below). Unlike the bare list, the `?q=`
+  branch has no `ORDER BY` at all, so its order is unspecified — sort
+  client-side if you need one.
 - `GET /policies?q=` returns a **custom projection**, not a bare
   AutoPolicy row: `{ id, policyNumber, status, effectiveDate,
   expirationDate, clientId, clientName }` — note there is no `carrierId`,

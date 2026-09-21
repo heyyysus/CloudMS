@@ -123,6 +123,26 @@ export const EmptyState: Story = {
   },
 }
 
+export const NoSearchMatches: Story = {
+  play: async () => {
+    await screen.findByText('Doe, Jane')
+    const input = screen.getByPlaceholderText(/search clients/i)
+    await userEvent.type(input, 'Nobody')
+    await expect(await screen.findByText('No clients match "Nobody".')).toBeInTheDocument()
+  },
+}
+
+export const LoadError: Story = {
+  args: {
+    listClientsFn: fn(async () => {
+      throw new Error('boom')
+    }),
+  },
+  play: async () => {
+    await expect(await screen.findByText("Couldn't load clients.")).toBeInTheDocument()
+  },
+}
+
 export const OpensClientTab: Story = {
   play: async () => {
     const row = await screen.findByRole('button', { name: /Doe, Jane/ })

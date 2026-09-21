@@ -49,7 +49,7 @@ export function ClientList({ onSelectClient, listClientsFn = defaultListClients 
           >
             <span className="text-sm font-medium">{formatNameLastFirst(client.namedInsured)}</span>
             <span className="text-xs text-muted-foreground">
-              {client.emails[0]?.email ?? formatPhone(client.phones[0]?.phoneNumber) ?? ''}
+              {client.emails[0]?.email ?? formatPhone(client.phones[0]?.phoneNumber)}
             </span>
           </button>
         ))}

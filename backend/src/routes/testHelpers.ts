@@ -3,7 +3,7 @@
 import { randomInt } from "crypto"
 import { inArray } from "drizzle-orm"
 import { generateSessionToken, hashToken } from "../auth/tokens"
-import { db } from "../db"
+import { adminDb, runInOrg } from "../db"
 import {
   autoPolicies,
   carriers,
@@ -47,6 +47,11 @@ import type {
   User,
   UserRole,
 } from "../types"
+
+// Re-exported so repository-level tests that call a repository directly
+// (outside a request, where requireAuth would normally open this) have one
+// obvious import to wrap those calls with.
+export { runInOrg }
 
 // Vitest runs each test file in its own worker/module instance, so a
 // per-module counter starting at 0 would collide across files running in
@@ -129,18 +134,25 @@ export class TestContext {
   // sendWelcomeEmail (invite, resend-welcome, restore) 500s for every org
   // this context mints.
   async org(): Promise<Organization> {
-    const [o] = await db
+    // adminDb, not db: organizations isn't RLS-protected (see rls.ts), but
+    // this insert can run before any org context exists to scope it to, same
+    // as bootstrap.ts/seed/run.ts creating a real organization.
+    const [o] = await adminDb
       .insert(organizations)
       .values({ name: unique("Test Org "), slug: unique("test-org-").slice(0, 64) })
       .returning()
     this.orgIds.push(o.id)
     this.defaultOrgId ??= o.id
-    await upsertEmailTemplate(o.id, {
-      key: WELCOME_TEMPLATE_KEY,
-      subject: "Welcome to CloudMS, {{name}}",
-      body: "Hi {{name}}, {{inviterName}} has invited you as {{role}}. Sign in at {{appUrl}}.",
-      updatedBy: null,
-    })
+    // A tenant row, unlike the insert above, so it runs on db inside this
+    // org's context rather than adminDb.
+    await runInOrg(o.id, () =>
+      upsertEmailTemplate(o.id, {
+        key: WELCOME_TEMPLATE_KEY,
+        subject: "Welcome to CloudMS, {{name}}",
+        body: "Hi {{name}}, {{inviterName}} has invited you as {{role}}. Sign in at {{appUrl}}.",
+        updatedBy: null,
+      })
+    )
     return o
   }
 
@@ -172,14 +184,16 @@ export class TestContext {
   async person(overrides: Partial<NewPerson> = {}) {
     const { orgId, ...rest } = overrides
     const resolvedOrgId = orgId ?? (await this.defaultOrg())
-    const p = await createPerson(resolvedOrgId, {
-      firstName: unique("First"),
-      lastName: "Test",
-      dateOfBirth: "1990-01-01",
-      gender: "m",
-      relationToInsured: "self",
-      ...rest,
-    })
+    const p = await runInOrg(resolvedOrgId, () =>
+      createPerson(resolvedOrgId, {
+        firstName: unique("First"),
+        lastName: "Test",
+        dateOfBirth: "1990-01-01",
+        gender: "m",
+        relationToInsured: "self",
+        ...rest,
+      })
+    )
     this.personIds.push(p.id)
     return p
   }
@@ -188,12 +202,14 @@ export class TestContext {
     const { orgId, ...rest } = overrides
     const resolvedOrgId = orgId ?? (await this.defaultOrg())
     const namedInsuredId = rest.namedInsuredId ?? (await this.person({ orgId: resolvedOrgId })).id
-    const c = await createClient(resolvedOrgId, {
-      mailingAddress1: "1 Test St",
-      physicalAddress1: "1 Test St",
-      ...rest,
-      namedInsuredId,
-    })
+    const c = await runInOrg(resolvedOrgId, () =>
+      createClient(resolvedOrgId, {
+        mailingAddress1: "1 Test St",
+        physicalAddress1: "1 Test St",
+        ...rest,
+        namedInsuredId,
+      })
+    )
     this.clientIds.push(c.id)
     return c
   }
@@ -201,11 +217,13 @@ export class TestContext {
   async carrier(overrides: Partial<NewCarrier> = {}) {
     const { orgId, ...rest } = overrides
     const resolvedOrgId = orgId ?? (await this.defaultOrg())
-    const c = await createCarrier(resolvedOrgId, {
-      name: "Test Carrier",
-      naic: uniqueNaic(),
-      ...rest,
-    })
+    const c = await runInOrg(resolvedOrgId, () =>
+      createCarrier(resolvedOrgId, {
+        name: "Test Carrier",
+        naic: uniqueNaic(),
+        ...rest,
+      })
+    )
     this.carrierIds.push(c.id)
     return c
   }
@@ -215,14 +233,16 @@ export class TestContext {
     const resolvedOrgId = orgId ?? (await this.defaultOrg())
     const clientId = rest.clientId ?? (await this.client({ orgId: resolvedOrgId })).id
     const carrierId = rest.carrierId ?? (await this.carrier({ orgId: resolvedOrgId })).id
-    const p = await createAutoPolicy(resolvedOrgId, {
-      policyNumber: unique("POL"),
-      effectiveDate: "2026-01-01",
-      expirationDate: "2027-01-01",
-      ...rest,
-      clientId,
-      carrierId,
-    })
+    const p = await runInOrg(resolvedOrgId, () =>
+      createAutoPolicy(resolvedOrgId, {
+        policyNumber: unique("POL"),
+        effectiveDate: "2026-01-01",
+        expirationDate: "2027-01-01",
+        ...rest,
+        clientId,
+        carrierId,
+      })
+    )
     this.policyIds.push(p.id)
     return p
   }
@@ -231,15 +251,17 @@ export class TestContext {
     const { orgId, ...rest } = overrides
     const resolvedOrgId = orgId ?? (await this.defaultOrg())
     const policyId = rest.policyId ?? (await this.policy({ orgId: resolvedOrgId })).id
-    const v = await createVehicle(resolvedOrgId, {
-      vin: uniqueVin(),
-      make: "Honda",
-      model: "Civic",
-      year: 2020,
-      garagingZip: "12345",
-      ...rest,
-      policyId,
-    })
+    const v = await runInOrg(resolvedOrgId, () =>
+      createVehicle(resolvedOrgId, {
+        vin: uniqueVin(),
+        make: "Honda",
+        model: "Civic",
+        year: 2020,
+        garagingZip: "12345",
+        ...rest,
+        policyId,
+      })
+    )
     this.vehicleIds.push(v.id)
     return v
   }
@@ -251,11 +273,13 @@ export class TestContext {
     const { orgId, ...rest } = overrides
     const resolvedOrgId = orgId ?? (await this.defaultOrg())
     const person = await this.person({ orgId: resolvedOrgId, ...rest })
-    const driver = await createDriver(resolvedOrgId, {
-      personId: person.id,
-      dlNumber: unique("DL"),
-    })
-    await addDriverToPolicy(resolvedOrgId, policyId, driver.id)
+    const driver = await runInOrg(resolvedOrgId, () =>
+      createDriver(resolvedOrgId, {
+        personId: person.id,
+        dlNumber: unique("DL"),
+      })
+    )
+    await runInOrg(resolvedOrgId, () => addDriverToPolicy(resolvedOrgId, policyId, driver.id))
     return { person, driver }
   }
 
@@ -263,18 +287,22 @@ export class TestContext {
   // array is needed here - as long as the policy is tracked, cleanup() below
   // removes its logs before it removes the author's user row.
   async log(policyId: string, authorId: string, body = "Test log", orgId?: string) {
-    const l = await createPolicyLog(orgId ?? (await this.defaultOrg()), {
-      policyId,
-      authorId,
-      body,
-    })
+    const resolvedOrgId = orgId ?? (await this.defaultOrg())
+    const l = await runInOrg(resolvedOrgId, () =>
+      createPolicyLog(resolvedOrgId, {
+        policyId,
+        authorId,
+        body,
+      })
+    )
     if (!l) throw new Error(`Could not create log for policy ${policyId}`)
     return l
   }
 
   // client_emails cascade-delete with their client, so nothing to track.
   async clientEmail(clientId: string, email = `${unique("to")}@example.com`, orgId?: string) {
-    return addEmailToClient(orgId ?? (await this.defaultOrg()), clientId, email)
+    const resolvedOrgId = orgId ?? (await this.defaultOrg())
+    return runInOrg(resolvedOrgId, () => addEmailToClient(resolvedOrgId, clientId, email))
   }
 
   async template(
@@ -283,13 +311,15 @@ export class TestContext {
     const { orgId, ...rest } = overrides
     const resolvedOrgId = orgId ?? (await this.defaultOrg())
     const name = rest.name ?? unique("Template ")
-    const t = await createCorrespondenceTemplate(resolvedOrgId, {
-      key: unique("correspondence-test-"),
-      name,
-      subject: rest.subject ?? "Your policy {{policyNumber}}",
-      body: rest.body ?? "Hi {{clientFirstName}}, your policy expires {{policyExpirationDate}}.",
-      updatedBy: null,
-    })
+    const t = await runInOrg(resolvedOrgId, () =>
+      createCorrespondenceTemplate(resolvedOrgId, {
+        key: unique("correspondence-test-"),
+        name,
+        subject: rest.subject ?? "Your policy {{policyNumber}}",
+        body: rest.body ?? "Hi {{clientFirstName}}, your policy expires {{policyExpirationDate}}.",
+        updatedBy: null,
+      })
+    )
     this.templateIds.push(t.id)
     return t
   }
@@ -313,14 +343,16 @@ export class TestContext {
     const { orgId, ...rest } = overrides
     const resolvedOrgId = orgId ?? (await this.defaultOrg())
     const templateId = rest.templateId ?? (await this.template({ orgId: resolvedOrgId })).id
-    const rule = await createReminderRule(resolvedOrgId, {
-      name: rest.name ?? unique("Rule "),
-      trigger: "policy_expiration",
-      offsetDays: rest.offsetDays ?? randomInt(100_000, 1_000_000),
-      templateId,
-      enabled: rest.enabled ?? true,
-      updatedBy: null,
-    })
+    const rule = await runInOrg(resolvedOrgId, () =>
+      createReminderRule(resolvedOrgId, {
+        name: rest.name ?? unique("Rule "),
+        trigger: "policy_expiration",
+        offsetDays: rest.offsetDays ?? randomInt(100_000, 1_000_000),
+        templateId,
+        enabled: rest.enabled ?? true,
+        updatedBy: null,
+      })
+    )
     this.ruleIds.push(rule.id)
     return rule
   }
@@ -366,27 +398,30 @@ export class TestContext {
     // deleted. Deleting users would cascade these away too (sessions.user_id
     // does cascade), but doing it explicitly here decouples the ordering from
     // that FK rather than relying on it.
-    if (this.userIds.length) await db.delete(sessions).where(inArray(sessions.userId, this.userIds))
+    if (this.userIds.length)
+      await adminDb.delete(sessions).where(inArray(sessions.userId, this.userIds))
 
     // Rules first: scheduled_emails cascades from them, and email_templates
     // is referenced with no cascade so it can only go once its rules have.
     if (this.ruleIds.length)
-      await db.delete(reminderRules).where(inArray(reminderRules.id, this.ruleIds))
+      await adminDb.delete(reminderRules).where(inArray(reminderRules.id, this.ruleIds))
     if (this.templateIds.length)
-      await db.delete(emailTemplates).where(inArray(emailTemplates.id, this.templateIds))
+      await adminDb.delete(emailTemplates).where(inArray(emailTemplates.id, this.templateIds))
     if (this.vehicleIds.length)
-      await db.delete(vehicles).where(inArray(vehicles.id, this.vehicleIds))
+      await adminDb.delete(vehicles).where(inArray(vehicles.id, this.vehicleIds))
     if (this.policyIds.length)
-      await db.delete(autoPolicies).where(inArray(autoPolicies.id, this.policyIds))
-    if (this.clientIds.length) await db.delete(clients).where(inArray(clients.id, this.clientIds))
-    if (this.personIds.length) await db.delete(persons).where(inArray(persons.id, this.personIds))
+      await adminDb.delete(autoPolicies).where(inArray(autoPolicies.id, this.policyIds))
+    if (this.clientIds.length)
+      await adminDb.delete(clients).where(inArray(clients.id, this.clientIds))
+    if (this.personIds.length)
+      await adminDb.delete(persons).where(inArray(persons.id, this.personIds))
     if (this.carrierIds.length)
-      await db.delete(carriers).where(inArray(carriers.id, this.carrierIds))
+      await adminDb.delete(carriers).where(inArray(carriers.id, this.carrierIds))
     if (this.userIds.length) {
       // email_log.triggered_by has no cascade delete, so any log rows
       // created by a tracked user must be removed before the user itself.
-      await db.delete(emailLog).where(inArray(emailLog.triggeredBy, this.userIds))
-      await db.delete(users).where(inArray(users.id, this.userIds))
+      await adminDb.delete(emailLog).where(inArray(emailLog.triggeredBy, this.userIds))
+      await adminDb.delete(users).where(inArray(users.id, this.userIds))
     }
     // Organizations last: org_memberships cascades from both users and
     // organizations, so it needs neither side deleted first, but everything
@@ -396,19 +431,19 @@ export class TestContext {
       // welcome-template PUT route) without going through template(), so it
       // is never in templateIds. Sweep by org here too, or the FK from
       // email_templates.org_id blocks the delete below.
-      await db.delete(emailTemplates).where(inArray(emailTemplates.orgId, this.orgIds))
+      await adminDb.delete(emailTemplates).where(inArray(emailTemplates.orgId, this.orgIds))
       // The userIds sweep above only catches email_log rows triggered by a
       // tracked user; a send triggered by the automation user (scheduler
       // tests) is not, so sweep by org too, or the FK from email_log.org_id
       // blocks the delete below.
-      await db.delete(emailLog).where(inArray(emailLog.orgId, this.orgIds))
+      await adminDb.delete(emailLog).where(inArray(emailLog.orgId, this.orgIds))
       // A nested "new" driver spec on a policy create/update (routes/policies.ts,
       // autoPolicies.ts's linkPolicyDrivers) creates its person+driver rows
       // server-side, so their ids never reach personIds above. Sweep both by
       // org here too, or drivers.org_id/persons.org_id block the delete below.
-      await db.delete(drivers).where(inArray(drivers.orgId, this.orgIds))
-      await db.delete(persons).where(inArray(persons.orgId, this.orgIds))
-      await db.delete(organizations).where(inArray(organizations.id, this.orgIds))
+      await adminDb.delete(drivers).where(inArray(drivers.orgId, this.orgIds))
+      await adminDb.delete(persons).where(inArray(persons.orgId, this.orgIds))
+      await adminDb.delete(organizations).where(inArray(organizations.id, this.orgIds))
       this.orgIds = []
     }
     // cleanup() runs in afterEach, so a cached default org is gone the moment

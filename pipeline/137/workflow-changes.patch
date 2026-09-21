@@ -1,0 +1,87 @@
+diff --git a/.github/workflows/agent-pr-review.yml b/.github/workflows/agent-pr-review.yml
+index 0d1463e..0a2cb04 100644
+--- a/.github/workflows/agent-pr-review.yml
++++ b/.github/workflows/agent-pr-review.yml
+@@ -2,8 +2,8 @@ name: agent-pr-review
+ 
+ # Reviews agent/issue-* PRs. Diff-scoped: only commits since the last reviewed SHA
+ # (tracked in a marker comment). Direct diff review in one session (no /code-review: its subagent
+-# fan-out returns early in headless mode). Advisory — never a required check. Sonnet by default,
+-# Opus when the PR carries `agent:deep-review`. Bot pushes never retrigger this.
++# fan-out returns early in headless mode). Advisory — never a required check. Opus always;
++# `agent:deep-review` buys a deeper review, not a different model. Bot pushes never retrigger this.
+ 
+ on:
+   pull_request:
+@@ -25,11 +25,13 @@ jobs:
+   review:
+     if: startsWith(github.event.pull_request.head.ref, 'agent/issue-') && !endsWith(github.actor, '[bot]')
+     runs-on: ubuntu-latest
+-    timeout-minutes: 10
++    # env isn't available in job-level keys, so this expression repeats below.
++    timeout-minutes: ${{ contains(github.event.pull_request.labels.*.name, 'agent:deep-review') && 20 || 10 }}
+     env:
+       PR: ${{ github.event.pull_request.number }}
+       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+       ISSUE: ${{ github.event.pull_request.head.ref }}
++      DEEP: ${{ contains(github.event.pull_request.labels.*.name, 'agent:deep-review') }}
+     steps:
+       - uses: actions/checkout@v4
+         with:
+@@ -55,17 +57,12 @@ jobs:
+           # kills git with SIGPIPE under pipefail once the diff exceeds the cap).
+           git diff "$base"..HEAD -- . ':!**/package-lock.json' ':!**/dist/**' ':!frontend/src/components/ui/**' ':!pipeline' \
+             > "$RUNNER_TEMP/diff.full.patch"
+-          head -n 6000 "$RUNNER_TEMP/diff.full.patch" > "$RUNNER_TEMP/diff.patch"
++          if [[ "$DEEP" == "true" ]]; then cap=20000; else cap=6000; fi
++          head -n "$cap" "$RUNNER_TEMP/diff.full.patch" > "$RUNNER_TEMP/diff.patch"
+           git diff "$base"..HEAD --stat > "$RUNNER_TEMP/diff.stat"
+           echo "mode=$mode" >> "$GITHUB_OUTPUT"
+           if [[ ! -s "$RUNNER_TEMP/diff.patch" ]]; then echo "empty=true" >> "$GITHUB_OUTPUT"; else echo "empty=false" >> "$GITHUB_OUTPUT"; fi
+ 
+-      - id: model
+-        env:
+-          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+-        run: |
+-          if [[ ",$LABELS," == *",agent:deep-review,"* ]]; then echo "model=opus" >> "$GITHUB_OUTPUT"; else echo "model=sonnet" >> "$GITHUB_OUTPUT"; fi
+-
+       - name: Build prompt
+         if: steps.range.outputs.empty == 'false'
+         env:
+@@ -75,6 +72,13 @@ jobs:
+           set -euo pipefail
+           title=$(gh issue view "$ISSUE" --json title -q .title)
+           body=$(gh issue view "$ISSUE" --json body -q .body)
++          if [[ "$DEEP" == "true" ]]; then
++            depth_note=$'\n          5. Deep review (agent:deep-review): line-by-line correctness and security audit of every hunk in the diff. Read surrounding code freely wherever it helps judge a hunk, not just where strictly needed.'
++            word_cap=400
++          else
++            depth_note=""
++            word_cap=150
++          fi
+           {
+             echo "PROMPT<<__PROMPT__"
+             cat <<EOF
+@@ -97,9 +101,9 @@ jobs:
+           3. Tests: a quick pass — do the added/changed tests actually exercise the changed behavior?
+              Flag changed behavior with no covering test, and tests that assert nothing meaningful.
+              Backend tests must use TestContext fixtures.
+-          4. Flag an outright correctness or security problem if you notice one, but do not hunt.
++          4. Flag an outright correctness or security problem if you notice one, but do not hunt.$depth_note
+ 
+-          Report format — keep it tight. "## PR review (\`$MODE\`)", then at most 150 words:
++          Report format — keep it tight. "## PR review (\`$MODE\`)", then at most $word_cap words:
+           one bullet per finding, \`path:line\` then one sentence naming the problem (and the fix in a
+           clause if obvious). No summary of what the PR does, no restating the diff, no praise, no
+           severity labels, no hedging. If clean, the entire body is one line: "No findings — scope,
+@@ -124,8 +128,8 @@ jobs:
+         uses: ./.github/actions/claude-run
+         with:
+           stage: pr-review
+-          model: ${{ steps.model.outputs.model }}
+-          max_turns: 35
++          model: opus
++          max_turns: ${{ contains(github.event.pull_request.labels.*.name, 'agent:deep-review') && 60 || 35 }}
+           allowed_tools: "Read,Grep,Glob,Bash(git diff *),Bash(git log *),Bash(git show *)"
+           prompt: ${{ env.PROMPT }}
+           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

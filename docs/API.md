@@ -82,10 +82,10 @@ always returns:
 
 ```json
 {
-  "user": { "id": 1, "email": "a@example.com", "name": "A", "role": "admin" },
-  "org": { "id": 1, "name": "Acme Agency", "slug": "acme" },
+  "user": { "id": "F78F3zeSZZj2UmfP0hYjqw", "email": "a@example.com", "name": "A", "role": "admin" },
+  "org": { "id": "5b4UX2tHkZlKKQxcPr3dnA", "name": "Acme Agency", "slug": "acme" },
   "memberships": [
-    { "orgId": 1, "name": "Acme Agency", "slug": "acme", "role": "admin" }
+    { "orgId": "5b4UX2tHkZlKKQxcPr3dnA", "name": "Acme Agency", "slug": "acme", "role": "admin" }
   ]
 }
 ```
@@ -186,7 +186,7 @@ Example response (`GET /persons/:id`):
 
 ```json
 {
-  "id": 12,
+  "id": "asPKUHKVllwJIJ2akLAHew",
   "firstName": "Jane",
   "lastName": "Doe",
   "dateOfBirth": "1987-07-22",
@@ -228,23 +228,23 @@ see [Response shapes](#response-shapes)):
 
 ```json
 {
-  "id": 155,
-  "namedInsuredId": 229,
+  "id": "V_XKe5zEUUAUtIrZ8Uo5fQ",
+  "namedInsuredId": "uJDhJKFXiT_GhYMsgnSnNw",
   "secondNamedInsuredId": null,
   "mailingAddress": "42 Wallaby Way",
   "physicalAddress": null,
   "createdAt": "2026-07-14T17:48:07.653Z",
   "updatedAt": "2026-07-14T17:48:07.653Z",
-  "namedInsured": { "id": 229, "firstName": "Smoke", "lastName": "Tester", "...": "..." },
+  "namedInsured": { "id": "uJDhJKFXiT_GhYMsgnSnNw", "firstName": "Smoke", "lastName": "Tester", "...": "..." },
   "secondNamedInsured": null,
   "phones": [
-    { "id": 26, "clientId": 155, "phoneNumber": "555-867-5309", "createdAt": "2026-07-14T17:48:07.653Z" }
+    { "id": "izFFNuDEbIDqsNi4KygxzQ", "clientId": "V_XKe5zEUUAUtIrZ8Uo5fQ", "phoneNumber": "555-867-5309", "createdAt": "2026-07-14T17:48:07.653Z" }
   ],
   "emails": [
-    { "id": 14, "clientId": 155, "email": "smoke@example.com", "createdAt": "2026-07-14T17:48:07.653Z" }
+    { "id": "P42OrLdpCdrTHdEpqC-H6w", "clientId": "V_XKe5zEUUAUtIrZ8Uo5fQ", "email": "smoke@example.com", "createdAt": "2026-07-14T17:48:07.653Z" }
   ],
   "policies": [
-    { "id": 104, "clientId": 155, "carrierId": 140, "policyNumber": "SMOKE-POL-001", "...": "..." }
+    { "id": "D4oED1x1JG_DyT9t1CHPCA", "clientId": "V_XKe5zEUUAUtIrZ8Uo5fQ", "carrierId": "uOsyWqOgvLnutT9kgJZe4A", "policyNumber": "SMOKE-POL-001", "...": "..." }
   ]
 }
 ```
@@ -293,9 +293,9 @@ Example response (`GET /policies/:id`, `POST /policies`, and
 
 ```json
 {
-  "id": 104,
-  "clientId": 155,
-  "carrierId": 140,
+  "id": "D4oED1x1JG_DyT9t1CHPCA",
+  "clientId": "V_XKe5zEUUAUtIrZ8Uo5fQ",
+  "carrierId": "uOsyWqOgvLnutT9kgJZe4A",
   "policyNumber": "SMOKE-POL-001",
   "policyAddress1": null,
   "policyAddress2": null,
@@ -307,16 +307,16 @@ Example response (`GET /policies/:id`, `POST /policies`, and
   "status": "pending",
   "createdAt": "2026-07-14T17:48:07.653Z",
   "updatedAt": "2026-07-14T17:48:07.653Z",
-  "client": { "id": 155, "namedInsuredId": 229, "...": "..." },
-  "carrier": { "id": 140, "name": "SmokeCarrier", "naic": "SMK0000001", "...": "..." },
-  "vehicles": [{ "id": 1, "policyId": 104, "vin": "1HGCM82633A123456", "...": "..." }],
+  "client": { "id": "V_XKe5zEUUAUtIrZ8Uo5fQ", "namedInsuredId": "uJDhJKFXiT_GhYMsgnSnNw", "...": "..." },
+  "carrier": { "id": "uOsyWqOgvLnutT9kgJZe4A", "name": "SmokeCarrier", "naic": "SMK0000001", "...": "..." },
+  "vehicles": [{ "id": "wRqmZCTnAfAYpVePwYOsLg", "policyId": "D4oED1x1JG_DyT9t1CHPCA", "vin": "1HGCM82633A123456", "...": "..." }],
   "policyDrivers": [
     {
-      "id": 7,
-      "policyId": 104,
-      "driverId": 3,
+      "id": "b9quhBm6NM7MfEQm6-eONw",
+      "policyId": "D4oED1x1JG_DyT9t1CHPCA",
+      "driverId": "3_U63RWO1XBQ2fI_TV2MBQ",
       "createdAt": "2026-07-14T17:48:07.653Z",
-      "driver": { "id": 3, "personId": 229, "dlNumber": "D1234567", "rating": "rated", "sr22": false, "person": { "id": 229, "firstName": "Smoke", "...": "..." } }
+      "driver": { "id": "3_U63RWO1XBQ2fI_TV2MBQ", "personId": "uJDhJKFXiT_GhYMsgnSnNw", "dlNumber": "D1234567", "rating": "rated", "sr22": false, "person": { "id": "uJDhJKFXiT_GhYMsgnSnNw", "firstName": "Smoke", "...": "..." } }
     }
   ]
 }
@@ -377,25 +377,25 @@ server assigns them:
   who was actually authenticated when it was created, not a client-supplied
   value.
 
-Example response (`GET /policy-logs?policyId=104`, `POST /policy-logs`):
+Example response (`GET /policy-logs?policyId=D4oED1x1JG_DyT9t1CHPCA`, `POST /policy-logs`):
 
 ```json
 [
   {
-    "id": 9,
-    "policyId": 104,
+    "id": "f6TaYWX6Hc0o_9-0tsTOZA",
+    "policyId": "D4oED1x1JG_DyT9t1CHPCA",
     "logNumber": 2,
     "body": "Sent updated declarations page to the client.",
     "createdAt": "2026-07-15T14:00:00.000Z",
-    "author": { "id": 3, "name": "Jane Staff", "email": "jane@example.com" }
+    "author": { "id": "wBbO-5fcM_WaEinFFstt8g", "name": "Jane Staff", "email": "jane@example.com" }
   },
   {
-    "id": 7,
-    "policyId": 104,
+    "id": "xvFXFPad0-NJeRaKJEXLtg",
+    "policyId": "D4oED1x1JG_DyT9t1CHPCA",
     "logNumber": 1,
     "body": "Called the client to confirm garaging address.",
     "createdAt": "2026-07-14T17:48:07.653Z",
-    "author": { "id": 3, "name": "Jane Staff", "email": "jane@example.com" }
+    "author": { "id": "wBbO-5fcM_WaEinFFstt8g", "name": "Jane Staff", "email": "jane@example.com" }
   }
 ]
 ```
@@ -438,27 +438,27 @@ the log.
 user, and it credits whoever made the link, which is not necessarily the
 attachment's uploader.
 
-Example response (`GET /policy-log-attachments?policyId=104`):
+Example response (`GET /policy-log-attachments?policyId=D4oED1x1JG_DyT9t1CHPCA`):
 
 ```json
 [
   {
-    "id": 12,
-    "logId": 9,
+    "id": "cNQFr-VHtvqt40RDhwzrVA",
+    "logId": "f6TaYWX6Hc0o_9-0tsTOZA",
     "createdAt": "2026-07-15T14:05:00.000Z",
-    "linkedBy": { "id": 3, "name": "Jane Staff", "email": "jane@example.com" },
+    "linkedBy": { "id": "wBbO-5fcM_WaEinFFstt8g", "name": "Jane Staff", "email": "jane@example.com" },
     "attachment": {
-      "id": 41,
-      "policyId": 104,
+      "id": "YZIcUd60lcipF6QRl5WhdQ",
+      "policyId": "D4oED1x1JG_DyT9t1CHPCA",
       "fileName": "Policy Change Form.pdf",
       "description": "Auto-generated summary of this edit",
       "mimeType": "application/pdf",
       "sizeBytes": 41230,
       "isVoided": false,
       "sourceType": "policy_change",
-      "sourceId": 104,
+      "sourceId": "D4oED1x1JG_DyT9t1CHPCA",
       "createdAt": "2026-07-15T14:05:00.000Z",
-      "uploadedBy": { "id": 3, "name": "Jane Staff", "email": "jane@example.com" }
+      "uploadedBy": { "id": "wBbO-5fcM_WaEinFFstt8g", "name": "Jane Staff", "email": "jane@example.com" }
     }
   }
 ]
@@ -724,27 +724,27 @@ Example response (`GET /search?q=Doe`):
 {
   "clients": [
     {
-      "id": 155,
-      "namedInsuredId": 229,
+      "id": "V_XKe5zEUUAUtIrZ8Uo5fQ",
+      "namedInsuredId": "uJDhJKFXiT_GhYMsgnSnNw",
       "secondNamedInsuredId": null,
       "mailingAddress": "42 Wallaby Way",
       "physicalAddress": null,
       "createdAt": "2026-07-14T17:48:07.653Z",
       "updatedAt": "2026-07-14T17:48:07.653Z",
-      "namedInsured": { "id": 229, "firstName": "Jane", "lastName": "Doe", "...": "..." },
+      "namedInsured": { "id": "uJDhJKFXiT_GhYMsgnSnNw", "firstName": "Jane", "lastName": "Doe", "...": "..." },
       "secondNamedInsured": null,
-      "phones": [{ "id": 26, "clientId": 155, "phoneNumber": "555-867-5309", "createdAt": "..." }],
-      "emails": [{ "id": 14, "clientId": 155, "email": "jane@example.com", "createdAt": "..." }]
+      "phones": [{ "id": "izFFNuDEbIDqsNi4KygxzQ", "clientId": "V_XKe5zEUUAUtIrZ8Uo5fQ", "phoneNumber": "555-867-5309", "createdAt": "..." }],
+      "emails": [{ "id": "P42OrLdpCdrTHdEpqC-H6w", "clientId": "V_XKe5zEUUAUtIrZ8Uo5fQ", "email": "jane@example.com", "createdAt": "..." }]
     }
   ],
   "policies": [
     {
-      "id": 104,
+      "id": "D4oED1x1JG_DyT9t1CHPCA",
       "policyNumber": "SMOKE-POL-001",
       "status": "pending",
       "effectiveDate": "2026-01-01",
       "expirationDate": "2027-01-01",
-      "clientId": 155,
+      "clientId": "V_XKe5zEUUAUtIrZ8Uo5fQ",
       "clientName": "Jane Doe"
     }
   ]
@@ -826,7 +826,7 @@ Status codes specific to this route:
   status (e.g. rate limited).
 - `503` — `RESEND_API_KEY` or `MAIL_FROM` isn't configured on the server.
 
-Example response (`POST /clients/42/send-email`, body
+Example response (`POST /clients/QekS3I2NUUTEgksVBqMMZg/send-email`, body
 `{ "subject": "Renewal", "body": "Your policy renews soon." }`):
 
 ```json
@@ -967,7 +967,7 @@ external cron calling this endpoint — with no code change.
 What is scheduled to happen on a policy, behind the **Activities** subtab.
 
 The shape is deliberately generic rather than "a list of scheduled emails": the
-`id` is namespaced (`"scheduled-email:42"`) and every row carries `kind` and
+`id` is namespaced (`"scheduled-email:qD4BxrBkL_cWdu8zdyw7LQ"`) and every row carries `kind` and
 `source`, so manually created tasks can join this list later without the
 contract changing. Today `scheduled_emails` is the only source and every row is
 `source: "automation"`.
@@ -982,7 +982,7 @@ An unknown or another org's policy id returns `404`.
 {
   "activities": [
     {
-      "id": "scheduled-email:42",
+      "id": "scheduled-email:qD4BxrBkL_cWdu8zdyw7LQ",
       "kind": "reminder",
       "title": "30-day renewal reminder",
       "detail": "Renewal Notice",

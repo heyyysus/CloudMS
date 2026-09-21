@@ -718,7 +718,7 @@ insured names and a matched phone/email; a policy's number, status, and
 client name) rather than the full nested detail shape; fetch
 `/clients/:id` or `/policies/:id` for the full record.
 
-Example response (`GET /search?q=Doe`):
+Example response (`GET /search?q=Smoke`):
 
 ```json
 {
@@ -731,10 +731,10 @@ Example response (`GET /search?q=Doe`):
       "physicalAddress": null,
       "createdAt": "2026-07-14T17:48:07.653Z",
       "updatedAt": "2026-07-14T17:48:07.653Z",
-      "namedInsured": { "id": "uJDhJKFXiT_GhYMsgnSnNw", "firstName": "Jane", "lastName": "Doe", "...": "..." },
+      "namedInsured": { "id": "uJDhJKFXiT_GhYMsgnSnNw", "firstName": "Smoke", "lastName": "Tester", "...": "..." },
       "secondNamedInsured": null,
       "phones": [{ "id": "izFFNuDEbIDqsNi4KygxzQ", "clientId": "V_XKe5zEUUAUtIrZ8Uo5fQ", "phoneNumber": "555-867-5309", "createdAt": "..." }],
-      "emails": [{ "id": "P42OrLdpCdrTHdEpqC-H6w", "clientId": "V_XKe5zEUUAUtIrZ8Uo5fQ", "email": "jane@example.com", "createdAt": "..." }]
+      "emails": [{ "id": "P42OrLdpCdrTHdEpqC-H6w", "clientId": "V_XKe5zEUUAUtIrZ8Uo5fQ", "email": "smoke@example.com", "createdAt": "..." }]
     }
   ],
   "policies": [
@@ -745,7 +745,7 @@ Example response (`GET /search?q=Doe`):
       "effectiveDate": "2026-01-01",
       "expirationDate": "2027-01-01",
       "clientId": "V_XKe5zEUUAUtIrZ8Uo5fQ",
-      "clientName": "Jane Doe"
+      "clientName": "Smoke Tester"
     }
   ]
 }

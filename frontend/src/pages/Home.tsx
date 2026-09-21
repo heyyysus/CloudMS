@@ -1,19 +1,18 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Activity, FileText, Upload, Users } from 'lucide-react'
+import { Upload } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ClientList } from '@/components/clients/client-list'
 import { ImportQuoteDialog } from '@/components/clients/import-quote-dialog'
 import { useClientTabs } from '@/components/layout/client-tabs'
 import { useFileDrop, isRaterFile } from '@/hooks/use-file-drop'
-import { clientDisplayName } from '@/api/clients'
+import { clientDisplayName, type ClientListItem, type ListClientsFn } from '@/api/clients'
 
-const sections = [
-  { title: 'Clients', icon: Users, description: 'No clients yet' },
-  { title: 'Policies', icon: FileText, description: 'No policies yet' },
-  { title: 'Activity', icon: Activity, description: 'No recent activity' },
-]
+interface HomeProps {
+  listClientsFn?: ListClientsFn
+}
 
-function Home() {
+function Home({ listClientsFn }: HomeProps) {
   const navigate = useNavigate()
   const { openTab } = useClientTabs()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -40,6 +39,11 @@ function Home() {
     }
   })
 
+  function handleSelectClient(client: ClientListItem) {
+    openTab({ id: client.id, label: clientDisplayName(client) })
+    navigate(`/clients/${client.id}`)
+  }
+
   return (
     <div className="relative flex flex-col gap-6" {...dragHandlers}>
       {isDraggingOver && (
@@ -51,48 +55,35 @@ function Home() {
         <h1 className="text-2xl font-semibold tracking-tight">Home</h1>
         <p className="text-muted-foreground">Welcome back to CloudMS.</p>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {sections.map((section) => (
-          <Card key={section.title}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <section.icon className="size-4 text-muted-foreground" />
-                {section.title}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{section.description} — coming soon.</p>
-            </CardContent>
-          </Card>
-        ))}
-        <Card
-          className="cursor-pointer border-dashed hover:border-primary hover:bg-primary/5"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Upload className="size-4 text-muted-foreground" />
-              Import a rater file
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Drag a TurboRater .tt2x file here, or click to choose one.
-            </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".tt2x,.xml"
-              className="sr-only"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                e.target.value = ''
-                if (file) openImportDialog(file)
-              }}
-            />
-          </CardContent>
-        </Card>
-      </div>
+      <Card
+        className="cursor-pointer border-dashed hover:border-primary hover:bg-primary/5"
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Upload className="size-4 text-muted-foreground" />
+            Import a rater file
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Drag a TurboRater .tt2x file here, or click to choose one.
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".tt2x,.xml"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (file) openImportDialog(file)
+            }}
+          />
+        </CardContent>
+      </Card>
+
+      <ClientList onSelectClient={handleSelectClient} listClientsFn={listClientsFn} />
 
       {rejectedFileName && (
         <p className="text-sm text-muted-foreground">

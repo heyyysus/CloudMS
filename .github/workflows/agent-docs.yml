@@ -81,6 +81,9 @@ jobs:
           You may only edit files under docs/ and README.md. Never edit PROJECT.md, never add code
           comments, never touch source files. Do not run git.
 
+          Docs you write and the Docs section below are read by a person: write them to the
+          "Writing for humans" section of CLAUDE.md.
+
           Whether or not you changed anything, append a final section to pipeline/$ISSUE/notes.md:
           ## Docs
           one or two lines: which docs were updated, or "no doc changes needed" and why.

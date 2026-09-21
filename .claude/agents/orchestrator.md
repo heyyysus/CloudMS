@@ -218,6 +218,9 @@ both #119's and #120's tests.
 - Coder stopped with `error_max_turns`: remove `needs-human`, add
   `pipeline:plan-approved`. The branch keeps its commits and the next run
   continues from them. This is routine; it happened four times in one evening.
+  The stop reason is in the failure comment (and the job summary) already — read
+  that, not the run log, to see it. Same for the planner, plan reviewer and
+  docs stage: a checkpointed `wip:` commit means the same recovery.
 - A stalled state (§2), within the twice-per-state limit.
 - A merge conflict against `main` on an agent PR — the fixer resolves it.
 - CI failing on a check unrelated to the diff and green on `main`.

@@ -117,12 +117,31 @@ jobs:
           github_token: ${{ github.token }}
 
       - name: Commit plan
+        id: commit
+        if: always()
+        env:
+          STOP_REASON: ${{ steps.claude.outputs.stop_reason }}
         run: |
           set -euo pipefail
-          test -s "pipeline/$ISSUE/plan.md" || { echo "plan.md was not written"; exit 1; }
-          git add "pipeline/$ISSUE/plan.md"
-          git commit -m "pipeline: plan for #$ISSUE"
-          git push origin "$BRANCH"
+          # always() so a cancellation or the 15-minute timeout doesn't throw away a plan
+          # Claude was still writing. A non-success stop reason always fails this step (even
+          # after checkpointing) so "Advance state" is skipped and the failure() block below
+          # reports it — a partial plan.md must never reach plan review as if it were real.
+          if [[ "$STOP_REASON" == "success" ]]; then
+            test -s "pipeline/$ISSUE/plan.md" || { echo "plan.md was not written"; exit 1; }
+            git add "pipeline/$ISSUE/plan.md"
+            git commit -m "pipeline: plan for #$ISSUE"
+            git push origin "$BRANCH"
+          else
+            if [[ -s "pipeline/$ISSUE/plan.md" ]] || [[ -n "$(git status --porcelain)" ]]; then
+              git add -A
+              git commit -q -m "wip: planner stopped before finishing (stop reason: ${STOP_REASON:-unknown})"
+              echo "wip_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+              git push origin "$BRANCH"
+            fi
+            echo "Planner did not finish cleanly (stop reason: ${STOP_REASON:-unknown})"
+            exit 1
+          fi
 
       - name: Advance state
         env:
@@ -137,4 +156,18 @@ jobs:
           GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
         run: |
           gh issue edit "$ISSUE" --remove-label "pipeline:needs-plan" --add-label "needs-human" || true
-          gh issue comment "$ISSUE" --body "Planner failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" || true
+
+      - if: failure()
+        uses: ./.github/actions/report-failure
+        with:
+          stage: planner
+          stop_reason: ${{ steps.claude.outputs.stop_reason }}
+          target: issue
+          number: ${{ env.ISSUE }}
+          resume: >-
+            Fix the cause, remove `needs-human`, and re-add `pipeline:needs-plan` to retry
+            (a partial `plan.md`, if any, is on `${{ env.BRANCH }}` as a `wip:` commit — treat it
+            as incomplete).
+          tail: ${{ steps.claude.outputs.tail }}
+          wip_sha: ${{ steps.commit.outputs.wip_sha }}
+          github_token: ${{ secrets.PIPELINE_BOT_TOKEN }}

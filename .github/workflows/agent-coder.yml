@@ -4,9 +4,10 @@ name: agent-coder
 # coder runs the backend test suite itself (the repo's per-commit PreToolUse hook is skipped
 # on CI runners so it cannot burn the turn budget).
 #
-# Work is never lost to the turn cap: the verify step commits whatever the coder left
-# uncommitted as a `wip:` commit and pushes it, so re-adding `pipeline:plan-approved` resumes
-# from the branch instead of starting over.
+# Work is never lost to a failure, a cancellation, or the 90-minute timeout: the checkpoint
+# step (if: always()) commits whatever the coder left uncommitted as a `wip:` commit and
+# pushes it, so re-adding `pipeline:plan-approved` resumes from the branch instead of
+# starting over.
 
 on:
   issues:
@@ -90,6 +91,7 @@ jobs:
 
       - name: Install and set up database
         run: |
+          exec > >(tee -a "$RUNNER_TEMP/stage.log") 2>&1
           set -euo pipefail
           (cd backend && npm ci --legacy-peer-deps && npm run db:push && npm run db:bootstrap)
           (cd frontend && npm ci)
@@ -156,20 +158,34 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
 
+      - name: Checkpoint uncommitted work
+        id: checkpoint
+        if: always()
+        env:
+          STOP_REASON: ${{ steps.claude.outputs.stop_reason }}
+        run: |
+          exec > >(tee -a "$RUNNER_TEMP/stage.log") 2>&1
+          set -euo pipefail
+          # always() so this also runs on cancellation and on the job timeout, not only a
+          # step failure — cancel-in-progress (line 21) makes a re-label mid-run drop
+          # everything uncommitted otherwise. Never lose work: whatever the coder left
+          # uncommitted goes on the branch as a WIP commit, so a re-run (or a human)
+          # continues from it instead of starting over.
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "Uncommitted changes left behind; committing them as WIP:"; git status --short
+            git add -A
+            git commit -q -m "wip: coder stopped before finishing (stop reason: ${STOP_REASON:-unknown})"
+            echo "wip_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+          git push origin "$BRANCH"
+
       - name: Verify work landed
         env:
           BASE: ${{ steps.sync.outputs.base }}
           STOP_REASON: ${{ steps.claude.outputs.stop_reason }}
         run: |
+          exec > >(tee -a "$RUNNER_TEMP/stage.log") 2>&1
           set -euo pipefail
-          # Never lose work: whatever the coder left uncommitted goes on the branch as a WIP
-          # commit, so a re-run (or a human) continues from it instead of starting over.
-          if [[ -n "$(git status --porcelain)" ]]; then
-            echo "Uncommitted changes left behind; committing them as WIP:"; git status --short
-            git add -A
-            git commit -q -m "wip: coder stopped before finishing (stop reason: ${STOP_REASON:-unknown})"
-          fi
-          git push origin "$BRANCH"
           n=$(git rev-list --count "$BASE..HEAD")
           echo "$n commit(s) on $BRANCH since sync; coder stop reason: ${STOP_REASON:-unknown}"
           [[ "$STOP_REASON" == "success" ]] || { echo "Coder did not finish cleanly"; exit 1; }
@@ -189,4 +205,18 @@ jobs:
           GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
         run: |
           gh issue edit "$ISSUE" --remove-label "pipeline:in-progress" --remove-label "pipeline:plan-approved" --add-label "needs-human" || true
-          gh issue comment "$ISSUE" --body "Coder failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}. Partial work, if any, is committed on \`$BRANCH\` (look for a \`wip:\` commit). To resume from it, remove \`needs-human\` and re-add \`pipeline:plan-approved\`." || true
+
+      - if: failure()
+        uses: ./.github/actions/report-failure
+        with:
+          stage: coder
+          stop_reason: ${{ steps.claude.outputs.stop_reason }}
+          target: issue
+          number: ${{ env.ISSUE }}
+          resume: >-
+            Remove `needs-human` and re-add `pipeline:plan-approved` to resume from
+            `${{ env.BRANCH }}` — it keeps any `wip:` commit, so the next run continues
+            instead of starting over.
+          tail: ${{ steps.claude.outputs.tail }}
+          wip_sha: ${{ steps.checkpoint.outputs.wip_sha }}
+          github_token: ${{ secrets.PIPELINE_BOT_TOKEN }}

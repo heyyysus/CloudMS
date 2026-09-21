@@ -39,15 +39,28 @@ reviewed commit so only new pushes are re-reviewed).
   audit prompt, more turns and time, a bigger diff cap. PR review runs Opus either way.
 - `area:*`, `bug`/`enhancement`/`documentation`/`question` — Haiku triage guesses.
 
+## When a stage fails
+
+The failure comment carries what happened, not just a link: the failed step, the
+Claude stop reason (`error_max_turns`, etc. — empty if the stage failed before or
+without running Claude), the run URL, up to ~20 redacted lines of the stage's output,
+and a one-line resume instruction for that stage. The same body also lands in the job
+summary (Actions → run → Summary). `agent-trigger` and `agent-triage` comment only —
+neither necessarily means the issue is in the pipeline, so they never add
+`needs-human`; every other stage does.
+
 ## Resuming / intervening
 
 - **Plan rejected** (`needs-human`): edit `plan.md` on `agent/issue-<n>` by hand, then
   remove `needs-human` and add `pipeline:plan-approved` to run the coder.
 - **Stage failed**: fix the cause, remove `needs-human`, re-add the `pipeline:*` label
   for the stage you want to run. Every stage is triggered purely by its label.
-- **Coder hit its turn cap**: whatever it had done is on `agent/issue-<n>`, uncommitted
-  leftovers included, as a trailing `wip:` commit. Remove `needs-human` and re-add
-  `pipeline:plan-approved`; the next run is told to continue from the branch.
+- **Coder hit its turn cap, was cancelled, or timed out**: whatever it had done is on
+  `agent/issue-<n>`, uncommitted leftovers included, as a trailing `wip:` commit.
+  Remove `needs-human` and re-add `pipeline:plan-approved`; the next run is told to
+  continue from the branch. The planner, plan reviewer and docs stage checkpoint the
+  same way — a `wip:` commit from one of them means `plan.md`, `review.md`, or the
+  docs/notes are incomplete; treat them as a draft, not a finished artifact.
 - **Abort**: remove `agent`.
 
 ## Costs

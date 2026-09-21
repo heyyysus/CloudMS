@@ -158,7 +158,14 @@ jobs:
           fi
 
       - if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
-        run: |
-          gh pr comment "$PR" --body "Automated PR review failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" || true
+        uses: ./.github/actions/report-failure
+        with:
+          stage: pr-review
+          stop_reason: ${{ steps.claude.outputs.stop_reason }}
+          target: pr
+          number: ${{ env.PR }}
+          resume: >-
+            Fix the cause and push again — a new commit re-triggers the review automatically
+            (no label to re-add).
+          tail: ${{ steps.claude.outputs.tail }}
+          github_token: ${{ secrets.PIPELINE_BOT_TOKEN }}

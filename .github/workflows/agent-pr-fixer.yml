@@ -287,6 +287,7 @@ jobs:
           LOG_ISSUE: ${{ steps.ctx.outputs.log_issue }}
           PR: ${{ steps.ctx.outputs.pr }}
           STOP_REASON: ${{ steps.claude.outputs.stop_reason }}
+          TAIL: ${{ steps.claude.outputs.tail }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -298,4 +299,28 @@ jobs:
           Anything it pushed stands. If it pushed, agent-pr-review runs again and the next
           round starts from there; if it did not, the PR is unchanged.
           EOF
+          if [[ -n "$TAIL" ]]; then
+            {
+              echo
+              echo "<details><summary>Last ~20 lines of output</summary>"
+              echo
+              echo '```'
+              printf '%s\n' "$TAIL"
+              echo '```'
+              echo "</details>"
+            } >> "$RUNNER_TEMP/body.md"
+          fi
           gh issue comment "$LOG_ISSUE" --body-file "$RUNNER_TEMP/body.md"
+
+      - if: failure()
+        uses: ./.github/actions/report-failure
+        with:
+          stage: pr-fixer
+          stop_reason: ${{ steps.claude.outputs.stop_reason }}
+          target: ${{ steps.ctx.outputs.log_issue != '' && 'issue' || 'none' }}
+          number: ${{ steps.ctx.outputs.log_issue }}
+          resume: >-
+            Fix the cause; the fixer runs again automatically the next time agent-pr-review
+            completes on this PR (or relabel `fixer:live` to prompt an earlier run).
+          tail: ${{ steps.claude.outputs.tail }}
+          github_token: ${{ secrets.PIPELINE_BOT_TOKEN }}

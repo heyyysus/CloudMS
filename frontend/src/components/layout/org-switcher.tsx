@@ -1,4 +1,4 @@
-import { ChevronsUpDown, Cloud } from 'lucide-react'
+import { Check, ChevronsUpDown, Cloud } from 'lucide-react'
 import { NavLink } from 'react-router'
 import {
   DropdownMenu,
@@ -54,15 +54,21 @@ export function OrgSwitcher({ orgName, memberships, activeOrgId, onSelectOrg }: 
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
-            {memberships.map((membership) => (
-              <DropdownMenuItem
-                key={membership.orgId}
-                onSelect={() => onSelectOrg(membership.orgId)}
-                data-active={membership.orgId === activeOrgId}
-              >
-                {membership.name}
-              </DropdownMenuItem>
-            ))}
+            {memberships.map((membership) => {
+              const active = membership.orgId === activeOrgId
+              return (
+                <DropdownMenuItem
+                  key={membership.orgId}
+                  onSelect={() => onSelectOrg(membership.orgId)}
+                  data-active={active}
+                  aria-current={active ? 'true' : undefined}
+                  className="data-[active=true]:font-medium"
+                >
+                  {membership.name}
+                  {active ? <Check className="ml-auto size-4" /> : null}
+                </DropdownMenuItem>
+              )
+            })}
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

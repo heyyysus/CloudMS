@@ -104,6 +104,19 @@ export const MultiOrg: Story = {
     await expect(await screen.findByRole('menuitem', { name: 'Beacon Agency' })).toBeInTheDocument()
     await expect(screen.getByRole('menuitem', { name: 'Acme Insurance' })).toBeInTheDocument()
 
+    // The active org is marked for both sighted and assistive-tech users, so
+    // switching is not a guess. `data-active` drives the styling; the check
+    // icon and aria-current are what actually surface it.
+    const activeItem = screen.getByRole('menuitem', { name: 'Acme Insurance' })
+    await expect(activeItem).toHaveAttribute('data-active', 'true')
+    await expect(activeItem).toHaveAttribute('aria-current', 'true')
+    await expect(activeItem.querySelector('svg')).toBeInTheDocument()
+
+    const otherItem = screen.getByRole('menuitem', { name: 'Beacon Agency' })
+    await expect(otherItem).toHaveAttribute('data-active', 'false')
+    await expect(otherItem).not.toHaveAttribute('aria-current')
+    await expect(otherItem.querySelector('svg')).not.toBeInTheDocument()
+
     await userEvent.click(screen.getByRole('menuitem', { name: 'Beacon Agency' }))
     await expect(args.onSelectOrg).toHaveBeenCalledWith('org-2')
   },

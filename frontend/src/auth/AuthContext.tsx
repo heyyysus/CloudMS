@@ -1,19 +1,8 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
-import { getMe, selectOrg, type Me, type Org, type Role, type User, type Membership } from '../api/auth'
+import { getMe, selectOrg, type Me } from '../api/auth'
 import { setOrgRequiredHandler } from '../api/client'
-
-interface AuthContextValue {
-  user: User | null
-  org: Org | null
-  memberships: Membership[]
-  role: Role | null
-  loading: boolean
-  setMe: (me: Me | null) => void
-  setOrg: (orgId: string) => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null)
+import { AuthContext, type AuthContextValue } from './auth-context'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<Me | null>(null)

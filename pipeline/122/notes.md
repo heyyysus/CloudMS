@@ -126,3 +126,14 @@ Against this runner's own isolated Postgres (`DATABASE_URL`/
 - `npm run build` — clean.
 - Frontend untouched by this issue (backend-only per plan); no frontend
   checks run, matching the plan's Tests section.
+
+## Docs
+
+No doc changes needed: `docs/multitenancy.md` and `CLAUDE.md` were already
+updated as part of the implementation branch (verified accurate against the
+diff). No route/endpoint/request/response-shape changes (`routes/policies.ts`
+only gained internal savepoints), no auth/session-facing behavior change worth
+`docs/AUTH_SESSIONS_EXPLAINED.md`, no UI change, and the new `DB_POOL_MAX` env
+var has a working default and is already commented in `.env.example`,
+consistent with how README.md already leaves other optional vars
+undocumented.

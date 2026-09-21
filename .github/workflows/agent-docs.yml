@@ -158,9 +158,27 @@ jobs:
           if gh pr list --head "$BRANCH" --state open --json number -q '.[0].number' | grep -q .; then
             echo "PR already open"
           else
+            PATCH="pipeline/$ISSUE/workflow-changes.patch"
             {
-              echo "Fixes #$ISSUE"
-              echo
+              if [[ -f "$PATCH" ]]; then
+                # Refs, not Fixes: the workflow change is not in this diff, so an auto-close
+                # on merge would close the issue with the fix unapplied (#137 → #144 → #147).
+                echo "Refs #$ISSUE"
+                echo
+                echo "## Apply the workflow patch before merging"
+                echo
+                echo "The workflow change for this issue is **not in this diff**. It is saved as \`$PATCH\`. Apply it, then merge:"
+                echo
+                echo '```'
+                echo "gh pr checkout $BRANCH"
+                echo "git apply $PATCH"
+                echo "git add -A .github/workflows && git commit -m 'apply workflow patch for #$ISSUE' && git push"
+                echo '```'
+                echo
+              else
+                echo "Fixes #$ISSUE"
+                echo
+              fi
               echo "Automated implementation by the agent pipeline. Plan, plan review and execution notes are in \`pipeline/$ISSUE/\`."
               echo
               echo "## Plan summary"

@@ -1,12 +1,16 @@
 # Coder notes — issue #147
 
-## Apply the workflow patch before merging
+## The workflow patch is applied
 
-```
-gh pr checkout agent/issue-147
-git apply pipeline/147/workflow-changes.patch
-git add -A .github/workflows && git commit -m 'apply workflow patch for #147' && git push
-```
+`.github/workflows/agent-docs.yml` carries the change directly, and
+`pipeline/147/workflow-changes.patch` has been deleted rather than left behind to be
+applied a second time. This PR's `Fixes #147` is therefore accurate: merging it puts
+the fix on `main`.
+
+That is the whole point of this issue. The PR was opened saying `Fixes #147` over a
+diff with no workflow change in it — #147 reproducing its own bug — because the guard
+it adds was not yet on `main` when `agent-docs` wrote the body. The next patch-carrying
+PR will say `Refs`.
 
 ## Implemented
 
@@ -19,9 +23,9 @@ whether `pipeline/$ISSUE/workflow-changes.patch` exists.
 - Patch absent → body is byte-identical to the old code (`Fixes #$ISSUE`, blank line,
   the usual "Automated implementation..." line).
 
-Saved as `pipeline/147/workflow-changes.patch` because this runner's token can't push
-`.github/workflows/`. The working `.github/workflows/agent-docs.yml` in this branch is
-back at `origin/main`'s content — apply the patch above before merging this PR.
+It was first saved as `pipeline/147/workflow-changes.patch` because the coder's token
+cannot push `.github/workflows/`; the patch has since been applied to the real file and
+deleted.
 
 Also updated `pipeline/README.md`'s artifacts table: the `workflow-changes.patch` row
 now notes that its presence flips the PR body to `Refs` instead of `Fixes`.
@@ -49,19 +53,20 @@ None. Implemented exactly what plan.md scoped.
     `origin/main`'s `agent-docs.yml` — acceptance criterion #2.
   - With-patch render: starts `Refs #147`, apply-instructions section sits above
     `## Plan summary` — acceptance criteria #1 and #3.
-- `git apply --check` on the saved patch against a copy of `origin/main`'s
-  `agent-docs.yml` applies cleanly.
-- This PR itself carries the patch and currently says `Fixes #147` in its body (the old
-  code path, since the patch isn't applied to the workflow file in this branch) — the
-  bug this issue fixes, present in its own PR. Apply the patch before merging (commands
-  at top of this file and in *Approach* step 5 of the plan).
+- Both renders re-run after the patch was applied to the real workflow file, against the
+  final `agent-docs.yml` on this branch: `Refs #147` with a patch present, `Fixes #147`
+  without, and the no-patch body still byte-identical to main's.
+- This PR was opened saying `Fixes #147` over a diff containing no workflow change — the
+  bug this issue fixes, reproduced in its own PR, because the guard was not on `main` yet
+  when `agent-docs` wrote the body. The patch is now applied here, so `Fixes #147` is
+  accurate and there is nothing left to apply before merging.
 
 ## Checks run
 
 - `actionlint .github/workflows/agent-docs.yml` (installed via `go install
   github.com/rhysd/actionlint/cmd/actionlint@latest`): clean, no findings.
-- Render harness described above: both cases pass.
-- `git apply --check`: patch applies cleanly to `origin/main`'s workflow file.
+- Render harness described above: both cases pass, before and after applying the patch.
+- YAML parse plus `bash -n` over every `run:` block in the final `agent-docs.yml`: clean.
 - No backend or frontend files touched — those suites not run, per plan scope.
 
 ## Docs

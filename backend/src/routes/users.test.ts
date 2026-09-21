@@ -5,7 +5,7 @@ import app from "../app"
 import { db } from "../db"
 import { emailLog, users } from "../db/schema"
 import { createMembership, findMembership, softDeleteUser } from "../repositories"
-import { makeTestUser, MISSING_ROW_ID, TestContext } from "./testHelpers"
+import { makeTestUser, MISSING_ROW_ID, runInOrg, TestContext } from "./testHelpers"
 
 const ctx = new TestContext()
 
@@ -134,7 +134,9 @@ describe("POST /users/invite", () => {
     expect(requestBody.text).toContain("Invitee Person")
     expect(requestBody.text).toContain(admin.email)
 
-    const [logRow] = await db.select().from(emailLog).where(eq(emailLog.recipient, email))
+    const [logRow] = await runInOrg(await ctx.orgId(), () =>
+      db.select().from(emailLog).where(eq(emailLog.recipient, email))
+    )
     expect(logRow.status).toBe("sent")
     expect(logRow.resendId).toBe("msg_1")
     expect(logRow.triggeredBy).toBe(admin.id)
@@ -153,7 +155,9 @@ describe("POST /users/invite", () => {
     expect(res.body.email.status).toBe("failed")
     ctx.track("user", res.body.user.id)
 
-    const [logRow] = await db.select().from(emailLog).where(eq(emailLog.recipient, email))
+    const [logRow] = await runInOrg(await ctx.orgId(), () =>
+      db.select().from(emailLog).where(eq(emailLog.recipient, email))
+    )
     expect(logRow.status).toBe("failed")
   })
 
@@ -461,7 +465,9 @@ describe("POST /users/:id/resend-welcome", () => {
     expect(res.body.email).toEqual({ status: "sent", resendId: "msg_resend" })
     expect(fetchMock).toHaveBeenCalledTimes(1)
 
-    const [logRow] = await db.select().from(emailLog).where(eq(emailLog.recipient, target.email))
+    const [logRow] = await runInOrg(await ctx.orgId(), () =>
+      db.select().from(emailLog).where(eq(emailLog.recipient, target.email))
+    )
     expect(logRow.status).toBe("sent")
     expect(logRow.triggeredBy).toBe(admin.id)
   })

@@ -134,6 +134,10 @@ jobs:
              revert the workflow files (git checkout -- .github/workflows), commit the patch, and say
              in notes.md that a human must apply it before the PR is merged.
 
+          notes.md and your commit messages are read by a person, and the first 40 lines of
+          notes.md are pasted into the PR body: write them to the "Writing for humans" section
+          of CLAUDE.md.
+
           Stop when the plan is implemented, checks pass, notes.md is complete and committed, and the
           branch is pushed. If you are running low on turns, commit and push what you have, and say in
           notes.md exactly what is left.

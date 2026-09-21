@@ -1,5 +1,68 @@
 # CLAUDE.md
 
+## Writing for humans
+
+**Rule: every artifact a person reads is shaped by the `i-have-adhd` skill.**
+Plans, plan reviews, PR bodies and PR review comments, issue comments,
+`pipeline/<n>/notes.md`, docs changes, commit messages, and the summary you end
+a session with. The reader has ADHD: prose that buries the action costs them
+the task, so this is a correctness requirement, not a style preference.
+
+The skill is enabled for this repo in `.claude/settings.json`
+(`i-have-adhd@i-have-adhd`, from the `ayghri/i-have-adhd` marketplace). In a
+local session, load it with `/i-have-adhd:i-have-adhd` and follow it. It is not
+installed on the CI runners, so the condensed rules below are what bind there;
+upstream `skills/i-have-adhd/SKILL.md` is canonical where the two differ.
+
+### The rules
+
+1. **Lead with the next action.** The first line is something the reader can
+   do — a command, a path, a snippet. Context comes after, if at all.
+2. **Number multi-step work.** One bounded action per step, and the fewest
+   steps that still work.
+3. **No preamble, no recap, no closer.** Never open with "Great question",
+   "Let me", "I'll", "Looking at your". Never close with "Hope this helps" or
+   "Let me know if you need anything else". Start with the answer, stop when
+   the answer is done.
+4. **End with one concrete next action.** If anything is open, name one thing
+   the reader can do in under two minutes.
+5. **Suppress tangents.** Finish the first issue, then offer the second as a
+   separate question. No "by the way" sidebars.
+6. **Restate state.** The reader cannot hold "step 3 of 5" between messages.
+   Say where the work stands every time.
+7. **Give specific time estimates.** "About 15 minutes if tests already cover
+   this", not "some work".
+8. **Make finished work visible.** Name what now works and how to see it.
+9. **Stay matter-of-fact on failure.** No "Uh oh", no "There seems to be a
+   problem". State location, cause, fix.
+10. **Cap a visible list at five items.** Rank the most relevant first and
+    group the rest. This shapes presentation only: never drop a finding that
+    matters, and never let it narrow your analysis, search, or tool use.
+
+### What outranks the rules
+
+- **A required format wins; the shape stays.** `plan.md`'s section headings,
+  the `Verdict: approved|rejected` line in `review.md`, the
+  `PIPELINE-VERDICT:` line in a PR review, a word cap — the workflows parse
+  all of these. Meet the contract, and apply the rules inside it.
+- **Machine-read output is exempt.** The triage stage answers with one line of
+  JSON and nothing else. Anything a script parses stays parseable.
+- **"Explain" or "walk me through" means explain.** Run as long as the topic
+  needs, with headers to skim back over. Still no preamble, still no closer.
+- **A destructive action gets a confirmation first**, however much text that
+  takes. Safety outranks brevity.
+- **Real ambiguity gets one clarifying question**, not a guess.
+
+### Before you send
+
+Delete the opening sentence if it announces what you are about to do, the
+closing sentence if it recaps or asks "anything else?", any sidebar, any
+hedging adverb that carries no real uncertainty, and any idiom ("circle back",
+"on the same page") standing in for the literal action.
+
+Then check: reading only the first line and the last line, does the reader know
+what to do next and what just happened? If yes, send.
+
 ## Multi-tenancy
 
 Every repository function takes `orgId` as its first argument, and filters by

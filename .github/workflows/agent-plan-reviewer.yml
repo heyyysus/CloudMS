@@ -71,6 +71,10 @@ jobs:
           Reject only for real problems (wrong scope, unsound approach, security risk, plan says the
           issue is too vague). Do not reject for style. A rejection goes to a human, not back to the planner.
 
+          review.md is read by a person — on a rejection the Findings section is pasted into the
+          issue — so write it to the "Writing for humans" section of CLAUDE.md. The format below
+          and the Verdict line are required and win where the two conflict.
+
           Write review.md as:
           # Plan review — issue #$ISSUE
           ## Findings   – bullets, most important first, with file references

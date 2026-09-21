@@ -264,7 +264,10 @@ describe("createAutoPolicyWithDetails", () => {
 
         await expect(
           runInOrg(orgId, () =>
-            createAutoPolicyWithDetails(orgId, policyValues(carrier.id, otherClient.id, "XORGCLIENT"))
+            createAutoPolicyWithDetails(
+              orgId,
+              policyValues(carrier.id, otherClient.id, "XORGCLIENT")
+            )
           )
         ).rejects.toThrow(CrossOrgReferenceError)
 

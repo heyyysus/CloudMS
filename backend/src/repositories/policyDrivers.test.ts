@@ -74,7 +74,9 @@ describe("policyDrivers repository", () => {
       expect(policiesForDriver).toHaveLength(1)
       expect(policiesForDriver[0].policy.id).toBe(policy.id)
 
-      const removed = await runInOrg(orgId, () => removeDriverFromPolicy(orgId, policy.id, driver.id))
+      const removed = await runInOrg(orgId, () =>
+        removeDriverFromPolicy(orgId, policy.id, driver.id)
+      )
       expect(removed).toBe(true)
       expect(await runInOrg(orgId, () => listDriversForPolicy(orgId, policy.id))).toHaveLength(0)
     } finally {

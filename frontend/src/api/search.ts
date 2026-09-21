@@ -1,7 +1,7 @@
 import { request } from './client'
-import type { ClientDetail } from './clients'
+import type { ClientListItem } from './clients'
 
-export type SearchClientResult = Omit<ClientDetail, 'policies'>
+export type SearchClientResult = ClientListItem
 
 export interface SearchPolicyResult {
   id: string

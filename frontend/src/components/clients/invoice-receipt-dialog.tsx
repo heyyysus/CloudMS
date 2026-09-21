@@ -147,7 +147,7 @@ function voidConfirmCopy(
 
   const cascading = activePayments.length > 0
   return {
-    title: `Void invoice #${invoice.id}?`,
+    title: `Void invoice #${invoice.invoiceNumber}?`,
     description:
       "This can't be undone. The invoice stays on file marked void, its money is reversed out of the trust ledger, and its PDF is withdrawn.",
     submitLabel: cascading

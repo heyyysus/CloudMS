@@ -57,6 +57,8 @@ runs:
         # First step in the current job whose conclusion is "failure" (an in-progress
         # job already reports conclusions for its finished steps). Falls back to
         # "step unknown" if the API lags or the run was cancelled before this ran.
+        # Needs `actions: read` on github_token — a PAT with repo scope has it, a job's
+        # GITHUB_TOKEN only if the workflow's permissions block grants it.
         jobs_json=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs" 2>/dev/null || echo '{}')
         failed_step=$(jq -r --arg job "$GITHUB_JOB" '
           ((.jobs // []) | map(select(.name == $job)) | first // {})
@@ -68,7 +70,7 @@ runs:
         if [[ -z "$tail" && -f "${RUNNER_TEMP}/stage.log" ]]; then
           tail=$(tail -n 20 "${RUNNER_TEMP}/stage.log" \
             | cut -c1-500 \
-            | sed -E 's/gh[pousr]_[A-Za-z0-9]{20,}/[REDACTED]/g; s/sk-ant-[A-Za-z0-9_-]{20,}/[REDACTED]/g' \
+            | sed -E 's/gh[pousr]_[A-Za-z0-9]{20,}/[REDACTED]/g; s/github_pat_[A-Za-z0-9_]{20,}/[REDACTED]/g; s/sk-ant-[A-Za-z0-9_-]{20,}/[REDACTED]/g' \
             | head -c 4000 || true)
         fi
 

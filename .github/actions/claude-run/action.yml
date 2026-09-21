@@ -98,41 +98,11 @@ runs:
         } >> "$GITHUB_STEP_SUMMARY"
 
         # Plain-text transcript tail for a failure comment to quote: one line per event, newest
-        # last. Prefer assistant text and command lines over full tool results (Risks #1 in
-        # pipeline/124/plan.md) — a tool result is the likeliest place a leaked secret would show
-        # up, so it is truncated and redacted same as everything else, not the main content.
+        # last, secrets redacted. The rendering lives in render-tail.sh so render-tail.test.sh
+        # can run it against a fixture — CI runs that test on every change under
+        # .github/actions/**.
         tail_file="$RUNNER_TEMP/claude-tail.txt"
-        jq -r '
-          [ .[] |
-            (
-              if .type == "assistant" then
-                (.message.content // []) | map(
-                  if .type == "text" then "[assistant] " + ((.text // "") | split("\n")[0])
-                  elif .type == "tool_use" then
-                    "[tool] " + .name + ": " + (
-                      ((.input.command // .input.file_path // .input.pattern // "") | tostring)
-                      | split("\n")[0]
-                    )
-                  else empty end
-                )
-              elif .type == "user" then
-                (.message.content // []) | map(
-                  if .type == "tool_result" then
-                    "[tool-result] " + (
-                      (if (.content | type) == "string" then .content
-                       else ((.content // []) | map(.text // "") | join(" ")) end)
-                      | split("\n")[0]
-                    )
-                  else empty end
-                )
-              else [] end
-            )
-          ] | flatten | .[]
-        ' "$EXEC_FILE" \
-          | tail -n 20 \
-          | cut -c1-500 \
-          | sed -E 's/gh[pousr]_[A-Za-z0-9]{20,}/[REDACTED]/g; s/sk-ant-[A-Za-z0-9_-]{20,}/[REDACTED]/g' \
-          | head -c 4000 > "$tail_file"
+        bash "$GITHUB_ACTION_PATH/render-tail.sh" "$EXEC_FILE" > "$tail_file"
         echo "tail_file=$tail_file" >> "$GITHUB_OUTPUT"
         {
           echo "tail<<__CLAUDE_TAIL__"

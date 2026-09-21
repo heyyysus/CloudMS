@@ -112,10 +112,11 @@ unless noted.
 
 - **Person** (bare): `id`, `firstName`, `lastName`, `dateOfBirth` (`"YYYY-MM-DD"`),
   `maritalStatus` (nullable), `gender`, `relationToInsured`, `createdAt`, `updatedAt`.
-- **Client** (bare, e.g. from plain `GET /clients`): `id`, `namedInsuredId`,
-  `secondNamedInsuredId` (nullable), `mailingAddress` (nullable),
-  `physicalAddress` (nullable), `createdAt`, `updatedAt`. **No nested
-  objects** — just the foreign key ids.
+- **Client** (bare, e.g. nested as `client` in Policy detail): `id`,
+  `namedInsuredId`, `secondNamedInsuredId` (nullable), `mailingAddress`
+  (nullable), `physicalAddress` (nullable), `createdAt`, `updatedAt`. **No
+  nested objects** — just the foreign key ids. Plain `GET /clients` does
+  **not** return this bare shape (see below).
 - **Client detail** (`GET /clients/:id`, and the create/update response):
   the bare Client fields **plus** `namedInsured` (Person),
   `secondNamedInsured` (Person, nullable), `phones` (array of
@@ -145,15 +146,17 @@ unless noted.
   `null`.
 - **Carrier** (bare): `id`, `name`, `naic`, `createdAt`, `updatedAt`.
 
-**Important — search results are a different, narrower shape than the
-plain list**, not the bare row and not the detail shape:
+**Important — `GET /clients` (with or without `q`) never returns the bare
+Client row.** Both return the **Client detail shape minus `policies`**:
+bare Client fields + `namedInsured`, `secondNamedInsured`, `phones`,
+`emails` — no `policies` array either way. A frontend list view can render
+an insured's name straight off either response without branching on
+whether `q` was passed.
 
-- `GET /clients?q=` returns the **Client detail shape minus `policies`**:
-  bare Client fields + `namedInsured`, `secondNamedInsured`, `phones`,
-  `emails` — but no `policies` array. Plain `GET /clients` (no `q`) returns
-  bare Client rows with none of that nested data. A frontend list view that
-  needs to render an insured's name must branch on whether `q` was passed,
-  or always call the client-detail-shaped path.
+- Plain `GET /clients` returns every client in the org, ordered by the
+  named insured's last name then first name.
+- `GET /clients?q=` returns the same shape but filtered to the query match
+  and capped at 50 results (see below) — order is relevance, not name.
 - `GET /policies?q=` returns a **custom projection**, not a bare
   AutoPolicy row: `{ id, policyNumber, status, effectiveDate,
   expirationDate, clientId, clientName }` — note there is no `carrierId`,
@@ -205,7 +208,7 @@ co-insured), mailing/physical address, phones, emails, and policies.
 
 | Method | Path | Role | Notes |
 |---|---|---|---|
-| GET | `/clients` | any | `listClients()`; add `?q=` to search instead (see below) |
+| GET | `/clients` | any | `listClients()` — detail-minus-`policies` shape, ordered by last name then first name; add `?q=` to search instead (see below) |
 | GET | `/clients/:id` | any | `getClientWithDetails(id)` — includes `namedInsured`, `secondNamedInsured`, `phones`, `emails`, `policies`; 404 if missing |
 | POST | `/clients` | any | creates the client row, then replaces phones/emails if provided |
 | PATCH | `/clients/:id` | any | partial; only touches phones/emails if those keys are present |
@@ -221,10 +224,10 @@ deletes all of them; passing `phones: [...]` replaces the full set. Same
 for `emails`. This keeps the write model simple since these rows have no
 identity worth preserving beyond their value.
 
-Example response (`GET /clients/:id`, `POST /clients`, `PATCH /clients/:id`,
-and `GET /clients?q=` all use this same detail-minus-`policies` shape,
-except plain `GET /clients` also includes `policies` and search omits it —
-see [Response shapes](#response-shapes)):
+Example response (`GET /clients/:id`, `POST /clients`, and `PATCH
+/clients/:id` all include the trailing `policies` array shown below; plain
+`GET /clients` and `GET /clients?q=` return this same shape minus
+`policies` — see [Response shapes](#response-shapes)):
 
 ```json
 {

@@ -1,7 +1,8 @@
 name: Check pipeline eligibility
 description: >-
   An issue is eligible for the agent pipeline only if its author is listed in
-  .github/CODEOWNERS and (unless disabled) it carries the `agent` label.
+  .github/CODEOWNERS — or is the pipeline bot on an `agent-authored` issue —
+  and (unless disabled) it carries the `agent` label.
   Every stage re-runs this so trust is re-verified at each boundary.
 
 inputs:
@@ -38,7 +39,20 @@ runs:
         # Individual @user handles in CODEOWNERS (teams like @org/team are ignored).
         owners=$(grep -v '^\s*#' .github/CODEOWNERS | grep -oE '@[A-Za-z0-9-]+' | grep -v '/' | tr -d '@' | sort -u)
 
-        if ! grep -qxF "$author" <<< "$owners"; then
+        # The orchestrator files issues as the pipeline bot, which is not — and
+        # should not be — in CODEOWNERS. Those are trusted on the same footing as
+        # the workflows themselves, since the rules it follows live in this repo.
+        # The `agent-authored` label is the narrowing: the orchestrator sets it on
+        # everything it files, so a stray bot comment or a third-party app cannot
+        # mint work for the pipeline just by opening an issue.
+        # RHS quoted so `[bot]` is a literal, not a glob character class.
+        bot_authored=false
+        if grep -qxF "agent-authored" <<< "$labels" \
+           && { [[ "$author" == "app/github-actions" ]] || [[ "$author" == "github-actions[bot]" ]]; }; then
+          bot_authored=true
+        fi
+
+        if [[ "$bot_authored" != "true" ]] && ! grep -qxF "$author" <<< "$owners"; then
           echo "eligible=false" >> "$GITHUB_OUTPUT"
           echo "reason=author @$author is not in CODEOWNERS" >> "$GITHUB_OUTPUT"
           exit 0

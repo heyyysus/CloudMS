@@ -1,0 +1,209 @@
+name: agent-orchestrator
+
+# Decides what the pipeline works on next and when a human is needed. The rules
+# live in .claude/agents/orchestrator.md; this workflow only gathers state and
+# hands it to Opus.
+#
+# Event-driven first: it wakes when a stage finishes, when an issue closes, or
+# when a PR closes, so the chain advances without waiting on a timer. The hourly
+# cron is a stall detector, not the engine — every stage starts on a label being
+# *added*, so a run that dies mid-stage leaves the issue in a state that nothing
+# will ever re-fire. The sweep is what notices.
+#
+# It deliberately does NOT listen for `labeled`: the labels it writes would wake
+# it again. Issue creation is picked up via agent-triage completing, which also
+# means the area labels it needs for parallelism decisions already exist.
+#
+# Control lives on the open issue labelled `orchestrator:log`:
+#   orchestrator:paused → do nothing
+#   orchestrator:live   → act
+#   neither             → observe-only; log what it would have done
+#
+# Scheduled and workflow_run events only fire from the default branch, so this
+# is inert until it reaches main.
+
+on:
+  issues:
+    types: [closed, reopened]
+  pull_request:
+    types: [closed]
+  workflow_run:
+    workflows:
+      - agent-triage
+      - agent-trigger
+      - agent-planner
+      - agent-plan-reviewer
+      - agent-coder
+      - agent-docs
+      - agent-pr-review
+      - agent-cleanup
+    types: [completed]
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+# Never cancel a run in progress: a half-applied set of labels is exactly the
+# stalled state this workflow exists to prevent.
+concurrency:
+  group: agent-orchestrator
+  cancel-in-progress: false
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve control flags
+        id: control
+        run: |
+          set -euo pipefail
+          log=$(gh issue list --label "orchestrator:log" --state open --limit 1 \
+                --json number -q '.[0].number // ""')
+          if [[ -z "$log" ]]; then
+            echo "No open issue labelled \`orchestrator:log\` — nothing to control or log to." \
+              >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          labels=$(gh issue view "$log" --json labels -q '.labels[].name')
+          if grep -qxF "orchestrator:paused" <<< "$labels"; then
+            echo "Paused by \`orchestrator:paused\` on #$log." >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          mode=observe
+          if grep -qxF "orchestrator:live" <<< "$labels"; then
+            mode=live
+          fi
+
+          echo "log_issue=$log" >> "$GITHUB_OUTPUT"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "Log issue #$log, mode \`$mode\`." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Snapshot pipeline state
+        if: steps.control.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          # Bodies are trimmed to the `Depends on:` line — the DAG is all the
+          # orchestrator needs from them, and 100 full bodies would crowd out
+          # the rules document in the prompt.
+          issues=$(gh issue list --state open --limit 100 \
+            --json number,title,labels,author,createdAt,updatedAt,body \
+            --jq '[.[] | {
+                    number,
+                    title,
+                    author: .author.login,
+                    labels: [.labels[].name],
+                    createdAt,
+                    updatedAt,
+                    dependsOn: ([.body // "" | scan("(?i)depends on:[^\n]*")] | first // "")
+                  }]')
+
+          prs=$(gh pr list --state open --limit 30 \
+            --json number,title,headRefName,isDraft,mergeable,updatedAt)
+
+          inflight=$(gh run list --limit 60 \
+            --json name,status,headBranch,displayTitle,createdAt \
+            --jq '[.[] | select(.status == "in_progress" or .status == "queued")]')
+
+          recent=$(gh run list --limit 30 \
+            --json name,status,conclusion,headBranch,displayTitle,createdAt \
+            --jq '[.[] | select(.conclusion == "failure" or .conclusion == "cancelled")]')
+
+          jq -n \
+            --argjson issues "$issues" \
+            --argjson prs "$prs" \
+            --argjson inflight "$inflight" \
+            --argjson recent "$recent" \
+            '{open_issues: $issues, open_prs: $prs, runs_in_flight: $inflight, recent_bad_runs: $recent}' \
+            > snapshot.json
+
+          echo "snapshot: $(wc -c < snapshot.json) bytes" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build prompt
+        if: steps.control.outputs.skip != 'true'
+        env:
+          MODE: ${{ steps.control.outputs.mode }}
+          LOG_ISSUE: ${{ steps.control.outputs.log_issue }}
+          TRIGGER: ${{ github.event_name }}
+          UPSTREAM: ${{ github.event.workflow_run.name }}
+          UPSTREAM_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |
+          set -euo pipefail
+          {
+            echo "PROMPT<<__PROMPT__"
+            cat .claude/agents/orchestrator.md
+            echo
+            echo "---"
+            echo
+            echo "# This run"
+            echo
+            echo "- Repository: ${GITHUB_REPOSITORY}"
+            echo "- Mode: **${MODE}**"
+            echo "- Log issue: #${LOG_ISSUE}"
+            echo "- Triggered by: ${TRIGGER}${UPSTREAM:+ (${UPSTREAM} → ${UPSTREAM_CONCLUSION})}"
+            echo "- Now (UTC): $(date -u '+%Y-%m-%d %H:%M')"
+            echo
+            echo "## State snapshot"
+            echo
+            echo '```json'
+            cat snapshot.json
+            echo '```'
+            echo
+            echo "The snapshot is a starting point, not the whole truth. Read anything else you"
+            echo "need with \`gh\` — issue bodies, comments, run logs, PR diffs — before deciding."
+            echo
+            if [[ "$MODE" == "live" ]]; then
+              echo "You are in **live** mode: act, then log what you did."
+            else
+              echo "You are in **observe-only** mode: decide exactly as you would in live mode,"
+              echo "then write those decisions to issue #${LOG_ISSUE} with every line prefixed"
+              echo "\`WOULD:\`. Change nothing else — no labels, no new issues, no comments"
+              echo "anywhere but the log issue."
+            fi
+            echo "__PROMPT__"
+          } >> "$GITHUB_ENV"
+
+      - id: claude
+        if: steps.control.outputs.skip != 'true'
+        uses: ./.github/actions/claude-run
+        with:
+          stage: orchestrator
+          model: opus
+          max_turns: 60
+          allowed_tools: "Read,Grep,Glob,Bash"
+          prompt: ${{ env.PROMPT }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+
+      - name: Report a run that did not finish
+        if: steps.control.outputs.skip != 'true' && steps.claude.outputs.stop_reason != 'success'
+        env:
+          LOG_ISSUE: ${{ steps.control.outputs.log_issue }}
+          STOP_REASON: ${{ steps.claude.outputs.stop_reason }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          # The orchestrator stopping quietly is itself a stall, so say so where
+          # the owner is already looking.
+          cat > "$RUNNER_TEMP/body.md" <<EOF
+          Orchestrator run did not finish cleanly (stop reason: \`${STOP_REASON:-unknown}\`).
+
+          $RUN_URL
+
+          Whatever it had already done stands; the next event or the hourly sweep picks up from
+          the current state.
+          EOF
+          gh issue comment "$LOG_ISSUE" --body-file "$RUNNER_TEMP/body.md"

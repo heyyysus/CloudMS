@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from "express"
+import { runInOrg } from "../db"
 import { findActiveMembership, findSessionWithUserByTokenHash } from "../repositories"
 import type { Session, UserRole, User } from "../types"
 import { hashToken } from "./tokens"
@@ -68,7 +69,30 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   req.session = row.session
   req.orgId = row.session.orgId
   req.membership = membership
-  next()
+
+  // Everything next() dispatches to - every downstream middleware and route
+  // handler - runs on one transaction with app.org_id set, which is what
+  // rls.ts's policies key off of (see db/context.ts's db proxy). The
+  // transaction commits when the response is done, not when this middleware
+  // returns: "close" fires once the response has finished sending, whether
+  // that was a normal res.json() or the error handler's 500, and also fires
+  // on an aborted connection - all three mean there is nothing left for this
+  // request to do.
+  await runInOrg(
+    req.orgId,
+    () =>
+      new Promise<void>((resolve) => {
+        res.on("close", resolve)
+        next()
+      })
+  ).catch((err: unknown) => {
+    // A pg error a handler lets escape aborts the transaction; Postgres
+    // turns the COMMIT above into a no-op ROLLBACK without raising, so this
+    // only fires for a genuine commit failure (lost connection, etc). The
+    // response was already sent by the time COMMIT runs, so there is nothing
+    // left to do but log it.
+    req.log.error(err, "org-scoped request transaction failed to commit")
+  })
 }
 
 // Admins pass every role check.

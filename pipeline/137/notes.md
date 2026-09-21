@@ -55,3 +55,10 @@ None. Scope matched the plan exactly.
   outside the workflow file — both branches produce the expected output.
 - No backend/frontend code touched (infra/docs only), so the backend/frontend test
   suites in the plan's step 5 don't apply here.
+
+## Docs
+
+No doc changes needed. The diff only edits the label's `--description` string in
+`scripts/setup-pipeline-labels.sh`; README.md names the label but doesn't quote its
+description text, and `pipeline/README.md`'s label glossary was already updated in
+this same pipeline run (per notes item 2 above).

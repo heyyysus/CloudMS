@@ -77,6 +77,15 @@ export function getClient(id: string, signal?: AbortSignal): Promise<ClientDetai
   return request(`/clients/${id}`, { signal })
 }
 
+export type ClientListItem = Omit<ClientDetail, 'policies'>
+
+export function listClients(q?: string, signal?: AbortSignal): Promise<ClientListItem[]> {
+  const query = q ? `?q=${encodeURIComponent(q)}` : ''
+  return request(`/clients${query}`, { signal })
+}
+
+export type ListClientsFn = typeof listClients
+
 export interface UpdateClientBody {
   namedInsuredId?: string
   secondNamedInsuredId?: string | null

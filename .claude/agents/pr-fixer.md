@@ -30,6 +30,8 @@ Work top to bottom. The first rule that matches wins.
 
 - Verdict is `blocking-security`.
 - The diff touches the **deny-list** (§2), whatever the verdict says.
+- The issue carries `needs-human`. The workflow stands down before you start, so
+  you should not reach this — if you do, the gate failed: say so and stop.
 - This is already **round 3** on this PR (§4).
 - A review finding contradicts the issue, or you cannot tell what correct
   behaviour is.
@@ -149,6 +151,8 @@ itself is probably the problem.
 ## 6. Never
 
 - Never merge a PR touching the deny-list (§2).
+- Never merge, fix, or scrap a PR whose issue carries `needs-human`. A person was
+  asked to take that one; a green diff is not a reason to overrule them.
 - Never merge on an earlier commit's green CI. Re-check the current head.
 - Never skip, delete, or weaken a test to get green.
 - Never push an empty commit, or close and reopen a PR, to re-trigger CI.

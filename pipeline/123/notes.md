@@ -126,3 +126,13 @@ All from `frontend/`:
   `npx playwright install --with-deps chromium`.)
 
 No backend changes; no backend checks run.
+
+## Docs
+
+No further doc changes needed beyond what the implementation stage already
+made to `docs/frontend-ui-design.md` and `frontend.md`. `docs/API.md` and
+`docs/AUTH_SESSIONS_EXPLAINED.md` already document the `{ user, org,
+memberships }` shape, `/auth/org`, and `invoiceNumber`/`receiptNumber` from
+the backend sub-issue that introduced them; this diff is frontend-only and
+doesn't change that surface. No README-relevant changes (no new env vars,
+scripts, or deploy steps).

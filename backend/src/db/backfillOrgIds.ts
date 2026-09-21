@@ -106,7 +106,13 @@ async function main() {
   // Child tables derive their org from the parent the plan names, rather than
   // guessing - a row can only ever be assigned to the org its parent is
   // actually in.
-  for (const table of ["scheduled_emails", "vehicles", "policy_drivers", "policy_logs", "policy_attachments"]) {
+  for (const table of [
+    "scheduled_emails",
+    "vehicles",
+    "policy_drivers",
+    "policy_logs",
+    "policy_attachments",
+  ]) {
     await backfillFromParent(table, "auto_policies", "policy_id")
   }
   await backfillFromParent("policy_log_attachments", "policy_logs", "log_id")

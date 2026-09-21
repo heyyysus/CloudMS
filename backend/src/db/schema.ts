@@ -199,11 +199,7 @@ export const reminderRules = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    unique("reminder_rules_trigger_offset_unique").on(
-      table.orgId,
-      table.trigger,
-      table.offsetDays
-    ),
+    unique("reminder_rules_trigger_offset_unique").on(table.orgId, table.trigger, table.offsetDays),
     index("reminder_rules_org_id_idx").on(table.orgId),
   ]
 )

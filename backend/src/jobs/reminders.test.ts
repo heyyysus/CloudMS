@@ -5,8 +5,8 @@
 // dispatchReminders operate over the *whole* table by design - that is what
 // lets any container pick up any due reminder - so two test files exercising
 // them in parallel vitest workers interfere through the database: one file's
-// planner run queues another file's rule (stamping it with its own timezone
-// env), and one file's dispatcher claims and sends another file's row. Vitest
+// planner run queues another file's rule, and one file's dispatcher claims
+// and sends another file's row. Vitest
 // runs the tests within a file sequentially, so keeping them together is what
 // makes them deterministic.
 import { randomInt, randomUUID } from "crypto"
@@ -206,9 +206,8 @@ describe("planReminders", () => {
     expect(await rowsFor(policy.id)).toHaveLength(0)
   })
 
-  it("schedules the send at the configured local hour", async () => {
-    process.env.REMINDER_TIMEZONE = "UTC"
-    process.env.REMINDER_SEND_HOUR = "9"
+  it("schedules the send at the organization's local hour", async () => {
+    await ctx.org({ reminderTimezone: "UTC", reminderSendHour: 9 })
     const { policy } = await dueSetup(112_353)
 
     await planDueReminders()
@@ -222,8 +221,7 @@ describe("planReminders", () => {
   // one targeting a summer date and one a winter date, must land on 14:00 and
   // 15:00 UTC respectively.
   it("tracks DST when converting the local send hour to UTC", async () => {
-    process.env.REMINDER_TIMEZONE = "America/Chicago"
-    process.env.REMINDER_SEND_HOUR = "9"
+    await ctx.org({ reminderTimezone: "America/Chicago", reminderSendHour: 9 })
     // A wide horizon so both target dates fall inside it regardless of when
     // this test runs.
     process.env.REMINDER_HORIZON_DAYS = "400"
@@ -254,6 +252,47 @@ describe("planReminders", () => {
     // 9am CDT (UTC-5) is 14:00Z; 9am CST (UTC-6) is 15:00Z.
     expect(summerRow.scheduledFor.toISOString()).toBe(`${summerTarget}T14:00:00.000Z`)
     expect(winterRow.scheduledFor.toISOString()).toBe(`${winterTarget}T15:00:00.000Z`)
+  })
+
+  // The acceptance criterion for #157: two organizations with the same rule
+  // shape and the same policy expiration date get different scheduled_for
+  // instants, because each reads its own reminder_timezone/reminder_send_hour
+  // rather than a process-wide env var.
+  it("honors each organization's own timezone and send hour", async () => {
+    process.env.REMINDER_HORIZON_DAYS = "400"
+    const offsetDays = freeOffset()
+    // A future summer day (CDT, UTC-5), so the Chicago instant is exact.
+    const target = nextOccurrence(7, 1)
+
+    const orgUtc = await ctx.org({ reminderTimezone: "UTC", reminderSendHour: 9 })
+    const clientUtc = await ctx.client({ orgId: orgUtc.id })
+    await ctx.clientEmail(clientUtc.id, undefined, orgUtc.id)
+    const policyUtc = await ctx.policy({
+      orgId: orgUtc.id,
+      clientId: clientUtc.id,
+      status: "active",
+      expirationDate: addDays(target, offsetDays),
+    })
+    await ctx.reminderRule({ orgId: orgUtc.id, offsetDays })
+
+    const orgChicago = await ctx.org({ reminderTimezone: "America/Chicago", reminderSendHour: 17 })
+    const clientChicago = await ctx.client({ orgId: orgChicago.id })
+    await ctx.clientEmail(clientChicago.id, undefined, orgChicago.id)
+    const policyChicago = await ctx.policy({
+      orgId: orgChicago.id,
+      clientId: clientChicago.id,
+      status: "active",
+      expirationDate: addDays(target, offsetDays),
+    })
+    await ctx.reminderRule({ orgId: orgChicago.id, offsetDays })
+
+    await planDueReminders()
+
+    const [utcRow] = await rowsFor(policyUtc.id, orgUtc.id)
+    const [chicagoRow] = await rowsFor(policyChicago.id, orgChicago.id)
+    expect(utcRow.scheduledFor.toISOString()).toBe(`${target}T09:00:00.000Z`)
+    expect(chicagoRow.scheduledFor.toISOString()).toBe(`${target}T22:00:00.000Z`)
+    expect(utcRow.scheduledFor.getTime()).not.toBe(chicagoRow.scheduledFor.getTime())
   })
 
   // The actual cross-tenant fix (planner.ts's p.org_id = r.org_id join):

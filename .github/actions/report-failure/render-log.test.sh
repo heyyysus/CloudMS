@@ -77,6 +77,15 @@ check "exits 0 on a missing file" "$?"
 check "renders nothing for it" \
   "$([[ ! -s "$out_missing" ]] && echo 0 || echo 1)"
 
+# --- drift against claude-run's renderer ---------------------------------------
+# The two renderers redact independently. A token shape added to one and not the
+# other leaks from whichever stage uses the other, silently — so make the drift
+# fail here instead. If they ever need to differ, delete this check deliberately.
+tail_redact=$(grep -m1 '^REDACT=' "$here/../claude-run/render-tail.sh")
+log_redact=$(grep -m1 '^REDACT=' "$here/render-log.sh")
+check "the redaction list matches claude-run/render-tail.sh" \
+  "$([[ "$tail_redact" == "$log_redact" ]] && echo 0 || echo 1)"
+
 if [[ "$failures" -gt 0 ]]; then
   echo "$failures check(s) failed"
   exit 1

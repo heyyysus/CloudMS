@@ -67,3 +67,38 @@ covering the CI wiring too.
 
 No doc changes needed — change is confined to `.github/actions/report-failure`
 (a CI failure-reporting action), no route/auth/UI/setup surface touched.
+
+## Round 1 fixes (pr-fixer)
+
+Run `bash .github/actions/report-failure/render-headline.test.sh` — the headline
+logic now has a harness, and the missing separator is gone.
+
+1. **Missing ` — ` on the no-step path.** The notice headline rendered
+   `**docs stage stopped early** stop reason \`x\`.` — recorded as expected output
+   in "For the docs stage / reviewer" above, so the defect shipped documented.
+   Corrected to `**docs stage stopped early** — stop reason \`x\`.`
+2. **Headline logic extracted to `render-headline.sh`**, mirroring how
+   `render-log.sh` was extracted, so it can be tested. `action.yml` calls it with
+   `$STAGE $OUTCOME $failed_step $STOP_REASON`; the `step unknown` fallback moved
+   into the script with the rest of the rule.
+3. **New `render-headline.test.sh`** — 9 checks, both outcomes, the fallback, the
+   empty stop reason, the exit status. Verified it fails against the pre-fix
+   logic: reinstating the old two-line `line=...` block fails exactly the
+   "keeping the em dash" check, 1 of 9.
+4. **Drift guard in `render-log.test.sh`** — asserts `REDACT=` is identical to
+   `claude-run/render-tail.sh`'s. Answers the review's "the two redaction lists
+   can now drift apart silently" without merging the renderers, which
+   `$GITHUB_ACTION_PATH` being per-action makes awkward. Verified it fails when
+   one list is edited alone.
+5. **`workflow-changes.patch` gained the third `pipeline-actions` step** for
+   `render-headline.test.sh`. Re-checked with `git apply --check`, applies clean.
+
+Not fixed: the renderers still duplicate the caps and the `<details>` block.
+Sharing them needs a third location both composite actions can resolve, which is
+a bigger change than this round warrants — the drift guard covers the part that
+can leak a secret.
+
+Checks: `render-headline.test.sh` 9/9, `render-log.test.sh` 15/15,
+`claude-run/render-tail.test.sh` 17/17, `shellcheck` clean on every
+`report-failure/*.sh`, `action.yml` parses as YAML. No backend or frontend files
+touched, so those suites don't apply.

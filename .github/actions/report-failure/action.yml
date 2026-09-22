@@ -68,7 +68,9 @@ runs:
           ((.jobs // []) | map(select(.name == $job)) | first // {})
           | ((.steps // []) | map(select(.conclusion == "failure")) | first.name) // empty
         ' <<< "$jobs_json" 2>/dev/null || true)
-        [[ "$OUTCOME" == "failed" ]] && failed_step="${failed_step:-step unknown}"
+
+        headline=$(bash "$GITHUB_ACTION_PATH/render-headline.sh" \
+          "$STAGE" "${OUTCOME:-failed}" "$failed_step" "$STOP_REASON" || true)
 
         tail="$TAIL_IN"
 
@@ -80,9 +82,7 @@ runs:
         {
           echo "$RESUME"
           echo
-          line="**$STAGE stage $OUTCOME**"
-          [[ -n "$failed_step" ]] && line="$line — step \"$failed_step\","
-          echo "$line stop reason \`${STOP_REASON:-unknown}\`."
+          echo "$headline"
           echo "Run: $RUN_URL"
           if [[ -n "$WIP_SHA" ]]; then
             echo "WIP commit: \`$WIP_SHA\` — partial work is not lost."

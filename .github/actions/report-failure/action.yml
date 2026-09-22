@@ -69,8 +69,15 @@ runs:
           | ((.steps // []) | map(select(.conclusion == "failure")) | first.name) // empty
         ' <<< "$jobs_json" 2>/dev/null || true)
 
-        headline=$(bash "$GITHUB_ACTION_PATH/render-headline.sh" \
-          "$STAGE" "${OUTCOME:-failed}" "$failed_step" "$STOP_REASON" || true)
+        # The renderer is best-effort like every other call in this step, but the
+        # headline is the comment's only claim: swallowing a renderer failure into
+        # an empty string would print a blank line where it belongs. Degrade to the
+        # bare facts instead. `outcome` defaults to "failed" in exactly two places —
+        # the input above and render-headline.sh — so do not re-default it here.
+        if ! headline=$(bash "$GITHUB_ACTION_PATH/render-headline.sh" \
+              "$STAGE" "$OUTCOME" "$failed_step" "$STOP_REASON") || [[ -z "$headline" ]]; then
+          headline="**$STAGE stage $OUTCOME** — see the run for details."
+        fi
 
         tail="$TAIL_IN"
 

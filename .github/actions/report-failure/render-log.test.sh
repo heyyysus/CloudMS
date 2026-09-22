@@ -83,8 +83,14 @@ check "renders nothing for it" \
 # fail here instead. If they ever need to differ, delete this check deliberately.
 tail_redact=$(grep -m1 '^REDACT=' "$here/../claude-run/render-tail.sh")
 log_redact=$(grep -m1 '^REDACT=' "$here/render-log.sh")
+# Both greps coming back empty — a rename of REDACT= in both files — would make the
+# comparison below pass while comparing nothing, so assert each side exists first.
+check "claude-run/render-tail.sh still declares REDACT=" \
+  "$([[ -n "$tail_redact" ]] && echo 0 || echo 1)"
+check "render-log.sh still declares REDACT=" \
+  "$([[ -n "$log_redact" ]] && echo 0 || echo 1)"
 check "the redaction list matches claude-run/render-tail.sh" \
-  "$([[ "$tail_redact" == "$log_redact" ]] && echo 0 || echo 1)"
+  "$([[ -n "$tail_redact" && "$tail_redact" == "$log_redact" ]] && echo 0 || echo 1)"
 
 if [[ "$failures" -gt 0 ]]; then
   echo "$failures check(s) failed"

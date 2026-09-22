@@ -102,3 +102,38 @@ Checks: `render-headline.test.sh` 9/9, `render-log.test.sh` 15/15,
 `claude-run/render-tail.test.sh` 17/17, `shellcheck` clean on every
 `report-failure/*.sh`, `action.yml` parses as YAML. No backend or frontend files
 touched, so those suites don't apply.
+
+## Round 2 fixes (pr-fixer)
+
+Run `bash .github/actions/report-failure/render-log.test.sh` — the drift guard no
+longer passes vacuously, and a broken headline renderer no longer prints a blank
+line.
+
+1. **Vacuous drift check** (`render-log.test.sh`). Both sides came from
+   `grep -m1 '^REDACT='`, so renaming `REDACT=` in *both* renderers made both
+   empty and the equality check pass comparing nothing. Each side is now asserted
+   non-empty first. Verified: renaming `REDACT=` in both files fails 3 checks,
+   where the old single check passed.
+2. **Swallowed renderer failure** (`action.yml:76-80`). `render-headline.sh ... ||
+   true` turned any renderer failure into an empty `headline`, printing a blank
+   line where the comment's only claim goes. Now the failure (or empty output)
+   degrades to `**$STAGE stage $OUTCOME** — see the run for details.` Verified
+   against a missing renderer and a silent one.
+3. **Third copy of the `failed` default** (`action.yml:78`). `${OUTCOME:-failed}`
+   dropped; `outcome` now defaults in exactly two places, the action input and
+   `render-headline.sh`.
+4. **Redundant "no double space" check** dropped from
+   `render-headline.test.sh` — the exact-string `is` four lines above already
+   pinned the whole headline, and the grep matched any double space on the line.
+
+Not fixed, unchanged from round 1: the renderers still duplicate the caps and the
+`<details>` block.
+
+Scope note from the review — `render-headline.sh` and its test go beyond plan.md's
+"by inspection, no harness", as does the cross-action drift check. Both came from
+round-1 review findings; recorded here rather than reverted.
+
+Checks: `render-headline.test.sh` 8/8, `render-log.test.sh` 17/17,
+`claude-run/render-tail.test.sh` 17/17, `shellcheck` clean on every
+`report-failure/*.sh`, `action.yml` parses as YAML, `workflow-changes.patch`
+applies clean. No backend or frontend files touched, so those suites don't apply.

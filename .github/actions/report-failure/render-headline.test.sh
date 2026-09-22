@@ -53,9 +53,6 @@ is "a stage that stopped early drops the step clause, keeping the em dash" \
   "$(bash "$render" docs 'stopped early' '' error_max_turns)" \
   '**docs stage stopped early** — stop reason `error_max_turns`.'
 
-check "no double space where the step clause was" \
-  "$(! bash "$render" docs 'stopped early' '' error_max_turns | grep -q '  ' && echo 0 || echo 1)"
-
 is "a non-failed outcome still shows a step when one is known" \
   "$(bash "$render" docs 'stopped early' 'Open PR' error_max_turns)" \
   '**docs stage stopped early** — step "Open PR", stop reason `error_max_turns`.'

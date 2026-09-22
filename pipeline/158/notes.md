@@ -79,3 +79,10 @@ pushed with the new column):
 - `npx vitest run` — 483 passed, 37 files
 - `npm run build` — pass
 - No frontend checks run — nothing under `frontend/` changed, per plan.
+
+## Docs
+
+No doc changes needed. `docs/multitenancy.md` already covers #158 in the
+implementation diff; `docs/API.md`'s send-email/correspondence response
+shapes (`{ id, to }`, `{ id, to, cc, subject }`) don't include reply-to, and
+`README.md` never mentioned `MAIL_REPLY_TO`.

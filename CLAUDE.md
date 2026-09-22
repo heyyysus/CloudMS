@@ -15,6 +15,52 @@ is the rules; everything below is only how they land here. In a local session
 with the plugin installed (`i-have-adhd@i-have-adhd`, enabled in
 `.claude/settings.json`), `/i-have-adhd:i-have-adhd` loads the same content.
 
+### Length budgets
+
+**Every artifact below has a hard word budget. Over budget is a defect, the
+same as a missing section heading.** The skill makes writing skimmable; the
+budget is what stops a skimmable artifact from being three screens long
+anyway. Count words before you commit — `wc -w` on the file, or on the body
+you are about to post.
+
+| artifact | budget | over-budget fix |
+|---|---|---|
+| `pipeline/<n>/plan.md` | **450 words** (650 if `risk:high`) | cut Approach prose to numbered one-liners |
+| `pipeline/<n>/notes.md` | **250 words** | cut Decisions to the ones that change future work |
+| `pipeline/<n>/review.md` | **150 words** | one line per finding, drop the agreeing ones |
+| PR review comment | **150 words** (250 with `agent:deep-review`) | already capped in the prompt |
+| `pr-fixer` round comment | **120 words** (200 when escalating) | list the fixes, not the reasoning |
+| `agent-authored` issue body | **250 words** | the change and the acceptance, nothing else |
+| issue comment, orchestrator log entry | **80 words** | |
+| commit message body | **60 words** | |
+
+The budget covers the whole file or comment, headings included. A required
+section with nothing to say gets one line — "None." beats a paragraph
+explaining that there is nothing.
+
+### Cut these five things first
+
+They are where the length actually goes. In order:
+
+1. **Restating the input.** The reader has the issue open. A plan's Goal says
+   what *done* looks like; it does not re-narrate the problem. A review does
+   not summarize the plan before judging it.
+2. **Defending a decision nobody questioned.** "Used `grep` rather than `awk`
+   — same effect, easier to name each failure mode" is two lines spent on a
+   choice with no consequence. Record a decision only when it constrains what
+   someone does next.
+3. **Narrating the process.** "I ran the test, then reverted, then confirmed"
+   is a transcript. Report the outcome: "Negative control passes."
+4. **The rationale paragraph under a bullet that already said it.** If the
+   bullet is clear, the paragraph is padding. If the paragraph is needed, the
+   bullet was wrong — fix the bullet.
+5. **Saying it twice in two sections.** The apply-patch commands belong in the
+   PR body *or* in `notes.md`, not both. Facts repeat across artifacts only
+   when each reader sees only one of them.
+
+Prefer a table over prose for anything with more than two parallel items:
+paths, checks run, options weighed.
+
 ### What outranks the skill
 
 - **A required format wins; the shape stays.** `plan.md`'s section headings,

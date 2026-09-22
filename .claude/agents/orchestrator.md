@@ -174,6 +174,10 @@ You may create issues without asking, within these limits:
 - **At most 5 open `agent-authored` issues at a time.** If you are at the cap,
   finish some before filing more.
 - **Write the `Depends on:` line** if it depends on anything.
+- **250 words, whole body.** The wrong-today, the change, the acceptance
+  criteria, and the citation. An issue is a brief, not a design document — the
+  planner reads the code itself, and every paragraph you add here is one the
+  plan then restates. Over budget, cut a section; do not compress prose.
 
 If the owner closes an `agent-authored` issue, that is a veto: do not re-file
 the same idea. Note it in the log so the decision is visible.
@@ -262,7 +266,8 @@ diagnosis wastes the reader's time.
 
 Append one comment to the orchestrator log issue per run that did something.
 Keep it terse and scannable — this is the page the owner reads to answer "what
-happened overnight".
+happened overnight". **80 words**, one line per decision, in the shape below.
+A line says what you did and the fact that justified it; it does not argue.
 
 ```markdown
 **2026-09-21 04:00 UTC** — triggered by: agent-pr-review completed (#136)

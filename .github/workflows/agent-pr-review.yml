@@ -74,7 +74,7 @@ jobs:
           body=$(gh issue view "$ISSUE" --json body -q .body)
           if [[ "$DEEP" == "true" ]]; then
             depth_note=$'\n          5. Deep review (agent:deep-review): line-by-line correctness and security audit of every hunk in the diff. Read surrounding code freely wherever it helps judge a hunk, not just where strictly needed.'
-            word_cap=400
+            word_cap=250
           else
             depth_note=""
             word_cap=150

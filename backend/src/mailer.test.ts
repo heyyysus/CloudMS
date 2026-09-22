@@ -66,16 +66,32 @@ describe("sendEmail", () => {
     expect(body.reply_to).toBeUndefined()
   })
 
-  it("includes reply_to when MAIL_REPLY_TO is set", async () => {
+  it("includes reply_to when the caller passes one", async () => {
     process.env.RESEND_API_KEY = "re_test"
     process.env.MAIL_FROM = "Cloud CMS <noreply@example.com>"
-    process.env.MAIL_REPLY_TO = "agency@example.com"
+    const fetchMock = stubResend({ id: "msg_123" })
+
+    await sendEmail({
+      to: ["client@example.com"],
+      replyTo: "agency@example.com",
+      subject: "Hi",
+      html: "<p>Hi</p>",
+      text: "Hi",
+    })
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string)
+    expect(body.reply_to).toBe("agency@example.com")
+  })
+
+  it("omits reply_to entirely when the caller passes none", async () => {
+    process.env.RESEND_API_KEY = "re_test"
+    process.env.MAIL_FROM = "Cloud CMS <noreply@example.com>"
     const fetchMock = stubResend({ id: "msg_123" })
 
     await sendEmail({ to: ["client@example.com"], subject: "Hi", html: "<p>Hi</p>", text: "Hi" })
 
     const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string)
-    expect(body.reply_to).toBe("agency@example.com")
+    expect("reply_to" in body).toBe(false)
   })
 
   it("throws MailSendError with the Resend error detail on a non-2xx response", async () => {

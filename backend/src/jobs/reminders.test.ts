@@ -480,6 +480,18 @@ describe("dispatchReminders", () => {
     expect(body.text).toBe(`Regards, ${org.name}`)
   })
 
+  it("renders the organization's mail_reply_to into {{agentEmail}}", async () => {
+    const org = await ctx.org({ mailReplyTo: "agency@example.com" })
+    const fetchMock = stubResend()
+    await dueReminder(212_003, { subject: "Reply to {{agentEmail}}", body: "Regards" })
+
+    await dispatchReminders()
+
+    const [, requestInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    const body = JSON.parse(requestInit.body as string)
+    expect(body.subject).toBe(`Reply to ${org.mailReplyTo}`)
+  })
+
   // The dispatch half of the two-org scheduler guarantee: each organization's
   // send is logged under its own org_id and renders its own name, never the
   // other organization's.

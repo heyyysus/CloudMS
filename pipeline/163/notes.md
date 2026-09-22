@@ -34,3 +34,9 @@
 |---|---|---|
 | backend | typecheck, lint, format:check, test (520), build | pass |
 | frontend | lint, build, test (357, incl. new stories) | pass |
+
+## Docs
+`docs/API.md` and `docs/multitenancy.md` were already updated by the implementation
+stage; no gaps. No changes needed to README.md, AUTH_SESSIONS_EXPLAINED.md
+(`isPlatformOwner` already documented from #161), or frontend-ui-design.md
+(`Platform.tsx` reuses existing components, no new sidebar entry).

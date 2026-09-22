@@ -1,0 +1,8 @@
++ git push origin agent/issue-151
+To https://github.com/example/CloudMS.git
+ ! [rejected]        agent/issue-151 -> agent/issue-151 (fetch first)
+error: failed to push some refs to 'https://github.com/example/CloudMS.git'
++ gh pr create --base main --head agent/issue-151 --title 'Example (#151)' --body-file /tmp/pr-body.md
+using token ghp_ABCDEFGHIJ1234567890abcdefghij for auth
+HTTP 422: Validation Failed (https://api.github.com/repos/example/CloudMS/pulls)
+gh: a pull request for branch "agent/issue-151" into branch "main" already exists

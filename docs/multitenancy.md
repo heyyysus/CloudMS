@@ -232,18 +232,23 @@ both touch every table's columns.
 Anything that is really a property of the agency moves from the process
 environment to columns on `organizations`. **Done (#121):** `organizations.name`
 replaces `AGENCY_NAME`, which no longer exists as an environment variable.
-**Remains:** `MAIL_FROM`, `MAIL_REPLY_TO`, `REMINDER_TIMEZONE`,
-`REMINDER_SEND_HOUR`, and the reminder planning window stay process-wide for
-now - #121 explicitly left these for a later issue, since none of them can
-change per request the way `agentName` does. Outbound email sends from a
-shared platform domain with the agency's reply-to; per-agency sending domains
-are a later problem. Process-level configuration that stays in the
-environment: `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `RESEND_API_KEY`, `R2_*`,
-`APP_URL`, logging, and the scheduler's tick and batch tuning.
+**Done (#157):** per-organization reminder timezone and send hour columns,
+read by the planner. **Remains:** `MAIL_FROM`, `MAIL_REPLY_TO`, and the
+reminder planning window stay process-wide for now. The planning window
+(`REMINDER_HORIZON_DAYS`, `REMINDER_LOOKBACK_DAYS`) tunes how much outage the
+scheduler recovers from - an operational property of the deployment, not
+something an agency would ever set, and unlike the send hour it never shows up
+in the output - so it stays in the environment rather than becoming a setting.
+Outbound email sends from a shared platform domain with the agency's reply-to;
+per-agency sending domains are a later problem. Process-level configuration
+that stays in the environment: `DATABASE_URL`, `GOOGLE_CLIENT_ID`,
+`RESEND_API_KEY`, `R2_*`, `APP_URL`, logging, and the scheduler's tick and
+batch tuning.
 
 Object storage keys are generated server-side as `org/<org_id>/...`, so an
 attachment can never be addressed across organizations. The reminder planner
-iterates organizations and honors each one's timezone and send hour.
+joins each rule to its organization's settings and honors that organization's
+own timezone and send hour.
 
 ## Onboarding
 
@@ -299,9 +304,9 @@ created automatically by a migration.
 5. **Done (#120):** per-organization invoice and receipt numbers.
 6. Organization settings columns; move the agency-level environment variables
    onto them; scope the reminder planner per organization. **Partially done
-   (#121):** `organizations.name` replaces `AGENCY_NAME`. `MAIL_REPLY_TO`,
-   `REMINDER_TIMEZONE`, `REMINDER_SEND_HOUR` and per-organization planner
-   scoping remain.
+   (#121, #157):** `organizations.name` replaces `AGENCY_NAME`; the reminder
+   planner reads each organization's own timezone and send hour. Only
+   `MAIL_REPLY_TO` remains.
 7. Organization creation and invite flow; retire `ADMIN_EMAIL`.
 8. Demo org: flag, demo sign-in, org-scoped reseed, guardrail settings, banner.
 9. **Done (#122):** row-level security backstop — see *Request scoping*
@@ -309,6 +314,10 @@ created automatically by a migration.
 
 ## History
 
+- 2026-09-22: #157 added `organizations.reminder_timezone` and
+  `organizations.reminder_send_hour`, retiring the `REMINDER_TIMEZONE` and
+  `REMINDER_SEND_HOUR` environment variables; the planner now joins each
+  rule to its organization's row for both values.
 - 2026-08-30 to 2026-09-06: demo mode landed as a standalone deployment in
   #103, #105, #110 and #112 (#104 was reverted by #106 before this). All of
   it was reverted on 2026-09-19 in favor of the demo org above. The database

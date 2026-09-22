@@ -32,8 +32,8 @@ for attempt in $(seq 1 30); do
         break
     fi
     if [ "$attempt" -eq 30 ]; then
-        echo "App did not become healthy within 5 minutes. Last 80 lines:"
-        docker compose logs --tail 80 app
+        echo "App did not become healthy within 5 minutes. Last 250 lines:"
+        docker compose logs --tail 250 app
         echo ""
         echo "Deployment FAILED - the previous image is no longer running either."
         exit 1

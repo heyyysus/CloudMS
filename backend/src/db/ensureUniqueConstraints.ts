@@ -228,6 +228,17 @@ export async function ensureUniqueConstraints(): Promise<number> {
               })`
         console.log(`${how} unique constraint ${constraint.name} on ${tableName}`)
         created++
+      } else {
+        // Logged for every constraint, not just the ones changed. When push
+        // stalls on a prompt for a constraint this step believes is already
+        // correct, "0 added" is not enough to tell anyone why - this line is
+        // what says which of the two views disagrees, and how.
+        console.log(
+          `Unique constraint ${constraint.name} on ${tableName} ok ` +
+            `(declared ${constraint.columns.join(", ")}; ` +
+            `pg_constraint ${before === null ? "nothing" : before.join(", ")}; ` +
+            `push ${seen === null ? "nothing" : seen.join(", ")})`
+        )
       }
     }
   }

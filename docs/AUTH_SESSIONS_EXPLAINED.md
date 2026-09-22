@@ -48,11 +48,17 @@ layer above (`auth/middleware.ts`, `auth/routes.ts`).
   `new Date()` itself so callers never forget to bump it. This is what
   `auth/routes.ts` calls on first login to persist the Google `sub` once a
   user's identity is confirmed (see the `googleSub` binding logic below).
-- **`deleteUser(id)`** — deletes by id and returns whether a row was
-  actually removed (`deleted.length > 0`), so callers can distinguish "user
-  didn't exist" from "user deleted." Because `sessions.user_id` has
-  `onDelete: "cascade"` in the schema, deleting a user also deletes all of
-  their sessions automatically — no manual cleanup needed here.
+- **`softDeleteUser(id, actorId)`** — marks a user deleted rather than
+  removing the row: stamps `deletedAt`/`deletedBy` and flips `isActive` to
+  `false`, and only matches a row that isn't already deleted. Returns the
+  updated row, or `undefined` when the user didn't exist or was already
+  deleted, so callers can tell those apart. The row staying put is the whole
+  point — existing history remains attributed to the same user id.
+- **`restoreUser(id)`** — the inverse: clears `deletedAt`/`deletedBy` and
+  sets `isActive` back to `true`, matching only a row that *is* currently
+  deleted. Reachable only by re-inviting a deleted user's email (see
+  `POST /users/invite`), which re-activates the account under its original
+  id.
 
 ### Notable design decisions
 
@@ -92,15 +98,8 @@ until this timestamp."
   *nonexistent* one, rather than making both cases look identical.
 - **`deleteSessionByTokenHash(tokenHash)`** — used by `POST /auth/logout` to
   invalidate exactly the session the caller is currently using. Returns a
-  boolean (`deleted.length > 0`) the same way `deleteUser` does.
-- **`deleteSessionsByUserId(userId)`** — revokes *all* sessions for one
-  user (e.g. "log out everywhere," or an admin deactivating an account).
-  Returns a count instead of a boolean since "how many sessions were killed"
-  is meaningful here. Not currently wired to a route, but exists as the
-  building block for that feature. This is also the reason
-  `sessions.user_id` needed an index (`sessions_user_id_idx`, added in
-  migration `0002`) — without it, this query and every cascading delete from
-  `users` did a full table scan.
+  boolean (`deleted.length > 0`) so the caller can tell "already gone" from
+  "just deleted."
 - **`deleteExpiredSessions()`** — deletes every session where `expiresAt` is
   in the past, returning the count deleted. This exists so expired rows
   don't accumulate forever, but as of now **nothing calls it on a schedule**
@@ -111,12 +110,16 @@ until this timestamp."
   used by `POST /auth/org` (and, with `orgId` supplied at creation time
   instead, by the auto-bind branch of `POST /auth/google`). This is the only
   place `sessions.org_id` is ever written after the row is created.
-- **`deleteSessionsByUserIdAndOrg(userId, orgId)`** — like
-  `deleteSessionsByUserId`, but scoped to one organization: revokes only the
-  caller's sessions bound to that org, leaving their sessions in any other
-  org (or an org-less session) untouched. `routes/users.ts` calls this
-  instead of `deleteSessionsByUserId` whenever a membership is deactivated,
-  since a membership change in one org must not log the user out of another.
+- **`deleteSessionsByUserIdAndOrg(userId, orgId)`** — revokes a user's
+  sessions bound to one organization, leaving their sessions in any other
+  org (or an org-less session) untouched. Returns a count rather than a
+  boolean, since "how many sessions were killed" is the meaningful answer
+  here. `routes/users.ts` calls it whenever a membership is deactivated,
+  because a membership change in one org must not log the user out of
+  another. This is also why `sessions.user_id` carries an index
+  (`sessions_user_id_idx`, declared on the `sessions` table in `schema.ts`)
+  — without it, this query and every cascading delete from `users` would do
+  a full table scan.
 
 ### Notable design decisions
 
@@ -125,10 +128,10 @@ until this timestamp."
   leak alone can't be replayed as a valid session cookie — an attacker would
   also need the original random token, which only ever lives in the
   client's cookie.
-- All four "does this exist" mutations (`deleteUser`, `deleteSessionByTokenHash`,
-  `deleteSessionsByUserId`, `deleteExpiredSessions`) use `.returning({ id: ... })`
-  purely to get a row count/boolean back cheaply, not because the id itself
-  is used.
+- All three deleting mutations (`deleteSessionByTokenHash`,
+  `deleteSessionsByUserIdAndOrg`, `deleteExpiredSessions`) use
+  `.returning({ id: ... })` purely to get a row count/boolean back cheaply,
+  not because the id itself is used.
 
 ---
 
@@ -169,10 +172,6 @@ Integration tests for `sessions.ts`, run against a real Postgres database
   confirms the session is now unfindable, then deletes the same hash again
   (expects `false`) — checking the "already gone" case is distinguishable
   from "successfully deleted."
-- **"deletes all sessions for a user"** — creates two sessions for the same
-  user, calls `deleteSessionsByUserId`, and checks the count is `2` and that
-  one of the two tokens is no longer findable — verifying the bulk delete
-  isn't scoped incorrectly (e.g. accidentally deleting only one row).
 - **"deletes only expired sessions"** — creates one already-expired session
   and one live session for the same user, then asserts
   `deleteExpiredSessions()` removes the expired one (findable check returns

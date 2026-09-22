@@ -1,7 +1,6 @@
 import "dotenv/config"
-import { eq, sql } from "drizzle-orm"
+import { sql } from "drizzle-orm"
 import { adminDb as db } from "./index"
-import { organizations } from "./schema"
 
 // Runs once at container start, before `drizzle-kit push` (see Dockerfile
 // CMD) - push is what emits `SET NOT NULL` on org_id, and that fails outright
@@ -89,16 +88,23 @@ async function needsDefaultOrg(): Promise<boolean> {
 }
 
 async function ensureDefaultOrg(): Promise<string> {
-  await db
-    .insert(organizations)
-    .values({ name: "default org", slug: "default-org" })
-    .onConflictDoNothing({ target: organizations.slug })
-  const [defaultOrg] = await db
-    .select({ id: organizations.id })
-    .from(organizations)
-    .where(eq(organizations.slug, "default-org"))
+  // Raw SQL, not the drizzle model: this runs *before* push, so the live
+  // organizations table is still the previous release's. An insert built from
+  // the model names every column schema.ts declares today, and Postgres
+  // rejects the whole statement for the ones the table has not got yet - so
+  // adding any column to organizations would break the boot here, one step
+  // before the push that would have added it. Naming only name and slug keeps
+  // this working against both shapes; every other column has a DB default.
+  await db.execute(sql`
+    insert into organizations (name, slug)
+    values ('default org', 'default-org')
+    on conflict (slug) do nothing
+  `)
+  const defaultOrgRows = await db.execute<{ id: string }>(
+    sql`select id from organizations where slug = 'default-org'`
+  )
   console.log("Ensured default organization exists")
-  return defaultOrg.id
+  return defaultOrgRows.rows[0].id
 }
 
 async function backfillRootTables(defaultOrgId: string): Promise<void> {

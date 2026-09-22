@@ -1,0 +1,202 @@
+name: agent-automerge
+
+# Merges an agent/issue-* PR once the PR-review stage has finished, when the review
+# is `clean` or `advisory` and CI is green. A soft block is not a block: advisory
+# findings are recorded on the PR and merged over.
+#
+# Haiku makes the call and fails closed — an unparseable answer, a missing verdict,
+# or review prose describing a security hole, data loss or a destructive migration
+# holds the merge even when the verdict line says `advisory`.
+#
+# Never merges when: the verdict is `blocking-security`, any check failed, checks are
+# still running past the deadline, the PR is a draft or conflicting, or the issue
+# carries `needs-human` or `agent:no-automerge`.
+#
+# The merge uses the PAT on purpose: a GITHUB_TOKEN merge emits no events, so
+# agent-cleanup and agent-next would never fire.
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: agent-automerge-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  automerge:
+    if: github.event.label.name == 'pipeline:pr-reviewed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ISSUE: ${{ github.event.issue.number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same trust boundary as every other stage: CODEOWNER author + `agent` label.
+      - id: gate
+        uses: ./.github/actions/check-eligibility
+        with:
+          issue_number: ${{ env.ISSUE }}
+          github_token: ${{ github.token }}
+
+      - name: Resolve PR and check hard preconditions
+        id: pre
+        if: steps.gate.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "go=false" >> "$GITHUB_OUTPUT"
+
+          labels=$(gh issue view "$ISSUE" --json labels -q '.labels[].name')
+          for blocker in needs-human agent:no-automerge; do
+            if grep -qxF "$blocker" <<< "$labels"; then
+              echo "Held: issue carries \`$blocker\`." | tee -a "$GITHUB_STEP_SUMMARY"; exit 0
+            fi
+          done
+
+          pr=$(gh pr list --head "agent/issue-$ISSUE" --state open --json number -q '.[0].number // ""')
+          if [[ -z "$pr" ]]; then
+            echo "No open PR for agent/issue-$ISSUE." | tee -a "$GITHUB_STEP_SUMMARY"; exit 0
+          fi
+          echo "PR=$pr" >> "$GITHUB_ENV"
+
+          draft=$(gh pr view "$pr" --json isDraft -q .isDraft)
+          mergeable=$(gh pr view "$pr" --json mergeable -q .mergeable)
+          head=$(gh pr view "$pr" --json headRefOid -q .headRefOid)
+          echo "HEAD_SHA=$head" >> "$GITHUB_ENV"
+          if [[ "$draft" == "true" ]]; then
+            echo "Held: PR #$pr is a draft." | tee -a "$GITHUB_STEP_SUMMARY"; exit 0
+          fi
+          if [[ "$mergeable" == "CONFLICTING" ]]; then
+            echo "Held: PR #$pr conflicts with main." | tee -a "$GITHUB_STEP_SUMMARY"; exit 0
+          fi
+
+          # The PR review is advisory and not a required check, so its completion says
+          # nothing about CI. Wait for the rollup to settle, then demand green.
+          deadline=$(( SECONDS + 1200 ))
+          while :; do
+            roll=$(gh pr view "$pr" --json statusCheckRollup \
+                   -q '[.statusCheckRollup[]? | select(.__typename == "CheckRun")]')
+            pending=$(jq '[.[] | select(.status != "COMPLETED")] | length' <<< "$roll")
+            [[ "$pending" == "0" ]] && break
+            if (( SECONDS >= deadline )); then
+              echo "Held: $pending check(s) still running after 20m." | tee -a "$GITHUB_STEP_SUMMARY"; exit 0
+            fi
+            sleep 30
+          done
+          failed=$(jq -r '[.[] | select(.conclusion != "SUCCESS" and .conclusion != "SKIPPED"
+                                        and .conclusion != "NEUTRAL")] | map(.name) | join(", ")' <<< "$roll")
+          if [[ -n "$failed" ]]; then
+            echo "Held: failing checks — $failed." | tee -a "$GITHUB_STEP_SUMMARY"; exit 0
+          fi
+
+          # The review for THIS head sha, found via the marker the review stage writes.
+          review=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${pr}/comments" --paginate \
+                   --jq "[.[] | select(.body | contains(\"<!-- pipeline-reviewed: ${head} -->\"))] | last | .body // \"\"")
+          if [[ -z "$review" ]]; then
+            echo "Held: no review comment found for $head." | tee -a "$GITHUB_STEP_SUMMARY"; exit 0
+          fi
+          verdict=$(grep -oE 'PIPELINE-VERDICT: *(clean|advisory|blocking-security)' <<< "$review" \
+                    | tail -1 | awk '{print $2}')
+          if [[ "$verdict" != "clean" && "$verdict" != "advisory" ]]; then
+            echo "Held: verdict is \`${verdict:-unparseable}\`." | tee -a "$GITHUB_STEP_SUMMARY"; exit 0
+          fi
+
+          {
+            echo "REVIEW<<__REVIEW__"
+            printf '%s\n' "$review"
+            echo "__REVIEW__"
+          } >> "$GITHUB_ENV"
+          echo "VERDICT=$verdict" >> "$GITHUB_ENV"
+          echo "go=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build prompt
+        if: steps.pre.outputs.go == 'true'
+        run: |
+          {
+            echo "PROMPT<<__PROMPT__"
+            cat <<EOF
+          You are the auto-merge gate of an automated pipeline for the CloudMS repo. CI is
+          green and the PR-review stage returned verdict \`$VERDICT\` for PR #$PR.
+
+          Decide whether to merge. The pipeline's policy is that a soft block is not a block:
+          \`clean\` and \`advisory\` both merge by default, and advisory findings are accepted
+          as recorded-but-not-blocking. Do NOT hold merely because findings exist, because a
+          nit is unaddressed, or because coverage could be better.
+
+          Override that default and hold ONLY if the review text itself describes something
+          that must not land regardless of the verdict line it carries:
+          - an exploitable security or cross-tenant data-exposure problem;
+          - data loss, a destructive or irreversible migration, or dropped user data;
+          - a change the review says breaks the build, the app, or an unrelated feature.
+
+          Reply with ONLY a single line of JSON, no prose, no code fence:
+          {"decision": <"merge"|"hold">, "reason": "<one short sentence>"}
+          If you are unsure, answer hold.
+
+          Review body:
+          $REVIEW
+          EOF
+            echo "__PROMPT__"
+          } >> "$GITHUB_ENV"
+
+      - id: claude
+        if: steps.pre.outputs.go == 'true'
+        uses: ./.github/actions/claude-run
+        with:
+          stage: automerge
+          model: haiku
+          max_turns: 2
+          allowed_tools: ""
+          prompt: ${{ env.PROMPT }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+
+      - name: Merge or hold
+        if: steps.pre.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+          RESULT: ${{ steps.claude.outputs.result }}
+        run: |
+          set -euo pipefail
+          json=$(grep -oE '\{[^}]*\}' <<< "$RESULT" | head -1 || true); [[ -n "$json" ]] || json="{}"
+          decision=$(jq -r '.decision // ""' <<< "$json")
+          reason=$(jq -r '.reason // ""' <<< "$json")
+
+          if [[ "$decision" != "merge" ]]; then
+            # Fails closed: an empty or unparseable answer lands here too.
+            gh issue edit "$ISSUE" --add-label "needs-human"
+          cat > "$RUNNER_TEMP/body.md" <<EOF
+          Auto-merge held (verdict \`$VERDICT\`): ${reason:-no parseable decision returned}
+
+          Remove \`needs-human\` and merge by hand if this is wrong.
+
+          ---
+          _Generated by [Claude Code](https://claude.ai/code)_
+          EOF
+            gh pr comment "$PR" --body-file "$RUNNER_TEMP/body.md"
+            exit 0
+          fi
+
+          gh pr merge "$PR" --squash --delete-branch
+          cat > "$RUNNER_TEMP/body.md" <<EOF
+          Auto-merged on verdict \`$VERDICT\`: $reason
+
+          ---
+          _Generated by [Claude Code](https://claude.ai/code)_
+          EOF
+          gh pr comment "$PR" --body-file "$RUNNER_TEMP/body.md"
+
+      - if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
+        run: |
+          gh issue edit "$ISSUE" --add-label "needs-human" || true
+          gh issue comment "$ISSUE" --body "Auto-merge stage failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" || true

@@ -89,6 +89,20 @@ describe("sendWelcomeEmail", () => {
     expect(logRow.triggeredBy).toBe(admin.id)
   })
 
+  // emails.ts:109 threads the organization's reply-to into the welcome send.
+  // Nothing asserted it reached Resend, so dropping that argument stayed green.
+  it("sends the organization's reply_to", async () => {
+    configureMail()
+    const fetchMock = stubResend({ id: "msg_replyto" })
+    const org = await ctx.org({ mailReplyTo: "welcome@example.com" })
+    const { invitee, admin } = await makeUsers()
+
+    await runInOrg(org.id, () => sendWelcomeEmail(org.id, invitee, admin, "staff"))
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string)
+    expect(body.reply_to).toBe("welcome@example.com")
+  })
+
   it("logs a failed entry and returns a failure result when mail isn't configured", async () => {
     delete process.env.RESEND_API_KEY
     delete process.env.MAIL_FROM

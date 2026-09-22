@@ -5,7 +5,8 @@ the repository modules that back it (`repositories/users.ts`,
 `repositories/sessions.ts`, `repositories/orgMemberships.ts`) and the test
 files that exercise them (`repositories/sessions.test.ts`,
 `repositories/orgMemberships.test.ts`, `auth/auth.test.ts`,
-`auth/org.test.ts`). Since sub-issue 3 of the multitenancy rollout (see
+`auth/org.test.ts`, `auth/platformOwner.test.ts`). Since sub-issue 3 of the
+multitenancy rollout (see
 `docs/multitenancy.md`), a session also carries the caller's *active
 organization*: `users.role` is gone, `org_memberships.role` is the only
 source of a user's role, and every route outside `/auth/*` requires an
@@ -261,8 +262,8 @@ reachable before a session is bound to an org; every other router still uses
   it"** — the happy path: a pre-existing user with exactly one active
   membership, Google confirms their email, and the response is a 200 with
   `{ user, org, memberships }` (`user` is the public shape — `id`, `email`,
-  `name`, `role` — notably *not* `googleSub` or timestamps, since
-  `publicUser()` in `routes.ts` explicitly whitelists fields) plus a
+  `name`, `role`, `isPlatformOwner` — notably *not* `googleSub` or timestamps,
+  since `publicUser()` in `routes.ts` explicitly whitelists fields) plus a
   `Set-Cookie` header containing `HttpOnly`. It also checks that
   `findUserByEmail` now shows the user's `googleSub` was persisted —
   confirming the **first-login binding** behavior in `routes.ts` (a user row
@@ -374,6 +375,39 @@ return.
   membership), not to "is this user an admin anywhere." A user who is
   `staff` in the org their session is bound to gets 403 even though the same
   person is `admin` of a different org.
+
+### `requirePlatformOwner` tests (`auth/platformOwner.test.ts`)
+
+New in #161: `requirePlatformOwner` reads `req.user!.isPlatformOwner`, never
+`req.membership`, so it pairs with `requireSession` and not `requireAuth` — a
+platform owner acts before an org exists or across orgs they don't belong to.
+`users.is_platform_owner` is seeded by `ensurePlatformOwner()`
+(`db/platformOwner.ts`) from `PLATFORM_OWNER_EMAIL`; no route calls this
+middleware yet.
+
+- **"lets a platform owner through with an unbound session and zero
+  memberships"** — the capability works even for a session with no org
+  bound, which `requireAuth` would 403 on. Uses a hand-minted unbound
+  session (`unboundSessionCookie`) since no login route can produce one for
+  a zero-membership user yet (`.env.example`'s risk note, #162).
+- **"rejects a user holding an admin membership in every org, not just this
+  one"** — confirms the flag, not accumulated `admin` memberships, is what
+  gates this: three-for-three `admin` still 403s without
+  `isPlatformOwner: true`.
+- **"grants nothing inside an org: a platform owner with staff membership
+  still fails requireRole(admin)"** — the reverse direction: being a
+  platform owner doesn't feed `requireRole`, so it can't shortcut an
+  in-org role check.
+- **"401s with no session cookie"** — same unauthenticated case every other
+  middleware here rejects.
+- **"401s when mounted without requireSession, even for a real platform
+  owner"** — guards against `requirePlatformOwner` being used standalone;
+  without `requireSession` populating `req.user` first, even a genuine
+  platform owner is rejected rather than silently passing.
+
+`GET /auth/me` also gained two cases in this file confirming
+`user.isPlatformOwner` reflects the flag (`true`/`false`) in the response
+body.
 
 ### `POST /auth/org` tests (`auth/org.test.ts`)
 

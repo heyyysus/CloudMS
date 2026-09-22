@@ -10,8 +10,8 @@ import { MailNotConfiguredError, MailSendError, plainTextToHtml, sendEmail } fro
 import type { User, UserRole } from "./types"
 
 // The sending organization's reply-to, or undefined when it has not set
-// one - mailer.ts then omits reply_to entirely, which is what an unset
-// MAIL_REPLY_TO did before #158.
+// one - mailer.ts then omits reply_to entirely, matching pre-#158 behavior
+// when the agency-wide reply-to env var was unset.
 export async function orgReplyTo(orgId: string): Promise<string | undefined> {
   const org = await findOrganizationById(orgId)
   return org?.mailReplyTo ?? undefined

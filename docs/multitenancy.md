@@ -233,9 +233,10 @@ Anything that is really a property of the agency moves from the process
 environment to columns on `organizations`. **Done (#121):** `organizations.name`
 replaces `AGENCY_NAME`, which no longer exists as an environment variable.
 **Done (#157):** per-organization reminder timezone and send hour columns,
-read by the planner. **Remains:** `MAIL_REPLY_TO` is the last agency-level
-variable still waiting for a column. `MAIL_FROM` and the reminder planning
-window stay process-wide by design rather than pending. The planning window
+read by the planner. **Done (#158):** `organizations.mail_reply_to` replaces
+`MAIL_REPLY_TO`, the last agency-level environment variable. `MAIL_FROM` and
+the reminder planning window stay process-wide by design rather than
+pending. The planning window
 (`REMINDER_HORIZON_DAYS`, `REMINDER_LOOKBACK_DAYS`) tunes how much outage the
 scheduler recovers from - an operational property of the deployment, not
 something an agency would ever set, and unlike the send hour it never shows up
@@ -303,11 +304,11 @@ created automatically by a migration.
    planner/dispatcher take an explicit `orgId`; `org_id` is `NOT NULL` again
    on every tenant table.
 5. **Done (#120):** per-organization invoice and receipt numbers.
-6. Organization settings columns; move the agency-level environment variables
-   onto them; scope the reminder planner per organization. **Partially done
-   (#121, #157):** `organizations.name` replaces `AGENCY_NAME`; the reminder
-   planner reads each organization's own timezone and send hour. Only
-   `MAIL_REPLY_TO` remains.
+6. **Done (#121, #157, #158).** Organization settings columns; move the
+   agency-level environment variables onto them; scope the reminder planner
+   per organization. `organizations.name` replaces `AGENCY_NAME`; the
+   reminder planner reads each organization's own timezone and send hour;
+   `organizations.mail_reply_to` replaces `MAIL_REPLY_TO`.
 7. Organization creation and invite flow; retire `ADMIN_EMAIL`.
 8. Demo org: flag, demo sign-in, org-scoped reseed, guardrail settings, banner.
 9. **Done (#122):** row-level security backstop — see *Request scoping*
@@ -315,6 +316,9 @@ created automatically by a migration.
 
 ## History
 
+- 2026-09-22: #158 added `organizations.mail_reply_to`, retiring the
+  `MAIL_REPLY_TO` environment variable; every send now takes its reply-to
+  from the sending organization's row instead.
 - 2026-09-22: #157 added `organizations.reminder_timezone` and
   `organizations.reminder_send_hour`, retiring the `REMINDER_TIMEZONE` and
   `REMINDER_SEND_HOUR` environment variables; the planner now joins each

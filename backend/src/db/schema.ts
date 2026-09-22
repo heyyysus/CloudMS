@@ -58,8 +58,8 @@ export const organizations = pgTable("organizations", {
     .notNull()
     .default("America/Chicago"),
   reminderSendHour: integer("reminder_send_hour").notNull().default(9),
-  // Null means the org hasn't set one, which reproduces today's behavior when
-  // MAIL_REPLY_TO was unset: sends carry no reply-to at all.
+  // Null means the org hasn't set one, which reproduces the pre-#158 behavior
+  // of an unset agency-wide reply-to: sends carry no reply-to at all.
   mailReplyTo: varchar("mail_reply_to", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

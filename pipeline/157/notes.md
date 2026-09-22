@@ -65,3 +65,10 @@ pushed with the new columns):
 - `npm run build` — pass
 
 No frontend checks run — no files under `frontend/` changed.
+
+## Docs
+
+No further doc changes needed. `docs/multitenancy.md` was already updated as
+part of the implementation diff (Remains → Done (#157), History entry); no
+API, auth, UI, or setup-step changes to reflect elsewhere, and README.md
+doesn't enumerate individual env vars.

@@ -4,12 +4,26 @@ import { runInOrg } from "../db"
 import { generateRowId } from "../db/ids"
 import { seedWelcomeTemplate } from "../emails"
 import { InviteResult, inviteToOrg } from "../invites"
-import { createOrganization } from "../repositories"
+import { createOrganization, listOrganizations } from "../repositories"
 import type { Organization } from "../types"
 import { firstIssue, isPgUniqueViolation } from "./helpers"
 import { createOrganizationBody } from "./schemas"
 
 export const organizationsRouter = Router()
+
+// Platform-owner-only, same pair as POST below: requireSession, not
+// requireAuth - a platform owner acts across orgs they hold no membership in.
+organizationsRouter.get(
+  "/organizations",
+  requireSession,
+  requirePlatformOwner,
+  async (_req: Request, res: Response) => {
+    const organizations = await listOrganizations()
+    res.json({
+      organizations: organizations.map((org) => ({ id: org.id, name: org.name, slug: org.slug })),
+    })
+  }
+)
 
 // Thrown inside the runInOrg transaction below to roll back the just-created
 // organization row when seating its admin fails - a zero-admin org is worse

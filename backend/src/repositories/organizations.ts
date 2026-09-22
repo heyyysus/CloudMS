@@ -16,6 +16,13 @@ export async function findOrganizationBySlug(slug: string): Promise<Organization
   return row
 }
 
+// Platform-owner only (see GET /organizations) - every organization on the
+// deployment, not scoped to any one of them. `organizations` is exempt from
+// RLS (see rls.ts's AUTH_LAYER_TABLES), so plain `db` already sees every row.
+export async function listOrganizations(): Promise<Organization[]> {
+  return db.select().from(organizations).orderBy(organizations.name)
+}
+
 export async function createOrganization(values: NewOrganization): Promise<Organization> {
   const [row] = await db.insert(organizations).values(values).returning()
   return row

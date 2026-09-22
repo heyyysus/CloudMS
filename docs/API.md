@@ -698,6 +698,34 @@ Entry types: `payment_received` (in), `carrier_sweep` (out, carries `carrierId`)
 `agency_fee` (out). A fully collected-and-settled transaction nets the trust
 balance back to `0.00`.
 
+### Trust reporting
+
+Org-wide reads over the same `trust_ledger` rows, admin-only: a date-ranged
+summary, a bucketed series, and a paginated entry list. All three take
+`?range=this-month|last-3-months|ytd|all-time` and bucket in the
+organization's `reminder_timezone` (`this-month` by day, `last-3-months` by
+week, `ytd` and `all-time` by month) — a `date_trunc` on the wall-clock
+reading of `created_at`, the read-side inverse of the send-hour conversion the
+reminder planner (`jobs/planner.ts`) does on write. All three are
+**as-corrected**: a reversal and the row it reverses are both excluded, not
+netted.
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| GET | `/trust-report/summary` | admin | `{ openingBalance, totalIn, totalOut, closingBalance }` |
+| GET | `/trust-report/series` | admin | one point per bucket with activity: `{ bucket, openingBalance, totalIn, totalOut, closingBalance }`, each bucket's opening carried forward from the previous one's closing |
+| GET | `/trust-report/entries` | admin | paginated, newest first: `{ entries, total, limit, offset }` |
+
+`openingBalance` is the as-corrected net strictly before the range (`0.00` for
+`all-time`, which has no lower bound); `closingBalance` = opening + in − out.
+
+`entries` accepts `limit` (default 50, max 200) and `offset` (default 0), plus
+optional `entryType`, `itemType` (an invoice item type, e.g.
+`new_business_sweep`), and `carrierId` filters. Each entry adds `clientId`,
+`clientName`, `policyId`, `policyNumber`, `carrierId`/`carrierName` (sweep
+entries only), and `itemType` (null for `payment_received`) to the ledger
+row's own fields.
+
 ## Search
 
 ### Method: Postgres trigram (`pg_trgm`)

@@ -6,47 +6,38 @@ status: implemented
 
 ## Implemented
 
-- `POST /organizations` (`requireSession` + `requirePlatformOwner`): creates
-  an org and seats its admin atomically, using `runInOrg` as a real
-  transaction (id generated app-side so it can scope the insert itself) —
-  seating failure rolls the org back too, so no zero-admin org can persist.
-- Lifted the invite core out of `POST /users/invite` into `invites.ts`'s
-  `inviteToOrg`, returning a result both routes render; `users.ts` unchanged
-  in behavior (all its tests pass unmodified).
-- `seedWelcomeTemplate(orgId)` in `emails.ts`, lifted from `bootstrap.ts`.
+- `POST /organizations` (`requireSession` + `requirePlatformOwner`): creates an
+  org and seats its admin in one `runInOrg` transaction — seating failure rolls
+  the org back, so no zero-admin org can persist.
+- Invite core lifted out of `POST /users/invite` into `invites.ts`'s
+  `inviteToOrg`, shared by both routes, as was `seedWelcomeTemplate(orgId)`
+  from `bootstrap.ts`; `users.ts` tests pass unmodified.
 - `POST /auth/google` lets a platform owner with zero memberships sign in
   (unbound session) — otherwise they could never reach the new route.
-- `bootstrap.ts`/`db/seed/users.ts`/`.env.example`: `ADMIN_EMAIL` and the
-  bootstrap default org are gone.
+- `ADMIN_EMAIL` and the bootstrap default org are gone.
 
 ## Decisions
 
-- Atomicity via `runInOrg`, not a compensating delete: keeps organization
-  deletion out of the codebase entirely (explicitly out of scope) and gives a
-  real rollback instead of a best-effort cleanup.
+- `backfillOrgIds.ts` creates `default-org` only when a root table actually
+  holds a null `org_id`. It is that row's last creator now, so an
+  unconditional insert resurrected it on every container start.
 
-## Deviations
+## Review round 1
 
-None.
+All four advisory findings fixed: the `default-org` creation above;
+`ci.yml:99`'s stale comment; `POST /organizations` now returns the `email` send
+result like `/users/invite`; duplicated test helpers lifted to
+`TestContext.platformOwner`/`unboundCookie`.
 
-## For the docs stage / reviewer
-
-- `docs/API.md`, `docs/multitenancy.md`, `docs/AUTH_SESSIONS_EXPLAINED.md`,
-  `frontend.md` updated for the new route and `ADMIN_EMAIL` retirement.
-- `.github/workflows/ci.yml:99-101`'s bootstrap comment ("welcome email
-  template, admin user") is now stale — left unedited, out of scope.
+Auth judgment (what the fixer escalated): the zero-membership exemption leaks
+nothing new — every other address's response is unchanged, and reaching it
+needs a valid Google token for that address. Its unbound session reaches only
+`requireSession` routes, and `/auth/org` still demands an active membership,
+so it binds to nothing.
 
 ## Checks run
 
-This runner's own database, `PLATFORM_OWNER_EMAIL` unset:
-- `npm run db:push` — pass
-- `npm run db:bootstrap` (twice) — pass, idempotent, no `ADMIN_EMAIL`
-- `npm run typecheck && npm run lint && npm run format:check && npm test && npm run build` — pass, 503/503 tests
-
-## Docs
-
-No changes needed here: `docs/API.md`, `docs/AUTH_SESSIONS_EXPLAINED.md`, and
-`docs/multitenancy.md` already cover `POST /organizations` and the
-`ADMIN_EMAIL` retirement (done in the implementation diff). No
-`ADMIN_EMAIL` references remain in README.md or docs/, and there's no UI
-change for `docs/frontend-ui-design.md`.
+Own throwaway Postgres 16, `PLATFORM_OWNER_EMAIL` unset: `db:push`,
+`db:bootstrap` twice (idempotent, no default org), `typecheck`, `lint`,
+`format:check`, `vitest run` — 503/503. Backfill both ways: no orphans → no
+`default-org`; one orphan → created and adopted.

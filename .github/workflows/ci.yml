@@ -96,10 +96,13 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
-      # Runs the same push + role grants + bootstrap (welcome email template,
-      # admin user) as the production container's CMD (dist/db/roles.js,
-      # dist/db/bootstrap.js), so tests that depend on baseline data (e.g. the
-      # welcome template) see it too, and run as the app role like production.
+      # Runs the same push + role grants + bootstrap as the production
+      # container's CMD (dist/db/roles.js, dist/db/bootstrap.js), so the suite
+      # runs against the same baseline and as the app role like production.
+      # Since #162 bootstrap seeds only the automation user and
+      # PLATFORM_OWNER_EMAIL (unset here, so that half no-ops) - no default
+      # org, no admin user, and no welcome template: TestContext.org() seeds
+      # each test org's own.
       - run: npm run db:push
       - run: npm run db:bootstrap
       # Coverage is report-only (no thresholds in vitest.config.ts): it tracks

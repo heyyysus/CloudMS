@@ -6,10 +6,9 @@ import { afterEach, describe, expect, it } from "vitest"
 import app from "../app"
 import { db } from "../db"
 import { users } from "../db/schema"
-import { createMembership, createSession, createUser } from "../repositories"
+import { createMembership, createUser } from "../repositories"
 import { TestContext } from "../routes/testHelpers"
 import { requireAuth, requirePlatformOwner, requireRole, requireSession } from "./middleware"
-import { generateSessionToken, hashToken } from "./tokens"
 
 const testEmailPrefix = "platform-owner-auth-test-"
 
@@ -20,21 +19,6 @@ function makeUser(suffix: string, isPlatformOwner = false) {
     email: `${testEmailPrefix}${suffix}@example.com`,
     isPlatformOwner,
   })
-}
-
-// Unlike ctx.cookie(), which always binds to an org, this mints an unbound
-// session - the shape a platform owner actually signs in with today (see
-// plan.md's Risks item 1: no membership means no login route reaches this
-// yet, so the middleware itself is what's under test here).
-async function unboundSessionCookie(userId: string): Promise<string> {
-  const token = generateSessionToken()
-  await createSession({
-    userId,
-    orgId: null,
-    tokenHash: hashToken(token),
-    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-  })
-  return `session=${token}`
 }
 
 afterEach(async () => {
@@ -59,7 +43,7 @@ platformOnlyApp.get("/admin-only", requireAuth, requireRole("admin"), (_req, res
 describe("requirePlatformOwner", () => {
   it("lets a platform owner through with an unbound session and zero memberships", async () => {
     const user = await makeUser("unbound", true)
-    const cookie = await unboundSessionCookie(user.id)
+    const cookie = await ctx.unboundCookie(user.id)
 
     const res = await request(platformOnlyApp).get("/platform-only").set("Cookie", cookie)
 
@@ -99,7 +83,7 @@ describe("requirePlatformOwner", () => {
 
   it("401s when mounted without requireSession, even for a real platform owner", async () => {
     const user = await makeUser("unmounted", true)
-    const cookie = await unboundSessionCookie(user.id)
+    const cookie = await ctx.unboundCookie(user.id)
 
     const res = await request(platformOnlyApp).get("/unmounted").set("Cookie", cookie)
 
@@ -110,7 +94,7 @@ describe("requirePlatformOwner", () => {
 describe("GET /auth/me", () => {
   it("reports isPlatformOwner: true for a platform owner", async () => {
     const user = await makeUser("me-owner", true)
-    const cookie = await unboundSessionCookie(user.id)
+    const cookie = await ctx.unboundCookie(user.id)
 
     const res = await request(app).get("/auth/me").set("Cookie", cookie)
 
@@ -120,7 +104,7 @@ describe("GET /auth/me", () => {
 
   it("reports isPlatformOwner: false for an ordinary user", async () => {
     const user = await makeUser("me-ordinary", false)
-    const cookie = await unboundSessionCookie(user.id)
+    const cookie = await ctx.unboundCookie(user.id)
 
     const res = await request(app).get("/auth/me").set("Cookie", cookie)
 

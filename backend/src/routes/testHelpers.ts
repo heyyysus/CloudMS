@@ -186,6 +186,29 @@ export class TestContext {
     return makeSessionCookie(userId, orgId ?? (await this.defaultOrg()))
   }
 
+  // A platform owner holds a deployment-wide capability rather than a
+  // membership, so unlike user() this seats them in no org - which is the
+  // state they are actually in before any organization exists.
+  async platformOwner(prefix: string): Promise<User> {
+    const u = await createUser({ email: `${unique(prefix)}@example.com`, isPlatformOwner: true })
+    this.userIds.push(u.id)
+    return u
+  }
+
+  // The session a platform owner signs in with: authenticated but bound to no
+  // org, which requireSession admits and requireAuth rejects. Distinct from
+  // cookie(), which always binds to one.
+  async unboundCookie(userId: string): Promise<string> {
+    const token = generateSessionToken()
+    await createSession({
+      userId,
+      orgId: null,
+      tokenHash: hashToken(token),
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    })
+    return `session=${token}`
+  }
+
   async person(overrides: Partial<NewPerson> = {}) {
     const { orgId, ...rest } = overrides
     const resolvedOrgId = orgId ?? (await this.defaultOrg())

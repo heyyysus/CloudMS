@@ -525,8 +525,12 @@ Status codes specific to these routes:
 
 `slug` is lowercase letters, digits, and hyphens, unique across all
 organizations (`409` on a collision). The response is
-`{ organization, admin: { id, email, name, role } }`; `admin.role` is always
-`"admin"`. This is how the very first organization on a deployment gets
+`{ organization, admin: { id, email, name, role }, email }`; `admin.role` is
+always `"admin"`, and `email` is the welcome send's outcome in the same shape
+`POST /users/invite` returns it (`{ status: "sent" | "failed", resendId? }`).
+The organization and its admin are committed before the send, so a `failed`
+email still comes back with `201` - the admin exists and can sign in, they
+just have not been told. This is how the very first organization on a deployment gets
 created — see `PLATFORM_OWNER_EMAIL` in `backend/.env.example` and
 `docs/multitenancy.md`'s Onboarding section. Out of scope for now: adding a
 second admin to an existing org (`POST /users/invite` with `role: "admin"`,

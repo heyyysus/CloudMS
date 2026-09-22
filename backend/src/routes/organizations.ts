@@ -76,9 +76,18 @@ organizationsRouter.post(
     }
 
     req.log.info(
-      { orgId: org.id, adminUserId: invite.user.id, actorId: req.user?.id },
+      {
+        orgId: org.id,
+        adminUserId: invite.user.id,
+        actorId: req.user?.id,
+        emailStatus: invite.email.status,
+      },
       "organization created"
     )
+    // `email` mirrors POST /users/invite's response. The organization and its
+    // admin are committed by this point, so a failed welcome send does not
+    // fail the request - without this field the caller would read the 201 as
+    // "the new admin has been told", with no way to see that they have not.
     res.status(201).json({
       organization: org,
       admin: {
@@ -87,6 +96,7 @@ organizationsRouter.post(
         name: invite.user.name,
         role: invite.membership.role,
       },
+      email: invite.email,
     })
   }
 )

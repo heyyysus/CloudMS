@@ -54,12 +54,41 @@ async function backfillFromParent(
   console.log(`Backfilled ${result.rowCount ?? 0} row(s) in ${table} from ${parentTable}`)
 }
 
-async function main() {
-  if (!(await tableExists("organizations"))) {
-    console.log("Skipped org_id backfill (fresh database, no tables yet)")
-    process.exit(0)
-  }
+// The tables whose pre-multitenancy rows have no org-bearing parent, so the
+// default org is the only home available for them. email_log has no parent
+// that outlives it (the recipient may not even resolve to a live client) and
+// email_templates needs a collision check first, so both sit outside the
+// plain loop below - but they still count when deciding whether a default org
+// is needed at all, which is why DEFAULT_ORG_TABLES is what needsDefaultOrg
+// reads and backfillRootTables iterates. One list, so the check cannot drift
+// from the backfill it guards.
+const DEFAULT_ORG_ROOT_TABLES = [
+  "persons",
+  "clients",
+  "carriers",
+  "auto_policies",
+  "reminder_rules",
+]
+const DEFAULT_ORG_TABLES = [...DEFAULT_ORG_ROOT_TABLES, "email_log", "email_templates"]
 
+// Whether any of those tables still holds a row this script would have to
+// place. bootstrap.ts stopped creating the default org in #162, leaving this
+// script its last creator - so creating one unconditionally would resurrect,
+// on every container start, the very row #162 retired. Checked rather than
+// assumed: a deployment that has already been backfilled has no orphans left
+// and therefore needs no default org at all.
+async function needsDefaultOrg(): Promise<boolean> {
+  for (const table of DEFAULT_ORG_TABLES) {
+    if (!(await tableExists(table))) continue
+    const result = await db.execute<{ exists: boolean }>(
+      sql`select exists (select 1 from ${sql.identifier(table)} where org_id is null) as exists`
+    )
+    if (result.rows[0]?.exists === true) return true
+  }
+  return false
+}
+
+async function ensureDefaultOrg(): Promise<string> {
   await db
     .insert(organizations)
     .values({ name: "default org", slug: "default-org" })
@@ -68,18 +97,16 @@ async function main() {
     .select({ id: organizations.id })
     .from(organizations)
     .where(eq(organizations.slug, "default-org"))
-  const defaultOrgId = defaultOrg.id
   console.log("Ensured default organization exists")
+  return defaultOrg.id
+}
 
-  // Pre-multitenancy rows with no org-bearing parent: assign them to the
-  // default org, exactly as bootstrap.ts already treats it as their home.
-  for (const table of ["persons", "clients", "carriers", "auto_policies", "reminder_rules"]) {
+async function backfillRootTables(defaultOrgId: string): Promise<void> {
+  // Pre-multitenancy rows with no org-bearing parent.
+  for (const table of DEFAULT_ORG_ROOT_TABLES) {
     await backfillFromDefaultOrg(table, defaultOrgId)
   }
 
-  // email_log has no parent that outlives it (the recipient may not even
-  // resolve to a live client), so it gets the default org like the tables
-  // above.
   await backfillFromDefaultOrg("email_log", defaultOrgId)
 
   // email_templates is the one root table that can collide: the (org_id,
@@ -101,6 +128,19 @@ async function main() {
     await backfillFromDefaultOrg("email_templates", defaultOrgId)
   } else {
     console.log("Skipped email_templates (table does not exist yet)")
+  }
+}
+
+async function main() {
+  if (!(await tableExists("organizations"))) {
+    console.log("Skipped org_id backfill (fresh database, no tables yet)")
+    process.exit(0)
+  }
+
+  if (await needsDefaultOrg()) {
+    await backfillRootTables(await ensureDefaultOrg())
+  } else {
+    console.log("No rows need the default organization - not creating one")
   }
 
   // Child tables derive their org from the parent the plan names, rather than

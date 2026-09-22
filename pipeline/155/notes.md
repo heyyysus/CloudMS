@@ -87,3 +87,9 @@ None. Implemented exactly what plan.md scoped; `agent-docs.yml` untouched.
 - Negative control: see "For the docs stage / reviewer" above.
 - No backend or frontend files touched, so vitest and the frontend suite were
   not run, per plan scope.
+
+## Docs
+
+No doc changes needed — this only adds a CI test and fixtures for the
+internal agent-pipeline PR-body builder, not user-facing behavior or API
+surface.

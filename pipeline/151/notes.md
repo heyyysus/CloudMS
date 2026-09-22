@@ -62,3 +62,8 @@ covering the CI wiring too.
   block extracted from `action.yml` — clean.
 - No backend/frontend files touched; those check suites don't apply and were
   not run, per plan.md ("Not run: the backend suite").
+
+## Docs
+
+No doc changes needed — change is confined to `.github/actions/report-failure`
+(a CI failure-reporting action), no route/auth/UI/setup surface touched.

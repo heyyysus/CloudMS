@@ -53,7 +53,9 @@ is() { # is <description> <actual> <expected>
 # the block in agent-docs.yml as of #147 (8d43ad6) — renaming the "Open PR" step
 # is safe, but restructuring the `{ … } > file` redirect or the `PATCH=` line
 # breaks extraction, on purpose and loudly.
+# shellcheck disable=SC2016
 start_pattern='^[[:space:]]*PATCH="pipeline/\$ISSUE/workflow-changes\.patch"[[:space:]]*$'
+# shellcheck disable=SC2016
 end_pattern='^[[:space:]]*} > "\$RUNNER_TEMP/pr-body\.md"[[:space:]]*$'
 
 start_matches=$(grep -nE "$start_pattern" "$agent_docs")

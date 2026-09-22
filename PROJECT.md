@@ -63,7 +63,7 @@ CI/CD runs as two GitHub Actions workflows. `ci.yml` typechecks, lints, format-c
 Multi-tenancy's remaining pieces (see `docs/multitenancy.md`):
 
 - **Organization creation and first-admin bootstrap.** Inviting a user into an org that already exists ships today as `POST /users/invite`; what's missing is a route that creates the organization and seats its first admin.
-- **Organization settings columns**, to retire the last agency-level environment variables — `MAIL_REPLY_TO`, `REMINDER_TIMEZONE`, `REMINDER_SEND_HOUR` — together with per-organization scoping of the reminder planner.
+- **Organization settings columns**, to retire the last agency-level environment variable — `MAIL_REPLY_TO`.
 - **A demo org** living in the same deployment.
 
 ## Direction

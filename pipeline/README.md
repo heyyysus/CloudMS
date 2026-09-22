@@ -23,7 +23,7 @@ Each issue gets `pipeline/<issue-number>/` on branch `agent/issue-<n>`:
 | `plan.md` | planner | goal, files/areas, approach, test strategy, risks, out-of-scope |
 | `review.md` | plan reviewer | feedback and a final `Verdict: approved` / `Verdict: rejected` line |
 | `notes.md` | coder, docs | what was built, decisions, deviations from the plan, docs status |
-| `workflow-changes.patch` | coder (only when needed) | changes under `.github/workflows/` the runner's token cannot push; a human applies them to the branch before merge |
+| `workflow-changes.patch` | coder (only when needed) | changes under `.github/workflows/` the runner's token cannot push; a human applies them to the branch before merge. Its presence makes the PR body say `Refs #<n>` instead of `Fixes #<n>`, so merging does not close the issue |
 
 They travel with the PR so the diff shows the full paper trail. The PR review itself
 lives as a PR comment (marker `<!-- pipeline-reviewed: <sha> -->` tracks the last

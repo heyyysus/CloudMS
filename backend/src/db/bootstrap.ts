@@ -30,13 +30,9 @@ async function main() {
     console.log(`Ensured admin user exists for ${adminEmail}`)
   }
 
-  // Wrapped: this runs between db:push and the test suite in CI, so a throw
-  // here must not take the whole bootstrap down with it.
-  try {
-    await ensurePlatformOwner()
-  } catch (err) {
-    console.error(err)
-  }
+  // No-ops unless PLATFORM_OWNER_EMAIL is set, which CI does not set - so it
+  // fails loudly like every other step here rather than hiding a bad seed.
+  await ensurePlatformOwner()
 
   // The author/sender of record for anything the scheduler sends, since
   // policy_logs.author_id is NOT NULL and sendCorrespondenceEmail wants a

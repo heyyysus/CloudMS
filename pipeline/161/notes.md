@@ -10,8 +10,9 @@
   `backend/src/auth/middleware.ts`.
 - `ensurePlatformOwner()` — new `backend/src/db/platformOwner.ts`. Reads
   `PLATFORM_OWNER_EMAIL`, no-ops if unset, otherwise insert-if-absent then
-  flag-on (never flag-off). Called from `bootstrap.ts`, wrapped in try/catch
-  so a throw there can't take down the rest of bootstrap in CI.
+  flag-on (never flag-off). Called from `bootstrap.ts` unwrapped, so a failed
+  seed exits non-zero like every other step there; CI is safe because it sets
+  no `PLATFORM_OWNER_EMAIL`, so the call returns early.
 - `/auth/me`, `/auth/google`, `/auth/org` all return `user.isPlatformOwner`
   now (one shared `publicUser` helper in `auth/routes.ts`).
 - `backend/.env.example` documents `PLATFORM_OWNER_EMAIL` next to

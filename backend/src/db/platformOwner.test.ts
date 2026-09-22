@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { adminDb } from "./index"
 import { ensurePlatformOwner } from "./platformOwner"
 import { users } from "./schema"
@@ -10,8 +10,21 @@ const testEmail = `platform-owner-db-test-${Date.now()}@example.com`
 
 const ctx = new TestContext()
 
+// .env.example tells deployments to set PLATFORM_OWNER_EMAIL, so a run here
+// may start with a real value in the environment - put back whatever was
+// there rather than leaving it deleted.
+let savedPlatformOwnerEmail: string | undefined
+
+beforeEach(() => {
+  savedPlatformOwnerEmail = process.env.PLATFORM_OWNER_EMAIL
+})
+
 afterEach(async () => {
-  delete process.env.PLATFORM_OWNER_EMAIL
+  if (savedPlatformOwnerEmail === undefined) {
+    delete process.env.PLATFORM_OWNER_EMAIL
+  } else {
+    process.env.PLATFORM_OWNER_EMAIL = savedPlatformOwnerEmail
+  }
   await adminDb.delete(users).where(eq(users.email, testEmail))
   await ctx.cleanup()
 })

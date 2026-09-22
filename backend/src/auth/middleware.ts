@@ -135,3 +135,20 @@ export function requireRole(role: UserRole) {
     next()
   }
 }
+
+// Deployment-wide capability, deliberately org-independent: pair with
+// requireSession, never requireAuth - a platform owner acts before an
+// organization exists and across orgs it is not a member of. Not reachable
+// by accumulating memberships: it reads only req.user.isPlatformOwner, never
+// req.membership.
+export function requirePlatformOwner(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) {
+    res.status(401).json({ error: "Not authenticated" })
+    return
+  }
+  if (!req.user.isPlatformOwner) {
+    res.status(403).json({ error: "Insufficient permissions" })
+    return
+  }
+  next()
+}

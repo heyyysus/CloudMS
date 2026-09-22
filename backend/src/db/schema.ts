@@ -77,12 +77,20 @@ export const users = pgTable("users", {
   // from isActive, which is a reversible "disable" the admin can see and undo.
   deletedAt: timestamp("deleted_at"),
   deletedBy: rowIdFk("deleted_by").references((): AnyPgColumn => users.id),
+  // Deployment-level capability, not a revival of users.role: it grants
+  // requirePlatformOwner and nothing else, is independent of any
+  // organization, and cannot be reached by accumulating memberships. Seeded
+  // from PLATFORM_OWNER_EMAIL by ensurePlatformOwner() (db/platformOwner.ts);
+  // never set by request input.
+  isPlatformOwner: boolean("is_platform_owner").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 })
 
 // Which organizations a user belongs to, and their role in each. `role` is
-// the sole source of a user's role - `users.role` was retired in sub-issue 3.
+// still the sole source of a user's *role* inside an org - `users.role` was
+// retired in sub-issue 3. `users.is_platform_owner` above is a separate,
+// org-independent capability; it does not feed requireRole.
 export const orgMemberships = pgTable(
   "org_memberships",
   {

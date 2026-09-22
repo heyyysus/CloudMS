@@ -20,7 +20,13 @@ import { SESSION_TTL_MS, generateSessionToken, hashToken } from "./tokens"
 const loginSchema = z.object({ idToken: z.string().min(1) })
 
 function publicUser(user: User, role: string | null) {
-  return { id: user.id, email: user.email, name: user.name, role }
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role,
+    isPlatformOwner: user.isPlatformOwner,
+  }
 }
 
 // The `{ user, org, memberships }` shape every auth route returns: a

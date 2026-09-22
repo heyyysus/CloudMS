@@ -1,6 +1,7 @@
 import "dotenv/config"
 import { and, eq } from "drizzle-orm"
 import { adminDb as db } from "./index"
+import { ensurePlatformOwner } from "./platformOwner"
 import { emailTemplates, organizations, orgMemberships, users } from "./schema"
 import { AUTOMATION_USER_EMAIL } from "../jobs/automationUser"
 
@@ -27,6 +28,14 @@ async function main() {
       .values({ email: adminEmail.toLowerCase() })
       .onConflictDoNothing({ target: users.email })
     console.log(`Ensured admin user exists for ${adminEmail}`)
+  }
+
+  // Wrapped: this runs between db:push and the test suite in CI, so a throw
+  // here must not take the whole bootstrap down with it.
+  try {
+    await ensurePlatformOwner()
+  } catch (err) {
+    console.error(err)
   }
 
   // The author/sender of record for anything the scheduler sends, since

@@ -366,7 +366,16 @@ export class TestContext {
   // test rather than via this context's own builders) so cleanup still
   // removes it.
   track(
-    kind: "person" | "client" | "carrier" | "policy" | "vehicle" | "user" | "rule" | "template",
+    kind:
+      | "person"
+      | "client"
+      | "carrier"
+      | "policy"
+      | "vehicle"
+      | "user"
+      | "rule"
+      | "template"
+      | "organization",
     id: string
   ) {
     switch (kind) {
@@ -393,6 +402,9 @@ export class TestContext {
         break
       case "template":
         this.templateIds.push(id)
+        break
+      case "organization":
+        this.orgIds.push(id)
         break
     }
   }

@@ -34,6 +34,12 @@ const ENTRIES: Entry[] = [
   { method: "get", path: "/health", kind: "exempt", reason: "no org data" },
   {
     method: "post",
+    path: "/organizations",
+    kind: "exempt",
+    reason: "platform-owner action that creates its own org - no existing org context to leak from",
+  },
+  {
+    method: "post",
     path: "/auth/google",
     kind: "exempt",
     reason: "pre-org: establishes the session itself",

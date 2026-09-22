@@ -165,5 +165,13 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          # Longer than start.sh's own wait for the app, so a failed boot ends
+          # with the container logs it prints rather than a bare SSH timeout.
+          command_timeout: 15m
+          # Pull here rather than leaving it to start.sh: the script pulls the
+          # very file it is running, so any change to it would otherwise sit
+          # unused for one deploy - including changes to how a failure reports.
           script: |
-            bash ${{ secrets.DEPLOY_PATH }}/scripts/start.sh
+            cd ${{ secrets.DEPLOY_PATH }}
+            git pull origin main
+            bash scripts/start.sh

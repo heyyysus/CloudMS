@@ -84,22 +84,28 @@ async function tableExists(name: string): Promise<boolean> {
 // create_unique_constraint and stalls the boot on a prompt. So ask the
 // question the way push asks it, and treat that as the source of truth.
 async function constraintColumnsAsPushSeesThem(tableName: string): Promise<Map<string, string[]>> {
-  const result = await db.execute<{ constraint_name: string; column_name: string }>(
-    sql`select tc.constraint_name, c.column_name
-        from information_schema.table_constraints tc
-        join information_schema.constraint_column_usage as ccu
-          using (constraint_schema, constraint_name)
-        join information_schema.columns as c
-          on c.table_schema = tc.constraint_schema
-          and tc.table_name = c.table_name
-          and ccu.column_name = c.column_name
-        where tc.table_name = ${tableName}
-          and tc.constraint_schema = 'public'
-          and tc.constraint_type = 'UNIQUE'
-        order by c.ordinal_position`
+  // Deliberately drizzle-kit's query verbatim, including what it lacks: no
+  // ORDER BY, and the UNIQUE filter applied after the fact rather than in
+  // SQL. Its diff compares the resulting column arrays positionally, so the
+  // order rows happen to come back in, and any row the loose join duplicates,
+  // are part of what push actually compares. Normalising either here would
+  // hide the mismatch that makes push want to recreate a constraint that is
+  // already correct.
+  const result = await db.execute<{
+    constraint_name: string
+    constraint_type: string
+    column_name: string
+  }>(
+    sql`SELECT c.column_name, c.data_type, constraint_type, constraint_name, constraint_schema
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
+        JOIN information_schema.columns AS c ON c.table_schema = tc.constraint_schema
+          AND tc.table_name = c.table_name AND ccu.column_name = c.column_name
+        WHERE tc.table_name = ${tableName} and constraint_schema = 'public'`
   )
   const byName = new Map<string, string[]>()
   for (const row of result.rows) {
+    if (row.constraint_type !== "UNIQUE") continue
     const columns = byName.get(row.constraint_name)
     if (columns) columns.push(row.column_name)
     else byName.set(row.constraint_name, [row.column_name])

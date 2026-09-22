@@ -69,28 +69,42 @@ async function tableExists(name: string): Promise<boolean> {
   return result.rows[0]?.exists === true
 }
 
-// Matched on name rather than on columns, because that is what push itself
-// diffs on: a same-columns constraint under a different name would still
-// leave push wanting to create this one.
-async function constraintExists(tableName: string, constraintName: string): Promise<boolean> {
-  const result = await db.execute<{ exists: boolean }>(
-    sql`select exists (
-      select 1
-      from pg_constraint c
-      join pg_class t on t.oid = c.conrelid
-      join pg_namespace n on n.oid = t.relnamespace
-      where n.nspname = 'public'
-        and t.relname = ${tableName}
-        and c.conname = ${constraintName}
-        and c.contype = 'u'
-    ) as exists`
+// The columns a unique constraint of this name actually covers, in order, or
+// null when there is no such constraint. The columns matter as much as the
+// name: a release that narrows or widens a unique (auto_policies went from a
+// column-level unique on policy_number to an org-scoped one on (org_id,
+// policy_number) in 2e9c815) can leave the new name attached to the old
+// column list, and push still wants to create the real one. Checking the name
+// alone reports that as "already there", skips it, and hands push the prompt
+// this whole script exists to avoid.
+async function existingConstraintColumns(
+  tableName: string,
+  constraintName: string
+): Promise<string[] | null> {
+  const result = await db.execute<{ column_name: string }>(
+    sql`select a.attname as column_name
+        from pg_constraint c
+        join pg_class t on t.oid = c.conrelid
+        join pg_namespace n on n.oid = t.relnamespace
+        join unnest(c.conkey) with ordinality as k(attnum, ord) on true
+        join pg_attribute a on a.attrelid = t.oid and a.attnum = k.attnum
+        where n.nspname = 'public'
+          and t.relname = ${tableName}
+          and c.conname = ${constraintName}
+          and c.contype = 'u'
+        order by k.ord`
   )
-  return result.rows[0]?.exists === true
+  if (result.rows.length === 0) return null
+  return result.rows.map((row) => row.column_name)
 }
 
 // Drizzle wraps driver errors in DrizzleQueryError with the pg error on
 // `cause`, so the SQLSTATE is never on the error actually thrown here - walk
 // the chain for it, the same way repositories/policyLogs.ts does.
+function sameColumns(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((column, i) => column === b[i])
+}
+
 export function isUniqueViolation(err: unknown): boolean {
   let current = err
   while (typeof current === "object" && current !== null) {
@@ -102,7 +116,8 @@ export function isUniqueViolation(err: unknown): boolean {
 }
 
 async function ensure(tableName: string, constraint: UniqueConstraint): Promise<boolean> {
-  if (await constraintExists(tableName, constraint.name)) return false
+  const existing = await existingConstraintColumns(tableName, constraint.name)
+  if (existing !== null && sameColumns(existing, constraint.columns)) return false
 
   const columns = sql.join(
     constraint.columns.map((column) => sql.identifier(column)),
@@ -110,12 +125,24 @@ async function ensure(tableName: string, constraint: UniqueConstraint): Promise<
   )
   const nullsNotDistinct = constraint.nullsNotDistinct ? sql` nulls not distinct` : sql``
 
+  // A stale definition under the right name is replaced, not left alone -
+  // push would drop it too. Both statements go in one transaction so a
+  // failure to add the new one puts the old one back rather than leaving the
+  // table with neither.
   try {
-    await db.execute(
-      sql`alter table ${sql.identifier(tableName)}
-          add constraint ${sql.identifier(constraint.name)}
-          unique${nullsNotDistinct} (${columns})`
-    )
+    await db.transaction(async (tx) => {
+      if (existing !== null) {
+        await tx.execute(
+          sql`alter table ${sql.identifier(tableName)}
+              drop constraint ${sql.identifier(constraint.name)}`
+        )
+      }
+      await tx.execute(
+        sql`alter table ${sql.identifier(tableName)}
+            add constraint ${sql.identifier(constraint.name)}
+            unique${nullsNotDistinct} (${columns})`
+      )
+    })
   } catch (err) {
     if (!isUniqueViolation(err)) throw err
     const columnList = constraint.columns.join(", ")
@@ -143,8 +170,11 @@ export async function ensureUniqueConstraints(): Promise<number> {
       continue
     }
     for (const constraint of constraints) {
+      const before = await existingConstraintColumns(tableName, constraint.name)
       if (await ensure(tableName, constraint)) {
-        console.log(`Added missing unique constraint ${constraint.name} on ${tableName}`)
+        const how =
+          before === null ? "Added missing" : `Replaced stale (was on ${before.join(", ")})`
+        console.log(`${how} unique constraint ${constraint.name} on ${tableName}`)
         created++
       }
     }

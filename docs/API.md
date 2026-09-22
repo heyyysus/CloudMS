@@ -82,7 +82,13 @@ always returns:
 
 ```json
 {
-  "user": { "id": "F78F3zeSZZj2UmfP0hYjqw", "email": "a@example.com", "name": "A", "role": "admin" },
+  "user": {
+    "id": "F78F3zeSZZj2UmfP0hYjqw",
+    "email": "a@example.com",
+    "name": "A",
+    "role": "admin",
+    "isPlatformOwner": false
+  },
   "org": { "id": "5b4UX2tHkZlKKQxcPr3dnA", "name": "Acme Agency", "slug": "acme" },
   "memberships": [
     { "orgId": "5b4UX2tHkZlKKQxcPr3dnA", "name": "Acme Agency", "slug": "acme", "role": "admin" }
@@ -94,6 +100,9 @@ always returns:
 (new login with multiple memberships, or after `/auth/org` rejected a
 switch). `memberships` lists every org the user has an *active* membership
 in, regardless of which one (if any) the session is currently bound to.
+`user.isPlatformOwner` is independent of `role` and of any org binding — it
+is a deployment-level capability seeded from `PLATFORM_OWNER_EMAIL`, not a
+membership. No route currently checks it (see `docs/multitenancy.md`).
 
 ## No pagination
 

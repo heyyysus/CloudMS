@@ -309,13 +309,22 @@ created automatically by a migration.
    per organization. `organizations.name` replaces `AGENCY_NAME`; the
    reminder planner reads each organization's own timezone and send hour;
    `organizations.mail_reply_to` replaces `MAIL_REPLY_TO`.
-7. Organization creation and invite flow; retire `ADMIN_EMAIL`.
+7. Organization creation and invite flow; retire `ADMIN_EMAIL`. **Done in
+   part (#161):** `users.is_platform_owner` and `requirePlatformOwner`, a
+   deployment-wide capability seeded from `PLATFORM_OWNER_EMAIL`, independent
+   of org membership and not reachable by accumulating memberships. No route
+   uses it yet, and a platform owner with zero memberships can't sign in
+   until the org-creation/invite flow lands - both are #162.
 8. Demo org: flag, demo sign-in, org-scoped reseed, guardrail settings, banner.
 9. **Done (#122):** row-level security backstop — see *Request scoping*
    above.
 
 ## History
 
+- 2026-09-22: #161 added `users.is_platform_owner` and the
+  `requirePlatformOwner` middleware - a deployment-wide capability, seeded
+  from `PLATFORM_OWNER_EMAIL` in `bootstrap.ts`, that no organization can
+  grant. No route uses it yet; that's #162.
 - 2026-09-22: #158 added `organizations.mail_reply_to`, retiring the
   `MAIL_REPLY_TO` environment variable; every send now takes its reply-to
   from the sending organization's row instead.

@@ -150,9 +150,7 @@ jobs:
           GH_TOKEN: ${{ secrets.PIPELINE_BOT_TOKEN }}
           TITLE: ${{ github.event.issue.title }}
         run: |
-          # Tee'd for the case report-failure actually falls back to stage.log: only
-          # when `tail` is empty, i.e. claude-run produced no execution file at all.
-          # Whenever it did, the Claude tail wins and this log is unused.
+          # Tee'd so report-failure can append this step's shell output to its comment.
           exec > >(tee -a "$RUNNER_TEMP/stage.log") 2>&1
           set -euo pipefail
           if gh pr list --head "$BRANCH" --state open --json number -q '.[0].number' | grep -q .; then
@@ -196,8 +194,9 @@ jobs:
           gh issue edit "$ISSUE" --remove-label "pipeline:docs" --add-label "pipeline:pr-open"
 
       # The docs stage is the one that does not fail on an unclean stop, so the
-      # `failure()` block below never reports it. Same reporter, same body, same
-      # tail and WIP sha — it just runs on a stage that carried on.
+      # `failure()` block below never reports it. Same reporter, same tail and WIP
+      # sha; only the headline differs, via `outcome` — the stage carried on, so
+      # calling it "failed" would be wrong and naming a failed step a fiction.
       - name: Report an incomplete docs run
         if: success() && steps.commit.outputs.docs_incomplete == 'true'
         uses: ./.github/actions/report-failure
@@ -206,6 +205,7 @@ jobs:
           stop_reason: ${{ steps.claude.outputs.stop_reason }}
           target: issue
           number: ${{ env.ISSUE }}
+          outcome: stopped early
           resume: >-
             The docs stage stopped early and the PR opened anyway, so this is a notice,
             not a stall. Read the docs part of the diff; to redo them, remove

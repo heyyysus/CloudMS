@@ -45,6 +45,12 @@ jobs:
       - name: claude-run tail renderer
         run: bash .github/actions/claude-run/render-tail.test.sh
 
+      - name: report-failure log renderer
+        run: bash .github/actions/report-failure/render-log.test.sh
+
+      - name: report-failure headline renderer
+        run: bash .github/actions/report-failure/render-headline.test.sh
+
   backend:
     needs: changes
     if: needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'

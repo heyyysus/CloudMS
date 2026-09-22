@@ -23,10 +23,13 @@ inputs:
   resume:
     description: One line of prose telling a human how to resume this stage.
     required: true
+  outcome:
+    description: >-
+      Past-tense outcome word for the headline, e.g. "failed" or "stopped early".
+    default: "failed"
   tail:
     description: >-
-      Pre-rendered transcript tail (claude-run's `tail` output). When empty, this
-      action falls back to $RUNNER_TEMP/stage.log if a step wrote one.
+      Pre-rendered transcript tail (claude-run's `tail` output).
     default: ""
   wip_sha:
     description: SHA of a WIP checkpoint commit made before failing, if any.
@@ -47,6 +50,7 @@ runs:
         TARGET: ${{ inputs.target }}
         NUMBER: ${{ inputs.number }}
         RESUME: ${{ inputs.resume }}
+        OUTCOME: ${{ inputs.outcome }}
         TAIL_IN: ${{ inputs.tail }}
         WIP_SHA: ${{ inputs.wip_sha }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -64,30 +68,47 @@ runs:
           ((.jobs // []) | map(select(.name == $job)) | first // {})
           | ((.steps // []) | map(select(.conclusion == "failure")) | first.name) // empty
         ' <<< "$jobs_json" 2>/dev/null || true)
-        failed_step="${failed_step:-step unknown}"
+
+        # The renderer is best-effort like every other call in this step, but the
+        # headline is the comment's only claim: swallowing a renderer failure into
+        # an empty string would print a blank line where it belongs. Degrade to the
+        # bare facts instead. `outcome` defaults to "failed" in exactly two places —
+        # the input above and render-headline.sh — so do not re-default it here.
+        if ! headline=$(bash "$GITHUB_ACTION_PATH/render-headline.sh" \
+              "$STAGE" "$OUTCOME" "$failed_step" "$STOP_REASON") || [[ -z "$headline" ]]; then
+          headline="**$STAGE stage $OUTCOME** — see the run for details."
+        fi
 
         tail="$TAIL_IN"
-        if [[ -z "$tail" && -f "${RUNNER_TEMP}/stage.log" ]]; then
-          tail=$(tail -n 20 "${RUNNER_TEMP}/stage.log" \
-            | cut -c1-500 \
-            | sed -E 's/gh[pousr]_[A-Za-z0-9]{20,}/[REDACTED]/g; s/github_pat_[A-Za-z0-9_]{20,}/[REDACTED]/g; s/sk-ant-[A-Za-z0-9_-]{20,}/[REDACTED]/g' \
-            | head -c 4000 || true)
+
+        shell_log=""
+        if [[ -f "${RUNNER_TEMP}/stage.log" ]]; then
+          shell_log=$(bash "$GITHUB_ACTION_PATH/render-log.sh" "${RUNNER_TEMP}/stage.log" || true)
         fi
 
         {
           echo "$RESUME"
           echo
-          echo "**$STAGE stage failed** — step \"$failed_step\", stop reason \`${STOP_REASON:-unknown}\`."
+          echo "$headline"
           echo "Run: $RUN_URL"
           if [[ -n "$WIP_SHA" ]]; then
             echo "WIP commit: \`$WIP_SHA\` — partial work is not lost."
           fi
           if [[ -n "$tail" ]]; then
             echo
-            echo "<details><summary>Last ~20 lines of output</summary>"
+            echo "<details><summary>Last ~20 lines of Claude's output</summary>"
             echo
             echo '```'
             printf '%s\n' "$tail"
+            echo '```'
+            echo "</details>"
+          fi
+          if [[ -n "$shell_log" ]]; then
+            echo
+            echo "<details><summary>Last ~20 lines of shell output</summary>"
+            echo
+            echo '```'
+            printf '%s\n' "$shell_log"
             echo '```'
             echo "</details>"
           fi

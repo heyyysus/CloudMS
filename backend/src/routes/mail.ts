@@ -11,6 +11,7 @@ import {
 import {
   buildCorrespondenceMergeValues,
   correspondenceSentLogBody,
+  orgReplyTo,
   sendCorrespondenceEmail,
 } from "../emails"
 import { firstIssue, parseId } from "./helpers"
@@ -62,7 +63,13 @@ mailRouter.post(
     }
 
     try {
-      const result = await sendEmail({ to, subject, html: plainTextToHtml(body), text: body })
+      const result = await sendEmail({
+        to,
+        replyTo: await orgReplyTo(req.orgId!),
+        subject,
+        html: plainTextToHtml(body),
+        text: body,
+      })
       req.log.info(
         { clientId, to, actorId: req.user?.id, resendId: result.id },
         "client email sent"

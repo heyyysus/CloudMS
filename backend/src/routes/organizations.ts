@@ -84,10 +84,7 @@ organizationsRouter.post(
       },
       "organization created"
     )
-    // `email` mirrors POST /users/invite's response. The organization and its
-    // admin are committed by this point, so a failed welcome send does not
-    // fail the request - without this field the caller would read the 201 as
-    // "the new admin has been told", with no way to see that they have not.
+    // `email` mirrors POST /users/invite's response; see docs/API.md.
     res.status(201).json({
       organization: org,
       admin: {

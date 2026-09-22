@@ -319,13 +319,19 @@ created automatically by a migration.
    organization and seats its first admin atomically; `POST /auth/google` lets
    a platform owner with zero memberships sign in (session unbound) so they
    can reach it; `bootstrap.ts` no longer creates a default organization or
-   reads `ADMIN_EMAIL`.
+   reads `ADMIN_EMAIL`. **Done (#163):** `GET /organizations` and the
+   `/platform` console - a platform owner opens it to see every organization
+   and create one; anyone else is redirected to `/home`.
 8. Demo org: flag, demo sign-in, org-scoped reseed, guardrail settings, banner.
 9. **Done (#122):** row-level security backstop — see *Request scoping*
    above.
 
 ## History
 
+- 2026-09-22: #163 added `GET /organizations` and the `/platform` console -
+  a platform owner opens it to see every organization and create one, with no
+  sidebar entry (URL-only, per the issue). Anyone else who navigates there is
+  redirected to `/home`.
 - 2026-09-22: #161 added `users.is_platform_owner` and the
   `requirePlatformOwner` middleware - a deployment-wide capability, seeded
   from `PLATFORM_OWNER_EMAIL` in `bootstrap.ts`, that no organization can

@@ -77,6 +77,36 @@ async function tableExists(name: string): Promise<boolean> {
 // column list, and push still wants to create the real one. Checking the name
 // alone reports that as "already there", skips it, and hands push the prompt
 // this whole script exists to avoid.
+// drizzle-kit does not read unique constraints from pg_constraint - it reads
+// them through information_schema.table_constraints joined to
+// constraint_column_usage (see its pgIntrospect). The two can disagree about
+// the same table, and it is push's view that decides whether push emits a
+// create_unique_constraint and stalls the boot on a prompt. So ask the
+// question the way push asks it, and treat that as the source of truth.
+async function constraintColumnsAsPushSeesThem(tableName: string): Promise<Map<string, string[]>> {
+  const result = await db.execute<{ constraint_name: string; column_name: string }>(
+    sql`select tc.constraint_name, c.column_name
+        from information_schema.table_constraints tc
+        join information_schema.constraint_column_usage as ccu
+          using (constraint_schema, constraint_name)
+        join information_schema.columns as c
+          on c.table_schema = tc.constraint_schema
+          and tc.table_name = c.table_name
+          and ccu.column_name = c.column_name
+        where tc.table_name = ${tableName}
+          and tc.constraint_schema = 'public'
+          and tc.constraint_type = 'UNIQUE'
+        order by c.ordinal_position`
+  )
+  const byName = new Map<string, string[]>()
+  for (const row of result.rows) {
+    const columns = byName.get(row.constraint_name)
+    if (columns) columns.push(row.column_name)
+    else byName.set(row.constraint_name, [row.column_name])
+  }
+  return byName
+}
+
 async function existingConstraintColumns(
   tableName: string,
   constraintName: string
@@ -115,9 +145,25 @@ export function isUniqueViolation(err: unknown): boolean {
   return false
 }
 
-async function ensure(tableName: string, constraint: UniqueConstraint): Promise<boolean> {
-  const existing = await existingConstraintColumns(tableName, constraint.name)
-  if (existing !== null && sameColumns(existing, constraint.columns)) return false
+async function ensure(
+  tableName: string,
+  constraint: UniqueConstraint,
+  asPushSeesIt: Map<string, string[]>
+): Promise<boolean> {
+  // Two views, and both have to agree before this constraint is left alone:
+  // pg_constraint decides whether ALTER TABLE ... ADD would collide, and
+  // push's view decides whether push still wants to create it.
+  const actual = await existingConstraintColumns(tableName, constraint.name)
+  const visible = asPushSeesIt.get(constraint.name) ?? null
+  if (
+    actual !== null &&
+    visible !== null &&
+    sameColumns(actual, constraint.columns) &&
+    sameColumns(visible, constraint.columns)
+  ) {
+    return false
+  }
+  const existing = actual
 
   const columns = sql.join(
     constraint.columns.map((column) => sql.identifier(column)),
@@ -169,11 +215,17 @@ export async function ensureUniqueConstraints(): Promise<number> {
       console.log(`Skipped ${tableName} (table does not exist yet)`)
       continue
     }
+    const asPushSeesIt = await constraintColumnsAsPushSeesThem(tableName)
     for (const constraint of constraints) {
       const before = await existingConstraintColumns(tableName, constraint.name)
-      if (await ensure(tableName, constraint)) {
+      const seen = asPushSeesIt.get(constraint.name) ?? null
+      if (await ensure(tableName, constraint, asPushSeesIt)) {
         const how =
-          before === null ? "Added missing" : `Replaced stale (was on ${before.join(", ")})`
+          before === null
+            ? "Added missing"
+            : `Replaced stale (pg_constraint had ${before.join(", ")}; push saw ${
+                seen === null ? "nothing" : seen.join(", ")
+              })`
         console.log(`${how} unique constraint ${constraint.name} on ${tableName}`)
         created++
       }

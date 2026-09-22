@@ -194,8 +194,9 @@ jobs:
           gh issue edit "$ISSUE" --remove-label "pipeline:docs" --add-label "pipeline:pr-open"
 
       # The docs stage is the one that does not fail on an unclean stop, so the
-      # `failure()` block below never reports it. Same reporter, same body, same
-      # tail and WIP sha — it just runs on a stage that carried on.
+      # `failure()` block below never reports it. Same reporter, same tail and WIP
+      # sha; only the headline differs, via `outcome` — the stage carried on, so
+      # calling it "failed" would be wrong and naming a failed step a fiction.
       - name: Report an incomplete docs run
         if: success() && steps.commit.outputs.docs_incomplete == 'true'
         uses: ./.github/actions/report-failure

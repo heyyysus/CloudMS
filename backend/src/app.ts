@@ -22,6 +22,7 @@ import { receiptsRouter } from "./routes/receipts"
 import { reminderRulesRouter } from "./routes/reminderRules"
 import { searchRouter } from "./routes/search"
 import { trustLedgerRouter } from "./routes/trustLedger"
+import { trustReportRouter } from "./routes/trustReport"
 import { usersRouter } from "./routes/users"
 import { vehiclesRouter } from "./routes/vehicles"
 import { vinDecoderRouter } from "./routes/vinDecoder"
@@ -57,6 +58,7 @@ app.use(paymentsRouter)
 app.use(receiptsRouter)
 app.use(mailRouter)
 app.use(trustLedgerRouter)
+app.use(trustReportRouter)
 app.use(searchRouter)
 app.use(vinDecoderRouter)
 app.use(usersRouter)

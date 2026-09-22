@@ -116,6 +116,9 @@ const ENTRIES: Entry[] = [
   { method: "post", path: "/policies/:policyId/send-correspondence", kind: "create-with-parent" },
   { method: "get", path: "/trust-ledger", kind: "list" },
   { method: "get", path: "/trust-balance", kind: "list" },
+  { method: "get", path: "/trust-report/summary", kind: "list" },
+  { method: "get", path: "/trust-report/series", kind: "list" },
+  { method: "get", path: "/trust-report/entries", kind: "list" },
   { method: "get", path: "/search", kind: "list" },
   {
     method: "get",
@@ -357,6 +360,25 @@ describe("cross-tenant isolation", () => {
       .get(`/trust-balance?clientId=${b.client.id}`)
       .set("Cookie", cookieA)
     expect(balance.body.balance).toBe("0.00")
+
+    // Org B's payment above posted real trust-ledger rows (with today's
+    // createdAt, so any range would otherwise catch them) - org A's admin
+    // must see none of it.
+    const trustSummary = await request(app)
+      .get("/trust-report/summary?range=all-time")
+      .set("Cookie", cookieA)
+    expect(trustSummary.body.closingBalance).toBe("0.00")
+
+    const trustSeries = await request(app)
+      .get("/trust-report/series?range=all-time")
+      .set("Cookie", cookieA)
+    expect(trustSeries.body).toEqual([])
+
+    const trustEntries = await request(app)
+      .get("/trust-report/entries?range=all-time")
+      .set("Cookie", cookieA)
+    expect(trustEntries.body.entries).toEqual([])
+    expect(trustEntries.body.total).toBe(0)
 
     const search = await request(app)
       .get(`/search?q=${encodeURIComponent(b.client.id)}`)

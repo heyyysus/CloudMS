@@ -2,7 +2,10 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
-    "lib": ["ES2020"],
+    // ES2022.Error only, for `new Error(msg, { cause })` - the runtime (Node
+    // 24) has had it for years, and the lint rule here requires it. Not the
+    // whole of ES2022, so nothing else silently starts type-checking.
+    "lib": ["ES2020", "ES2022.Error"],
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,

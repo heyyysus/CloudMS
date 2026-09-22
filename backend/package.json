@@ -14,7 +14,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "db:push": "ts-node src/db/extensions.ts && drizzle-kit push --force && ts-node src/db/roles.ts && ts-node src/db/rls.ts",
+    "db:push": "ts-node src/db/extensions.ts && ts-node src/db/backfillDocumentNumbers.ts && ts-node src/db/ensureUniqueConstraints.ts && ts-node src/db/push.ts && ts-node src/db/roles.ts && ts-node src/db/rls.ts",
     "db:bootstrap": "ts-node src/db/bootstrap.ts",
     "db:backfill-org": "ts-node src/db/backfillOrgIds.ts",
     "db:studio": "drizzle-kit studio",

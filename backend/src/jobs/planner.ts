@@ -49,12 +49,13 @@ export async function planDueReminders(
            -- wall clock for storage. Pinning UTC explicitly keeps the stored
            -- value independent of the database session's TimeZone setting,
            -- which is what drizzle assumes when it reads the column back.
-           (((p.expiration_date - r.offset_days) + make_interval(hours => ${cfg.sendHour}))
-             at time zone ${cfg.timeZone}) at time zone 'UTC'
+           (((p.expiration_date - r.offset_days) + make_interval(hours => o.reminder_send_hour))
+             at time zone o.reminder_timezone) at time zone 'UTC'
     from reminder_rules r
     -- The whole cross-tenant fix: without this, a rule in org A would queue
     -- reminders against org B's policies.
     join auto_policies p on p.org_id = r.org_id and p.status = 'active'
+    join organizations o on o.id = r.org_id
     where r.enabled
       and r.trigger = 'policy_expiration'
       and (p.expiration_date - r.offset_days)

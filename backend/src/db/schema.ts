@@ -54,6 +54,10 @@ export const organizations = pgTable("organizations", {
   slug: varchar("slug", { length: 64 }).notNull().unique(),
   nextInvoiceNumber: integer("next_invoice_number").notNull().default(1),
   nextReceiptNumber: integer("next_receipt_number").notNull().default(1),
+  reminderTimezone: varchar("reminder_timezone", { length: 64 })
+    .notNull()
+    .default("America/Chicago"),
+  reminderSendHour: integer("reminder_send_hour").notNull().default(9),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 })

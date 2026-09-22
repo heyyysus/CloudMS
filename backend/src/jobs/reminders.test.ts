@@ -483,11 +483,16 @@ describe("dispatchReminders", () => {
   it("renders the organization's mail_reply_to into {{agentEmail}}", async () => {
     const org = await ctx.org({ mailReplyTo: "agency@example.com" })
     const fetchMock = stubResend()
-    await dueReminder(212_003, { subject: "Reply to {{agentEmail}}", body: "Regards" })
+    const { email } = await dueReminder(212_003, {
+      subject: "Reply to {{agentEmail}}",
+      body: "Regards",
+    })
 
     await dispatchReminders()
 
-    const [, requestInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    // sendTo, not calls[0]: dispatchReminders claims whatever is due across the
+    // whole table, so a parallel test file's row can be the first send.
+    const [, requestInit] = sendTo(fetchMock, email.email)
     const body = JSON.parse(requestInit.body as string)
     expect(body.subject).toBe(`Reply to ${org.mailReplyTo}`)
   })

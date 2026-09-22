@@ -233,8 +233,9 @@ Anything that is really a property of the agency moves from the process
 environment to columns on `organizations`. **Done (#121):** `organizations.name`
 replaces `AGENCY_NAME`, which no longer exists as an environment variable.
 **Done (#157):** per-organization reminder timezone and send hour columns,
-read by the planner. **Remains:** `MAIL_FROM`, `MAIL_REPLY_TO`, and the
-reminder planning window stay process-wide for now. The planning window
+read by the planner. **Remains:** `MAIL_REPLY_TO` is the last agency-level
+variable still waiting for a column. `MAIL_FROM` and the reminder planning
+window stay process-wide by design rather than pending. The planning window
 (`REMINDER_HORIZON_DAYS`, `REMINDER_LOOKBACK_DAYS`) tunes how much outage the
 scheduler recovers from - an operational property of the deployment, not
 something an agency would ever set, and unlike the send hour it never shows up

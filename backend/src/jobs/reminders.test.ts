@@ -5,10 +5,9 @@
 // dispatchReminders operate over the *whole* table by design - that is what
 // lets any container pick up any due reminder - so two test files exercising
 // them in parallel vitest workers interfere through the database: one file's
-// planner run queues another file's rule, and one file's dispatcher claims
-// and sends another file's row. Vitest
-// runs the tests within a file sequentially, so keeping them together is what
-// makes them deterministic.
+// planner run queues another file's rule, and one file's dispatcher claims and
+// sends another file's row. Vitest runs the tests within a file sequentially,
+// so keeping them together is what makes them deterministic.
 import { randomInt, randomUUID } from "crypto"
 import { eq, inArray } from "drizzle-orm"
 import { Client } from "pg"
@@ -292,7 +291,6 @@ describe("planReminders", () => {
     const [chicagoRow] = await rowsFor(policyChicago.id, orgChicago.id)
     expect(utcRow.scheduledFor.toISOString()).toBe(`${target}T09:00:00.000Z`)
     expect(chicagoRow.scheduledFor.toISOString()).toBe(`${target}T22:00:00.000Z`)
-    expect(utcRow.scheduledFor.getTime()).not.toBe(chicagoRow.scheduledFor.getTime())
   })
 
   // The actual cross-tenant fix (planner.ts's p.org_id = r.org_id join):

@@ -102,7 +102,9 @@ switch). `memberships` lists every org the user has an *active* membership
 in, regardless of which one (if any) the session is currently bound to.
 `user.isPlatformOwner` is independent of `role` and of any org binding — it
 is a deployment-level capability seeded from `PLATFORM_OWNER_EMAIL`, not a
-membership. No route currently checks it (see `docs/multitenancy.md`).
+membership. `POST /organizations` (below) is the only route that checks it.
+A platform owner is also the one case `POST /auth/google` lets through with
+zero active memberships, since they act before any organization exists.
 
 ## No pagination
 
@@ -514,6 +516,22 @@ Status codes specific to these routes:
 
 - `409` on POST/PATCH — a carrier with that NAIC already exists.
 - `409` on DELETE — the carrier is referenced by existing policies or invoices.
+
+## Organizations
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| POST | `/organizations` | **platform owner** | `requireSession`, not `requireAuth` - no org context exists yet. Body `{ name, slug, admin: { email, name? } }`. Creates the organization and seats `admin` as its first admin in one call, atomically: if seating the admin fails (duplicate/deleted email), the organization is rolled back too, so a create never leaves a zero-admin org behind. |
+
+`slug` is lowercase letters, digits, and hyphens, unique across all
+organizations (`409` on a collision). The response is
+`{ organization, admin: { id, email, name, role } }`; `admin.role` is always
+`"admin"`. This is how the very first organization on a deployment gets
+created — see `PLATFORM_OWNER_EMAIL` in `backend/.env.example` and
+`docs/multitenancy.md`'s Onboarding section. Out of scope for now: adding a
+second admin to an existing org (`POST /users/invite` with `role: "admin"`,
+once the org has its first member with an active session, covers that),
+renaming, or deleting an organization.
 
 ## Users
 

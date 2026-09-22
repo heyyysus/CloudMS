@@ -2,7 +2,12 @@ import { eq } from "drizzle-orm"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { db, runInOrg } from "./db"
 import { emailLog } from "./db/schema"
-import { extractMergeFields, renderTemplate, sendWelcomeEmail } from "./emails"
+import {
+  extractMergeFields,
+  renderTemplate,
+  sendCorrespondenceEmail,
+  sendWelcomeEmail,
+} from "./emails"
 import { makeTestUser, TestContext } from "./routes/testHelpers"
 import type { User } from "./types"
 
@@ -87,6 +92,45 @@ describe("sendWelcomeEmail", () => {
     expect(logRow.status).toBe("sent")
     expect(logRow.resendId).toBe("msg_1")
     expect(logRow.triggeredBy).toBe(admin.id)
+  })
+
+  // emails.ts:109 threads the organization's reply-to into the welcome send.
+  // Nothing asserted it reached Resend, so dropping that argument stayed green.
+  it("sends the organization's reply_to", async () => {
+    configureMail()
+    const fetchMock = stubResend({ id: "msg_replyto" })
+    const org = await ctx.org({ mailReplyTo: "welcome@example.com" })
+    const { invitee, admin } = await makeUsers()
+
+    await runInOrg(org.id, () => sendWelcomeEmail(org.id, invitee, admin, "staff"))
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string)
+    expect(body.reply_to).toBe("welcome@example.com")
+  })
+
+  // emails.ts:289, the correspondence call site reached from routes/mail.ts:181.
+  // The reply-to tests in routes/mail.test.ts cover routes/mail.ts:66, which is
+  // a different call into sendEmail, so this one was unasserted.
+  it("sends the organization's reply_to on a correspondence send", async () => {
+    configureMail()
+    const fetchMock = stubResend({ id: "msg_corr" })
+    const org = await ctx.org({ mailReplyTo: "corr@example.com" })
+    const admin = await makeTestUser("emails-corr-admin")
+    ctx.track("user", admin.id)
+
+    await runInOrg(org.id, () =>
+      sendCorrespondenceEmail({
+        orgId: org.id,
+        template: { key: "corr-test", subject: "Hi", body: "Hello" },
+        values: {},
+        to: ["client@example.com"],
+        cc: [],
+        triggeredBy: admin.id,
+      })
+    )
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string)
+    expect(body.reply_to).toBe("corr@example.com")
   })
 
   it("logs a failed entry and returns a failure result when mail isn't configured", async () => {

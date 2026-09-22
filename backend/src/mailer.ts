@@ -1,8 +1,10 @@
 // Outbound transactional email via Resend's HTTP API. This lives server-side,
 // mirroring vinDecoder.ts, so the vendor URL/key and response shape stay out
-// of the client and every send goes through the app's own auth. Config is
-// read inline from process.env per call (not cached at module load) so tests
-// can stub it and so a missing key surfaces per-request rather than at boot.
+// of the client and every send goes through the app's own auth.
+// RESEND_API_KEY/MAIL_FROM are read inline from process.env per call (not
+// cached at module load) so tests can stub them and so a missing key surfaces
+// per-request rather than at boot; reply-to is per-organization and passed in
+// by the caller instead.
 const RESEND_ENDPOINT = "https://api.resend.com/emails"
 
 const MAIL_TIMEOUT_MS = 10_000
@@ -20,6 +22,9 @@ export interface SendEmailInput {
   // Copied recipients. Resend omits the header entirely when absent, so an
   // empty list is normalized to undefined by the caller rather than sent.
   cc?: string[]
+  // The sending organization's reply-to. Omitted (not sent as "") when the
+  // org hasn't set one.
+  replyTo?: string
   subject: string
   html: string
   text: string
@@ -46,8 +51,6 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     throw new MailNotConfiguredError("RESEND_API_KEY and MAIL_FROM must be set to send email")
   }
 
-  const replyTo = process.env.MAIL_REPLY_TO
-
   let res: Response
   try {
     res = await fetch(RESEND_ENDPOINT, {
@@ -63,7 +66,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         subject: input.subject,
         html: input.html,
         text: input.text,
-        ...(replyTo ? { reply_to: replyTo } : {}),
+        ...(input.replyTo ? { reply_to: input.replyTo } : {}),
       }),
       signal: AbortSignal.timeout(MAIL_TIMEOUT_MS),
     })

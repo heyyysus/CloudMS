@@ -169,6 +169,58 @@ describe("POST /clients/:clientId/send-email", () => {
     expect(res.body.to).toEqual(["first@example.com"])
   })
 
+  it("sends with the org's reply-to, and different orgs produce different reply-to", async () => {
+    configureMail()
+    const orgA = await ctx.org({ mailReplyTo: "a@example.com" })
+    const orgB = await ctx.org({ mailReplyTo: "b@example.com" })
+
+    const userA = await ctx.user("mail-replyto-a", "admin", orgA.id)
+    const clientA = await ctx.client({ orgId: orgA.id })
+    await runInOrg(orgA.id, () => addEmailToClient(orgA.id, clientA.id, "clienta@example.com"))
+    const fetchMockA = stubResend({ id: "msg_a" })
+
+    const resA = await request(app)
+      .post(`/clients/${clientA.id}/send-email`)
+      .set("Cookie", await ctx.cookie(userA.id, orgA.id))
+      .send({ subject: "Hi", body: "Hello" })
+    expect(resA.status).toBe(201)
+    const bodyA = JSON.parse(fetchMockA.mock.calls[0][1]?.body as string)
+
+    const userB = await ctx.user("mail-replyto-b", "admin", orgB.id)
+    const clientB = await ctx.client({ orgId: orgB.id })
+    await runInOrg(orgB.id, () => addEmailToClient(orgB.id, clientB.id, "clientb@example.com"))
+    const fetchMockB = stubResend({ id: "msg_b" })
+
+    const resB = await request(app)
+      .post(`/clients/${clientB.id}/send-email`)
+      .set("Cookie", await ctx.cookie(userB.id, orgB.id))
+      .send({ subject: "Hi", body: "Hello" })
+    expect(resB.status).toBe(201)
+    const bodyB = JSON.parse(fetchMockB.mock.calls[0][1]?.body as string)
+
+    expect(bodyA.reply_to).toBe("a@example.com")
+    expect(bodyB.reply_to).toBe("b@example.com")
+    expect(bodyA.reply_to).not.toBe(bodyB.reply_to)
+  })
+
+  it("omits reply_to entirely for an org that hasn't set one", async () => {
+    configureMail()
+    const org = await ctx.org({ mailReplyTo: null })
+    const user = await ctx.user("mail-replyto-null", "admin", org.id)
+    const client = await ctx.client({ orgId: org.id })
+    await runInOrg(org.id, () => addEmailToClient(org.id, client.id, "onfile@example.com"))
+    const fetchMock = stubResend({ id: "msg_null" })
+
+    const res = await request(app)
+      .post(`/clients/${client.id}/send-email`)
+      .set("Cookie", await ctx.cookie(user.id, org.id))
+      .send({ subject: "Hi", body: "Hello" })
+
+    expect(res.status).toBe(201)
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string)
+    expect("reply_to" in body).toBe(false)
+  })
+
   it("returns 503 when mail isn't configured", async () => {
     delete process.env.RESEND_API_KEY
     delete process.env.MAIL_FROM

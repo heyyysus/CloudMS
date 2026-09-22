@@ -5,8 +5,17 @@
 // of the route layer and the logging concern out of the repository layer.
 import { findEmailTemplateByKey } from "./repositories/emailTemplates"
 import { createEmailLogEntry } from "./repositories/emailLog"
+import { findOrganizationById } from "./repositories/organizations"
 import { MailNotConfiguredError, MailSendError, plainTextToHtml, sendEmail } from "./mailer"
 import type { User, UserRole } from "./types"
+
+// The sending organization's reply-to, or undefined when it has not set
+// one - mailer.ts then omits reply_to entirely, matching pre-#158 behavior
+// when the agency-wide reply-to env var was unset.
+export async function orgReplyTo(orgId: string): Promise<string | undefined> {
+  const org = await findOrganizationById(orgId)
+  return org?.mailReplyTo ?? undefined
+}
 
 export const WELCOME_TEMPLATE_KEY = "welcome"
 
@@ -96,7 +105,13 @@ export async function sendWelcomeEmail(
   const html = plainTextToHtml(text)
 
   try {
-    const result = await sendEmail({ to: [user.email], subject, html, text })
+    const result = await sendEmail({
+      to: [user.email],
+      replyTo: await orgReplyTo(orgId),
+      subject,
+      html,
+      text,
+    })
     await createEmailLogEntry(orgId, {
       recipient: user.email,
       templateKey: WELCOME_TEMPLATE_KEY,
@@ -271,7 +286,14 @@ export async function sendCorrespondenceEmail(input: {
   }
 
   try {
-    const result = await sendEmail({ to, cc: cc.length > 0 ? cc : undefined, subject, html, text })
+    const result = await sendEmail({
+      to,
+      cc: cc.length > 0 ? cc : undefined,
+      replyTo: await orgReplyTo(orgId),
+      subject,
+      html,
+      text,
+    })
     await logAll({ resendId: result.id, status: "sent" })
     return { resendId: result.id, subject, body: text }
   } catch (err) {

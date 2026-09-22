@@ -41,10 +41,14 @@ export function remindersEnabled(): boolean {
 // send. Distinct from the automation *user*, which supplies authorship: a
 // client should read the agency's (organization's) name, not "CloudMS
 // Automation". Pure - the caller already has the organization in hand and
-// passes its name in, keeping this module env-only otherwise.
-export function agencyIdentity(org: { name: string }): { name: string; email: string } {
+// passes its name and reply-to in. "" (not undefined) is the empty case,
+// since the result renders into a {{agentEmail}} template string.
+export function agencyIdentity(org: {
+  name: string
+  mailReplyTo: string | null
+}): { name: string; email: string } {
   return {
     name: org.name,
-    email: process.env.MAIL_REPLY_TO ?? "",
+    email: org.mailReplyTo ?? "",
   }
 }

@@ -53,14 +53,12 @@ async function backfillFromParent(
   console.log(`Backfilled ${result.rowCount ?? 0} row(s) in ${table} from ${parentTable}`)
 }
 
-// The tables whose pre-multitenancy rows have no org-bearing parent, so the
-// default org is the only home available for them. email_log has no parent
-// that outlives it (the recipient may not even resolve to a live client) and
-// email_templates needs a collision check first, so both sit outside the
-// plain loop below - but they still count when deciding whether a default org
-// is needed at all, which is why DEFAULT_ORG_TABLES is what needsDefaultOrg
-// reads and backfillRootTables iterates. One list, so the check cannot drift
-// from the backfill it guards.
+// Pre-multitenancy rows with no org-bearing parent: the default org is the
+// only home available for them. ROOT is what the plain loop in
+// backfillRootTables assigns; email_log and email_templates are placed
+// separately (no parent that outlives them, and a same-key collision to
+// resolve first), but they still count towards whether a default org is
+// needed at all, so DEFAULT_ORG_TABLES adds them back for needsDefaultOrg.
 const DEFAULT_ORG_ROOT_TABLES = [
   "persons",
   "clients",
@@ -70,14 +68,12 @@ const DEFAULT_ORG_ROOT_TABLES = [
 ]
 const DEFAULT_ORG_TABLES = [...DEFAULT_ORG_ROOT_TABLES, "email_log", "email_templates"]
 
-// Whether any of those tables still holds a row this script would have to
-// place. bootstrap.ts stopped creating the default org in #162, leaving this
-// script its last creator - so creating one unconditionally would resurrect,
-// on every container start, the very row #162 retired. Checked rather than
-// assumed: a deployment that has already been backfilled has no orphans left
-// and therefore needs no default org at all.
-async function needsDefaultOrg(): Promise<boolean> {
-  for (const table of DEFAULT_ORG_TABLES) {
+// bootstrap.ts stopped creating the default org in #162, leaving this script
+// its last creator - so an unconditional insert would put the row back on
+// every container start. Takes its table list so the orphan branch is
+// testable without dropping NOT NULL on a real table.
+export async function needsDefaultOrg(tables = DEFAULT_ORG_TABLES): Promise<boolean> {
+  for (const table of tables) {
     if (!(await tableExists(table))) continue
     const result = await db.execute<{ exists: boolean }>(
       sql`select exists (select 1 from ${sql.identifier(table)} where org_id is null) as exists`
@@ -180,7 +176,11 @@ async function main() {
   process.exit(0)
 }
 
-main().catch((err) => {
-  console.error(err)
-  process.exit(1)
-})
+// Only when run as the boot step, so the tests can import the function above
+// without the module exiting the process out from under them.
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err)
+    process.exit(1)
+  })
+}

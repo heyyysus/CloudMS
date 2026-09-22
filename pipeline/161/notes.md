@@ -62,3 +62,14 @@ Backend: `npm run typecheck`, `npm run lint`, `npm run format:check`,
 `npm run db:push` run once against this runner's own Postgres to apply the
 new column before testing. No frontend changes (plan scopes none), so
 `frontend/`'s checks weren't run.
+
+## Docs
+
+`docs/API.md` and `docs/multitenancy.md` were already updated in the diff
+(new `isPlatformOwner` field, rollout item 7, History). Docs stage also fixed
+`docs/AUTH_SESSIONS_EXPLAINED.md`: its `publicUser()` field list was now
+stale (missing `isPlatformOwner`), and it was missing a walkthrough section
+for the new `auth/platformOwner.test.ts` suite that the file's existing
+per-middleware-test structure calls for. README.md and
+`docs/frontend-ui-design.md` untouched — no env-var table in README to
+extend and no UI changes.

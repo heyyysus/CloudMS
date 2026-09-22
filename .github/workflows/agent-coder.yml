@@ -140,6 +140,12 @@ jobs:
           notes.md are pasted into the PR body: write them to the "Writing for humans" section
           of CLAUDE.md.
 
+          Budget: 250 words for notes.md, 60 for a commit message body. "Checks run" is the
+          command list and pass/fail, not a narration of running them. Record a decision only if
+          it constrains what someone does next; a choice with no consequence is not a decision.
+          "Deviations: none." is a complete section. Do not repeat the plan, and do not repeat
+          anything the PR body already carries.
+
           Stop when the plan is implemented, checks pass, notes.md is complete and committed, and the
           branch is pushed. If you are running low on turns, commit and push what you have, and say in
           notes.md exactly what is left.

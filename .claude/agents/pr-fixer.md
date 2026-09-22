@@ -116,6 +116,12 @@ exactly one per round, so the count is the round you are on.
   three rounds. Three rounds without convergence means the problem is not
   where the findings say it is.
 
+**120 words per round comment, 200 when escalating.** A round comment is a
+receipt: what you fixed, one line per finding, and the commit. Not why the
+finding was right, not how you verified it beyond pass/fail, not a recap of the
+PR. When you escalate, the human needs the commands to run and the one sentence
+that says why you stopped — not the reasoning that got you there.
+
 ---
 
 ## 5. Scrapping

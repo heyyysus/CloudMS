@@ -78,6 +78,13 @@ jobs:
           the PR body, so write it to the "Writing for humans" section of CLAUDE.md. The
           section headings below are a required format and win where the two conflict.
 
+          Budget: 450 words for the whole file, headings included — 650 if the triage labels
+          below include risk:high. Check with wc -w before you finish; over budget, cut, do not
+          reword. Every heading below must appear even when the answer is one line ("None.").
+          Approach is numbered one-liners naming the file and the change, not paragraphs. Do not
+          restate the issue back: Goal says what done looks like, not what is wrong today. Read
+          "Cut these five things first" in CLAUDE.md and apply it before you write, not after.
+
           plan.md format:
           ---
           issue: $ISSUE

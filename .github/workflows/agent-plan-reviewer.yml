@@ -75,6 +75,12 @@ jobs:
           issue — so write it to the "Writing for humans" section of CLAUDE.md. The format below
           and the Verdict line are required and win where the two conflict.
 
+          Budget: 150 words for the whole file. One line per finding: what is wrong (or what you
+          checked that is not), with the file reference. Do not summarize the plan before judging
+          it, and do not spend a bullet confirming something the plan already states correctly —
+          if six of your judgement criteria pass cleanly, that is one line, not six. On approval
+          "## Required changes (if rejected)" is the single line "N/A".
+
           Write review.md as:
           # Plan review — issue #$ISSUE
           ## Findings   – bullets, most important first, with file references

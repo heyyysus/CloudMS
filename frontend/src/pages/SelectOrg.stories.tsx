@@ -7,7 +7,12 @@ import { AuthContext, type AuthContextValue } from '@/auth/auth-context'
 import { ToastProvider } from '@/components/ui/toast'
 import type { Membership, Org, User } from '@/api/auth'
 
-const user: User = { id: 'usr-1', email: 'jane@acme.test', name: 'Jane Doe' }
+const user: User = {
+  id: 'usr-1',
+  email: 'jane@acme.test',
+  name: 'Jane Doe',
+  isPlatformOwner: false,
+}
 
 const memberships: Membership[] = [
   { orgId: 'org-1', name: 'Acme Insurance', slug: 'acme', role: 'admin' },

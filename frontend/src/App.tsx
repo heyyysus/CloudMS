@@ -3,6 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/RequireAuth'
+import { RequirePlatformOwner } from './auth/RequirePlatformOwner'
 import { RequireRole } from './auth/RequireRole'
 import { AppLayout } from './components/layout/app-layout'
 import { ToastProvider } from './components/ui/toast'
@@ -16,6 +17,7 @@ import Login from './pages/Login'
 import Logout from './pages/Logout'
 import ManageCarriers from './pages/ManageCarriers'
 import ManageUsers from './pages/ManageUsers'
+import Platform from './pages/Platform'
 import SelectOrg from './pages/SelectOrg'
 import TrustAccounting from './pages/TrustAccounting'
 
@@ -31,6 +33,9 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/logout" element={<Logout />} />
               <Route path="/select-org" element={<SelectOrg />} />
+              <Route element={<RequirePlatformOwner />}>
+                <Route path="/platform" element={<Platform />} />
+              </Route>
               <Route element={<RequireAuth />}>
                 <Route element={<AppLayout />}>
                   <Route path="/home" element={<Home />} />

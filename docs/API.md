@@ -521,6 +521,7 @@ Status codes specific to these routes:
 
 | Method | Path | Role | Notes |
 |---|---|---|---|
+| GET | `/organizations` | **platform owner** | `requireSession`, not `requireAuth`, same reason as POST below. `listOrganizations()` - every organization, ordered by name. Response `{ organizations: [{ id, name, slug }] }`. |
 | POST | `/organizations` | **platform owner** | `requireSession`, not `requireAuth` - no org context exists yet. Body `{ name, slug, admin: { email, name? } }`. Creates the organization and seats `admin` as its first admin in one call, atomically: if seating the admin fails (duplicate/deleted email), the organization is rolled back too, so a create never leaves a zero-admin org behind. |
 
 `slug` is lowercase letters, digits, and hyphens, unique across all

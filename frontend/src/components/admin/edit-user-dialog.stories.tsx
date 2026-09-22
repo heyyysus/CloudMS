@@ -7,6 +7,7 @@ const user: AdminUser = {
   id: '2',
   email: 'staffer@example.com',
   name: 'Blake Staffer',
+  isPlatformOwner: false,
   role: 'staff',
   isActive: true,
   hasSignedIn: true,

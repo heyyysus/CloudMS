@@ -42,3 +42,11 @@ This runner's own database, `PLATFORM_OWNER_EMAIL` unset:
 - `npm run db:push` — pass
 - `npm run db:bootstrap` (twice) — pass, idempotent, no `ADMIN_EMAIL`
 - `npm run typecheck && npm run lint && npm run format:check && npm test && npm run build` — pass, 503/503 tests
+
+## Docs
+
+No changes needed here: `docs/API.md`, `docs/AUTH_SESSIONS_EXPLAINED.md`, and
+`docs/multitenancy.md` already cover `POST /organizations` and the
+`ADMIN_EMAIL` retirement (done in the implementation diff). No
+`ADMIN_EMAIL` references remain in README.md or docs/, and there's no UI
+change for `docs/frontend-ui-design.md`.

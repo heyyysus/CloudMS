@@ -71,6 +71,7 @@ describe("POST /auth/google", () => {
       email: user.email,
       name: "Test User",
       role: "staff",
+      isPlatformOwner: false,
     })
     expect(res.body.org).toMatchObject({ id: org.id, name: org.name, slug: org.slug })
     expect(res.body.memberships).toHaveLength(1)

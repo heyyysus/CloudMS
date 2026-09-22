@@ -1,6 +1,7 @@
 import "dotenv/config"
 import { and, eq } from "drizzle-orm"
 import { adminDb as db } from "./index"
+import { ensurePlatformOwner } from "./platformOwner"
 import { emailTemplates, organizations, orgMemberships, users } from "./schema"
 import { AUTOMATION_USER_EMAIL } from "../jobs/automationUser"
 
@@ -28,6 +29,10 @@ async function main() {
       .onConflictDoNothing({ target: users.email })
     console.log(`Ensured admin user exists for ${adminEmail}`)
   }
+
+  // No-ops unless PLATFORM_OWNER_EMAIL is set, which CI does not set - so it
+  // fails loudly like every other step here rather than hiding a bad seed.
+  await ensurePlatformOwner()
 
   // The author/sender of record for anything the scheduler sends, since
   // policy_logs.author_id is NOT NULL and sendCorrespondenceEmail wants a

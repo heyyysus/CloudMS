@@ -7,6 +7,7 @@ import {
   paymentMethodEnum,
   reminderTriggerEnum,
   scheduledEmailStatusEnum,
+  trustLedgerEntryTypeEnum,
   userRoleEnum,
 } from "../db/schema"
 import {
@@ -17,6 +18,7 @@ import {
   insertPolicyLogSchema,
   insertVehicleSchema,
 } from "../db/validation"
+import { TRUST_REPORT_RANGES } from "../repositories/trustLedger"
 
 // Presigned uploads only accept these three types; enforced both when
 // generating the upload URL (signed as the required Content-Type header) and
@@ -424,4 +426,22 @@ export const scheduledEmailQuery = z.object({
         .filter(Boolean)
     )
     .pipe(z.array(z.enum(scheduledEmailStatusEnum.enumValues)).optional()),
+})
+
+// Reusable page shape - a query string arrives as strings, so limit/offset
+// need coercion; the max keeps a single request from asking for a page big
+// enough to matter as a cost concern.
+export const paginationQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+})
+
+export const trustRangeQuery = z.object({
+  range: z.enum(TRUST_REPORT_RANGES).default("this-month"),
+})
+
+export const trustReportEntriesQuery = trustRangeQuery.extend(paginationQuery.shape).extend({
+  entryType: z.enum(trustLedgerEntryTypeEnum.enumValues).optional(),
+  itemType: z.enum(invoiceItemTypeEnum.enumValues).optional(),
+  carrierId: idParam.optional(),
 })

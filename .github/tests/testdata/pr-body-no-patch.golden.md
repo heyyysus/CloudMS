@@ -1,6 +1,6 @@
 <!-- Regenerate with: REGENERATE=1 bash .github/tests/pr-body.test.sh -->
-<!-- Hand-review the new golden against agent-docs.yml:159-191 before committing: -->
-<!-- the harness that generates this file is the same one that checks it. -->
+<!-- Hand-review the new golden against the "Open PR" step in agent-docs.yml -->
+<!-- before committing: the harness that generates this file also checks it. -->
 <!-- golden content follows -->
 Fixes #9999
 

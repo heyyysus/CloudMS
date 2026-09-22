@@ -12,9 +12,10 @@
 #
 # Regenerate the no-patch golden after a deliberate change to the PR-body block:
 #   REGENERATE=1 bash .github/tests/pr-body.test.sh
-# Then hand-review the new golden against agent-docs.yml:159-191 before committing —
-# the harness that generates the golden is the same one this test uses to check it,
-# so only a human catches a bug the two would otherwise agree on forever.
+# Then hand-review the new golden against the "Open PR" step in agent-docs.yml
+# before committing — the harness that generates the golden is the same one this
+# test uses to check it, so only a human catches a bug the two would otherwise
+# agree on forever.
 #
 # CI runs this in ci.yml's pipeline-actions job, on changes under
 # .github/workflows/** and .github/tests/**.
@@ -49,10 +50,10 @@ is() { # is <description> <actual> <expected>
 
 # --- extract the block straight out of agent-docs.yml --------------------------
 # The block is a literal `run: |` scalar, so its shell text is the YAML text
-# verbatim: no YAML parser needed. The anchors are the exact start/end lines of
-# the block in agent-docs.yml as of #147 (8d43ad6) — renaming the "Open PR" step
-# is safe, but restructuring the `{ … } > file` redirect or the `PATCH=` line
-# breaks extraction, on purpose and loudly.
+# verbatim: no YAML parser needed. The anchors are the first and last lines of
+# the body-building block inside agent-docs.yml's "Open PR" step — the block may
+# move freely, and renaming the step is safe, but restructuring the `{ … } > file`
+# redirect or the `PATCH=` line breaks extraction, on purpose and loudly.
 # shellcheck disable=SC2016
 start_pattern='^[[:space:]]*PATCH="pipeline/\$ISSUE/workflow-changes\.patch"[[:space:]]*$'
 # shellcheck disable=SC2016
@@ -116,17 +117,11 @@ render() { # render <with-patch: 0|1> <output-dir>
   ( cd "$work/repo" && ISSUE=9999 BRANCH=agent/issue-9999 RUNNER_TEMP="$work" bash "$work/body-block.sh" )
 }
 
-if render 0 "$nopatch_dir"; then
-  check "no-patch render runs without error" 0
-else
-  check "no-patch render runs without error" 1
-fi
+render 0 "$nopatch_dir"
+check "no-patch render runs without error" $?
 
-if render 1 "$patch_dir"; then
-  check "patch-present render runs without error" 0
-else
-  check "patch-present render runs without error" 1
-fi
+render 1 "$patch_dir"
+check "patch-present render runs without error" $?
 
 nopatch_body="$nopatch_dir/work/pr-body.md"
 patch_body="$patch_dir/work/pr-body.md"
@@ -141,10 +136,18 @@ if [[ ! -s "$patch_body" ]]; then
 fi
 
 if [[ "${REGENERATE:-}" == "1" ]]; then
+  # Only write once the render actually produced a body. Writing on a failed
+  # render records a header-only golden and reports success, which every later
+  # run then agrees with.
+  if [[ "$failures" -gt 0 ]]; then
+    echo
+    echo "refusing to write $golden: the render failed above"
+    exit 1
+  fi
   {
     echo "<!-- Regenerate with: REGENERATE=1 bash .github/tests/pr-body.test.sh -->"
-    echo "<!-- Hand-review the new golden against agent-docs.yml:159-191 before committing: -->"
-    echo "<!-- the harness that generates this file is the same one that checks it. -->"
+    echo "<!-- Hand-review the new golden against the \"Open PR\" step in agent-docs.yml -->"
+    echo "<!-- before committing: the harness that generates this file also checks it. -->"
     echo "$golden_marker"
     cat "$nopatch_body"
   } > "$golden"
@@ -171,14 +174,14 @@ else
   check "patch present: apply-patch heading sits above ## Plan summary" 1
 fi
 
-if grep -q 'git apply' "$patch_body"; then check_git_apply=0; else check_git_apply=1; fi
-check "patch present: apply instructions contain git apply" "$check_git_apply"
+grep -q 'git apply' "$patch_body"
+check "patch present: apply instructions contain git apply" $?
 
-if grep -q 'git rm' "$patch_body"; then check_git_rm=0; else check_git_rm=1; fi
-check "patch present: apply instructions contain git rm" "$check_git_rm"
+grep -q 'git rm' "$patch_body"
+check "patch present: apply instructions contain git rm" $?
 
-if grep -q 'git push' "$patch_body"; then check_git_push=0; else check_git_push=1; fi
-check "patch present: apply instructions contain git push" "$check_git_push"
+grep -q 'git push' "$patch_body"
+check "patch present: apply instructions contain git push" $?
 
 # --- assert: patch absent (Goal items 1 and 3) -----------------------------------
 is "no patch: body starts with Fixes #9999" \
@@ -198,7 +201,7 @@ else
     echo "$diff_output"
     echo "       If this change is intentional, regenerate with:"
     echo "         REGENERATE=1 bash .github/tests/pr-body.test.sh"
-    echo "       then hand-review the diff against agent-docs.yml:159-191 before committing."
+    echo "       then hand-review the diff against the \"Open PR\" step in agent-docs.yml before committing."
     failures=$((failures + 1))
   fi
 fi

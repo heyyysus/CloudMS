@@ -40,6 +40,7 @@ import type {
   NewAutoPolicy,
   NewCarrier,
   NewClient,
+  NewOrganization,
   NewPerson,
   NewVehicle,
   Organization,
@@ -133,13 +134,17 @@ export class TestContext {
   // what bootstrap.ts/seed/run.ts do for a real organization - without one,
   // sendWelcomeEmail (invite, resend-welcome, restore) 500s for every org
   // this context mints.
-  async org(): Promise<Organization> {
+  async org(overrides: Partial<NewOrganization> = {}): Promise<Organization> {
     // adminDb, not db: organizations isn't RLS-protected (see rls.ts), but
     // this insert can run before any org context exists to scope it to, same
     // as bootstrap.ts/seed/run.ts creating a real organization.
     const [o] = await adminDb
       .insert(organizations)
-      .values({ name: unique("Test Org "), slug: unique("test-org-").slice(0, 64) })
+      .values({
+        name: unique("Test Org "),
+        slug: unique("test-org-").slice(0, 64),
+        ...overrides,
+      })
       .returning()
     this.orgIds.push(o.id)
     this.defaultOrgId ??= o.id

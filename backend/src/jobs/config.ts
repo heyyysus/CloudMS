@@ -11,8 +11,6 @@ function num(name: string, fallback: number): number {
 
 export interface ReminderConfig {
   tickMs: number
-  timeZone: string
-  sendHour: number
   horizonDays: number
   lookbackDays: number
   batchSize: number
@@ -23,10 +21,6 @@ export interface ReminderConfig {
 export function reminderConfig(): ReminderConfig {
   return {
     tickMs: num("REMINDER_TICK_MS", 60_000),
-    // An IANA zone, handed to Postgres' AT TIME ZONE so the send hour tracks
-    // DST without any date math here.
-    timeZone: process.env.REMINDER_TIMEZONE ?? "America/Chicago",
-    sendHour: num("REMINDER_SEND_HOUR", 9),
     // How far ahead rows are planned. Because they exist days before they are
     // due, an outage shorter than this sends late rather than not at all.
     horizonDays: num("REMINDER_HORIZON_DAYS", 7),

@@ -114,6 +114,21 @@ describe("POST /auth/google", () => {
     expect(res.status).toBe(403)
   })
 
+  it("logs in a platform owner with zero memberships, leaving the session unbound", async () => {
+    const user = await makeUser("owner-no-membership", { isPlatformOwner: true })
+    mockVerify.mockResolvedValue({ email: user.email, sub: "s" })
+
+    const res = await request(app).post("/auth/google").send({ idToken: "valid" })
+
+    expect(res.status).toBe(200)
+    expect(res.body.org).toBeNull()
+    expect(res.body.memberships).toEqual([])
+
+    const cookie = res.headers["set-cookie"]?.[0]
+    const row = await findSessionWithUserByTokenHash(hashToken(cookieToken(cookie)))
+    expect(row?.session.orgId).toBeNull()
+  })
+
   it("does not count an inactive membership", async () => {
     const user = await makeUser("inactive-membership")
     const org = await ctx.org()

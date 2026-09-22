@@ -254,12 +254,14 @@ own timezone and send hour.
 
 ## Onboarding
 
-Creating an agency is an application action, not an infrastructure task: a
-platform-level admin creates the organization and invites its first admin,
-who then invites staff exactly as today. `ADMIN_EMAIL` bootstrap goes away
-once that flow exists. **Open:** whether a platform-admin flag on `users`
-is enough, or whether self-serve signup (create your own organization) is
-wanted for launch.
+Creating an agency is an application action, not an infrastructure task.
+**Done (#162):** `POST /organizations`, platform-owner-only, creates the
+organization and seats its first admin in one call; that admin then invites
+staff exactly as today. `ADMIN_EMAIL` bootstrap is gone - `bootstrap.ts` no
+longer creates a default organization, and the very first organization on a
+deployment is created through this route by whoever is `PLATFORM_OWNER_EMAIL`.
+**Open:** whether self-serve signup (create your own organization) is wanted
+for launch.
 
 ## Demo org
 
@@ -309,12 +311,15 @@ created automatically by a migration.
    per organization. `organizations.name` replaces `AGENCY_NAME`; the
    reminder planner reads each organization's own timezone and send hour;
    `organizations.mail_reply_to` replaces `MAIL_REPLY_TO`.
-7. Organization creation and invite flow; retire `ADMIN_EMAIL`. **Done in
-   part (#161):** `users.is_platform_owner` and `requirePlatformOwner`, a
+7. **Done.** Organization creation and invite flow; retire `ADMIN_EMAIL`.
+   **Done (#161):** `users.is_platform_owner` and `requirePlatformOwner`, a
    deployment-wide capability seeded from `PLATFORM_OWNER_EMAIL`, independent
-   of org membership and not reachable by accumulating memberships. No route
-   uses it yet, and a platform owner with zero memberships can't sign in
-   until the org-creation/invite flow lands - both are #162.
+   of org membership and not reachable by accumulating memberships. **Done
+   (#162):** `POST /organizations` (platform-owner-only) creates an
+   organization and seats its first admin atomically; `POST /auth/google` lets
+   a platform owner with zero memberships sign in (session unbound) so they
+   can reach it; `bootstrap.ts` no longer creates a default organization or
+   reads `ADMIN_EMAIL`.
 8. Demo org: flag, demo sign-in, org-scoped reseed, guardrail settings, banner.
 9. **Done (#122):** row-level security backstop — see *Request scoping*
    above.

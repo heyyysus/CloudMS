@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm"
 import { db } from "../db"
 import { organizations } from "../db/schema"
-import type { Organization } from "../types"
+import type { NewOrganization, Organization } from "../types"
 import { CrossOrgReferenceError } from "./errors"
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -13,6 +13,11 @@ export async function findOrganizationById(id: string): Promise<Organization | u
 
 export async function findOrganizationBySlug(slug: string): Promise<Organization | undefined> {
   const [row] = await db.select().from(organizations).where(eq(organizations.slug, slug))
+  return row
+}
+
+export async function createOrganization(values: NewOrganization): Promise<Organization> {
+  const [row] = await db.insert(organizations).values(values).returning()
   return row
 }
 

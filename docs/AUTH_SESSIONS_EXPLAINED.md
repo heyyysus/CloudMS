@@ -433,9 +433,11 @@ Login is invite-only (`findUserByEmail` in `auth/routes.ts` — no matching
 
 - run the seed (`npm run db:seed` in `backend/`, which creates
   `jesus.velarde07@gmail.com` as admin), or
-- set `ADMIN_EMAIL=<your-google-account-email>` in `.env` and run
-  `npm run db:bootstrap` (the bootstrap script inserts that email as an
-  admin user via `onConflictDoNothing`).
+- set `PLATFORM_OWNER_EMAIL=<your-google-account-email>` in `.env`, run
+  `npm run db:bootstrap`, sign in (a platform owner is exempt from the
+  zero-memberships 403 — see `docs/API.md`'s Organizations section), and call
+  `POST /organizations` to create your own org and seat yourself as its
+  admin.
 
 ### 2. Start the backend
 

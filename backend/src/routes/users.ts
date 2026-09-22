@@ -1,13 +1,12 @@
 import { Request, Response, Router } from "express"
 import { requireAuth, requireRole } from "../auth/middleware"
 import { sendWelcomeEmail } from "../emails"
+import { inviteToOrg } from "../invites"
 import { AUTOMATION_USER_EMAIL } from "../jobs/automationUser"
 import {
   createMembership,
-  createUser,
   deleteSessionsByUserIdAndOrg,
   findMembership,
-  findUserByEmail,
   findUserById,
   listOrgMembers,
   restoreUser,
@@ -15,7 +14,7 @@ import {
   updateUser,
 } from "../repositories"
 import type { OrgMembership, User, UserRole } from "../types"
-import { firstIssue, isPgUniqueViolation, parseId } from "./helpers"
+import { firstIssue, parseId } from "./helpers"
 import { inviteUserBody, updateUserBody } from "./schemas"
 
 export const usersRouter = Router()
@@ -54,58 +53,34 @@ usersRouter.post(
       res.status(400).json({ error: firstIssue(parsed.error) })
       return
     }
-    const { email, name, role } = parsed.data
-
-    // includeDeleted so a previously-deleted account's address is offered
-    // back as a restore rather than colliding on the unique constraint with
-    // no way for the admin to see why.
-    const existing = await findUserByEmail(email, { includeDeleted: true })
-    if (existing?.deletedAt) {
-      res
-        .status(409)
-        .json({ error: "This email belonged to a deleted user", deletedUserId: existing.id })
-      return
-    }
-
-    let user: User
-    let membership: OrgMembership
-    if (existing) {
-      // A live user: invite means "add a membership in this org", not
-      // "create another users row" - the email is already provisioned.
-      const existingMembership = await findMembership(existing.id, req.orgId!)
-      if (existingMembership?.isActive) {
+    const result = await inviteToOrg(req.orgId!, parsed.data, req.user!)
+    switch (result.kind) {
+      case "deleted-email":
+        res.status(409).json({
+          error: "This email belonged to a deleted user",
+          deletedUserId: result.deletedUserId,
+        })
+        return
+      case "already-member":
         res.status(409).json({ error: "This user is already a member of this organization" })
         return
-      }
-      user = existing
-      membership = existingMembership
-        ? // Reactivating rather than inserting avoids the (user_id, org_id)
-          // unique constraint an insert would hit.
-          ((await updateMembership(existingMembership.id, {
-            isActive: true,
-            role,
-          })) as OrgMembership)
-        : await createMembership({ userId: existing.id, orgId: req.orgId!, role })
-    } else {
-      try {
-        user = await createUser({ email, name: name ?? null })
-      } catch (err) {
-        if (isPgUniqueViolation(err, "users_email_unique")) {
-          res.status(409).json({ error: "A user with this email already exists" })
-          return
-        }
-        throw err
-      }
-      membership = await createMembership({ userId: user.id, orgId: req.orgId!, role })
+      case "duplicate-email":
+        res.status(409).json({ error: "A user with this email already exists" })
+        return
+      case "invited":
+        req.log.info(
+          {
+            invitedUserId: result.user.id,
+            actorId: req.user?.id,
+            emailStatus: result.email.status,
+          },
+          "user invited"
+        )
+        res
+          .status(201)
+          .json({ user: adminUser(result.user, result.membership), email: result.email })
+        return
     }
-
-    const emailResult = await sendWelcomeEmail(req.orgId!, user, req.user!, role)
-
-    req.log.info(
-      { invitedUserId: user.id, actorId: req.user?.id, emailStatus: emailResult.status },
-      "user invited"
-    )
-    res.status(201).json({ user: adminUser(user, membership), email: emailResult })
   }
 )
 

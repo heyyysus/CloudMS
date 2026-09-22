@@ -10,24 +10,24 @@ interface SeedUsersOptions {
   // "staff"). Only the first org's seeding gives the agency more than one
   // admin; the second org is "a couple of policies, two staff" per the issue.
   adminAmongStaff?: number
-  // Whether ADMIN_EMAIL gets a membership in this org. Its users row is only
-  // created once, on the first org that passes true - a later call reuses
-  // the existing row rather than re-inserting the email.
+  // Whether PLATFORM_OWNER_EMAIL gets a membership in this org. Its users row
+  // is only created once, on the first org that passes true - a later call
+  // reuses the existing row rather than re-inserting the email.
   includeAdmin: boolean
 }
 
-// Inserts staffCount random users plus (optionally) ADMIN_EMAIL, and an
-// org_memberships row per user scoped to orgId mirroring users.role - see
+// Inserts staffCount random users plus (optionally) PLATFORM_OWNER_EMAIL, and
+// an org_memberships row per user scoped to orgId mirroring users.role - see
 // docs/multitenancy.md's "no org_id on users" divergence for why the users
 // row itself carries no org_id. usedEmails is shared across every call so
-// two orgs' random staff (and ADMIN_EMAIL) can't collide on users.email,
-// which stays globally unique.
+// two orgs' random staff (and PLATFORM_OWNER_EMAIL) can't collide on
+// users.email, which stays globally unique.
 export async function seedUsers(
   orgId: string,
   usedEmails: Set<string>,
   { staffCount, adminAmongStaff = 0, includeAdmin }: SeedUsersOptions
 ): Promise<User[]> {
-  const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase()
+  const adminEmail = process.env.PLATFORM_OWNER_EMAIL?.toLowerCase()
   const adminNeedsUserRow = includeAdmin && !!adminEmail && !usedEmails.has(adminEmail)
   if (adminEmail) usedEmails.add(adminEmail)
 

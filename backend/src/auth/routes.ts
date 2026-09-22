@@ -87,8 +87,11 @@ authRouter.post("/auth/google", async (req: Request, res: Response) => {
 
   const memberships = await listActiveMembershipsWithOrg(user.id)
   // Same message as the no-user case above - the endpoint must not leak
-  // whether the address exists but has no active membership.
-  if (memberships.length === 0) {
+  // whether the address exists but has no active membership. A platform
+  // owner is exempt: they act before any organization exists (POST
+  // /organizations), so zero memberships is their normal starting state, not
+  // a sign of an unprovisioned account.
+  if (memberships.length === 0 && !user.isPlatformOwner) {
     res.status(403).json({ error: "Account not authorized" })
     return
   }

@@ -18,7 +18,7 @@ Errors: `400 {error:"idToken is required"}`, `401 {error:"Invalid Google token"}
 
 1. **`frontend/.env`** with `VITE_GOOGLE_CLIENT_ID=<same value as GOOGLE_CLIENT_ID in backend/.env>`. Already gitignored by the root `.gitignore` (`.env` matches at any depth). A committed `frontend/.env.example` documents it.
 2. **Google Cloud Console** → OAuth client → Authorized JavaScript origins: add `http://localhost:5173` and `http://localhost` for local dev (production origin presumably already set).
-3. A user row must exist for the tester (invite-only): set `ADMIN_EMAIL` in `backend/.env` so the migrate/startup bootstrap creates it.
+3. A user row must exist for the tester (invite-only). `ADMIN_EMAIL`/bootstrap-created admin is gone (#162) - set `PLATFORM_OWNER_EMAIL` in `backend/.env`, sign in as that address, then `POST /organizations` to create an org and seat yourself as its admin. See `docs/API.md`'s Organizations section.
 
 ## Git steps
 
@@ -66,7 +66,7 @@ npm install -D @types/google.accounts
 ## Verification
 
 1. `cd frontend && npm run lint && npm run build` (build runs `tsc -b`).
-2. Backend running on 8000 with `GOOGLE_CLIENT_ID` + `ADMIN_EMAIL` set (bootstrap creates the invited admin row).
+2. Backend running on 8000 with `GOOGLE_CLIENT_ID` set and a user row provisioned for the tester (see prerequisites above - `ADMIN_EMAIL` bootstrap no longer exists).
 3. `npm run dev` → open `http://localhost:5173/login`; sign in with the invited Google account → redirected to `/`, auth strip shows name/email/role; `session` cookie visible in DevTools; page refresh stays authed (proves `getMe` bootstrap).
 4. `/logout` → lands on `/login`, cookie cleared; visiting `/login` while authed redirects to `/`.
 5. Negative path: non-invited Google account → 403 message rendered, no cookie.

@@ -3,7 +3,7 @@
 // call the functions here, which load the template, merge fields, send, and
 // log the attempt to email_log. Keeps the merge-field/template concerns out
 // of the route layer and the logging concern out of the repository layer.
-import { findEmailTemplateByKey } from "./repositories/emailTemplates"
+import { findEmailTemplateByKey, upsertEmailTemplate } from "./repositories/emailTemplates"
 import { createEmailLogEntry } from "./repositories/emailLog"
 import { findOrganizationById } from "./repositories/organizations"
 import { MailNotConfiguredError, MailSendError, plainTextToHtml, sendEmail } from "./mailer"
@@ -68,6 +68,22 @@ export function renderTemplate(template: string, fields: Record<string, string>)
     /\{\{\s*([a-zA-Z][a-zA-Z0-9]*)\s*\}\}/g,
     (_match, field: string) => fields[field] ?? ""
   )
+}
+
+// Seeds a fresh organization's welcome template - without it, the first
+// invite sent into a brand-new org 500s (sendWelcomeEmail below throws when
+// the template is missing). Called once, right after the org row lands.
+export async function seedWelcomeTemplate(orgId: string): Promise<void> {
+  await upsertEmailTemplate(orgId, {
+    key: WELCOME_TEMPLATE_KEY,
+    subject: "Welcome to CloudMS, {{name}}",
+    body: `Hi {{name}},
+
+{{inviterName}} has invited you to CloudMS as {{role}}.
+
+Sign in with your Google account ({{email}}) at {{appUrl}} - no password needed, access is already set up for this address.`,
+    updatedBy: null,
+  })
 }
 
 export interface SendWelcomeEmailResult {

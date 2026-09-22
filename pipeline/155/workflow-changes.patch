@@ -1,0 +1,24 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 7287c23..c499936 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -29,7 +29,8 @@ jobs:
+               - '.github/workflows/ci.yml'
+             actions:
+               - '.github/actions/**'
+-              - '.github/workflows/ci.yml'
++              - '.github/workflows/**'
++              - '.github/tests/**'
+ 
+   pipeline-actions:
+     needs: changes
+@@ -51,6 +52,9 @@ jobs:
+       - name: report-failure headline renderer
+         run: bash .github/actions/report-failure/render-headline.test.sh
+ 
++      - name: agent-docs PR body
++        run: bash .github/tests/pr-body.test.sh
++
+   backend:
+     needs: changes
+     if: needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'

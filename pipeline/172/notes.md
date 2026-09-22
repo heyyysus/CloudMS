@@ -44,3 +44,10 @@ None.
 | `npm run build` | pass |
 
 Frontend untouched, so no frontend checks run.
+
+## Docs
+
+`docs/API.md`'s "Trust reporting" section (already added in the implementation
+commit) fully covers the three endpoints — no further doc changes needed.
+README, auth/session, and frontend-UI docs are unaffected: backend-only,
+admin-scoped, no new UI or setup steps.

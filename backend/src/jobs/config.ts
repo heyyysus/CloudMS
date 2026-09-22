@@ -43,10 +43,10 @@ export function remindersEnabled(): boolean {
 // Automation". Pure - the caller already has the organization in hand and
 // passes its name and reply-to in. "" (not undefined) is the empty case,
 // since the result renders into a {{agentEmail}} template string.
-export function agencyIdentity(org: {
+export function agencyIdentity(org: { name: string; mailReplyTo: string | null }): {
   name: string
-  mailReplyTo: string | null
-}): { name: string; email: string } {
+  email: string
+} {
   return {
     name: org.name,
     email: org.mailReplyTo ?? "",

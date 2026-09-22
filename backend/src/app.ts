@@ -10,6 +10,7 @@ import { correspondenceTemplatesRouter } from "./routes/correspondenceTemplates"
 import { emailTemplatesRouter } from "./routes/emailTemplates"
 import { invoicesRouter } from "./routes/invoices"
 import { mailRouter } from "./routes/mail"
+import { organizationsRouter } from "./routes/organizations"
 import { paymentsRouter } from "./routes/payments"
 import { personsRouter } from "./routes/persons"
 import { policiesRouter } from "./routes/policies"
@@ -42,6 +43,7 @@ app.use(express.json())
 app.use(cookieParser())
 
 app.use(authRouter)
+app.use(organizationsRouter)
 app.use(personsRouter)
 app.use(clientsRouter)
 app.use(policiesRouter)

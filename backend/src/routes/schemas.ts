@@ -356,6 +356,26 @@ export const setActiveOrgBody = z.object({
   orgId: idParam,
 })
 
+// Lowercase letters, digits and hyphens only - mirrors the "default-org" /
+// "second-org" slugs seed data already uses, and is simple enough that a
+// platform owner can type one by hand.
+const orgSlug = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens")
+
+export const createOrganizationBody = z.object({
+  name: z.string().trim().min(1).max(150),
+  slug: orgSlug,
+  admin: z.object({
+    email: z.email().trim().toLowerCase().max(255),
+    name: z.string().trim().min(1).max(150).nullable().optional(),
+  }),
+})
+
 export const updateEmailTemplateBody = z.object({
   subject: z.string().trim().min(1).max(200),
   body: z.string().trim().min(1).max(20000),

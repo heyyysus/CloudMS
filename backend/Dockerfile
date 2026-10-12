@@ -24,8 +24,6 @@ ENV NODE_ENV=production
 
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
-COPY drizzle.config.ts ./
-COPY src ./src
 COPY package*.json ./
 
 # Four steps prepare the live database before the schema is pushed, because
@@ -40,10 +38,11 @@ COPY package*.json ./
 #                           before adding a unique constraint to a populated
 #                           table, and a container has no TTY to answer on.
 #                           Creating them here leaves push nothing to ask.
-#   push                  - drizzle-kit push behind a guard, because push
-#                           exits 0 even when it failed to apply anything.
+#   push                  - the schema diff through drizzle-kit's API (see
+#                           push.ts), with its constraint introspection
+#                           ordered so a correct schema diffs as empty.
 # Then (re)grant the app role and bootstrap PLATFORM_OWNER_EMAIL if set,
-# before serving. drizzle-kit push reads schema.ts from source at runtime,
-# which is why src/ and drizzle.config.ts are copied in above; drizzle-kit
-# itself is resolvable because it's a runtime dependency (see package.json).
+# before serving. push.ts imports schema.ts from dist, so nothing here needs
+# the sources; drizzle-kit itself is resolvable because it's a runtime
+# dependency (see package.json).
 CMD ["sh", "-c", "node dist/db/extensions.js && node dist/db/backfillOrgIds.js && node dist/db/backfillDocumentNumbers.js && node dist/db/ensureUniqueConstraints.js && node dist/db/push.js && node dist/db/roles.js && node dist/db/bootstrap.js && node dist/index.js"]

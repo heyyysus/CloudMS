@@ -9,9 +9,8 @@ import * as schema from "./schema"
 // rows without asking first: pgSuggestions prompts "do you want to truncate
 // <table>?" for every create_unique_constraint statement, and it does so
 // before --force is ever consulted, so --force does not suppress it. With no
-// TTY the prompt throws, and push then exits 0 anyway - the boot sails past
-// it and the constraint is never created (see push.ts, which turns that
-// swallowed failure into a hard stop).
+// TTY the prompt throws and the boot stops there (push.ts drives the same
+// diff through drizzle-kit's API, which runs the same prompt).
 //
 // Creating the constraints here first means push has no such statement left
 // to prompt about. It is the only interactive prompt on push's path, so once

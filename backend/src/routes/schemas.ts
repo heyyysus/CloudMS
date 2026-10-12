@@ -243,12 +243,25 @@ export const createCarrierBody = insertCarrierSchema.omit(omitMeta).extend({
 export const updateCarrierBody = createCarrierBody.partial()
 
 // Money arrives as a JSON number or a decimal string; normalize to a
-// 2-decimal string for the numeric(12,2) columns. `positiveMoney` rejects 0
-// and negatives.
+// 2-decimal string for the numeric(12,2) columns. `positiveMoney` rejects 0,
+// negatives, anything finer than a cent (0.004 would store as 0.00), and
+// anything the column cannot hold (Postgres answers that with an error the
+// app would report as a 500).
+export const MAX_MONEY = 9_999_999_999.99
+const WHOLE_CENTS = /^(\d+|\d*\.\d{1,2})$/
 const positiveMoney = z.union([z.number(), z.string().trim().min(1)]).transform((value, ctx) => {
-  const n = typeof value === "number" ? value : Number(value)
+  const text = typeof value === "number" ? String(value) : value
+  const n = Number(text)
   if (!Number.isFinite(n) || n <= 0) {
     ctx.addIssue({ code: "custom", message: "Must be a positive amount" })
+    return z.NEVER
+  }
+  if (n > MAX_MONEY) {
+    ctx.addIssue({ code: "custom", message: `Amount exceeds the maximum of ${MAX_MONEY}` })
+    return z.NEVER
+  }
+  if (!WHOLE_CENTS.test(text)) {
+    ctx.addIssue({ code: "custom", message: "Amounts are whole cents (at most 2 decimals)" })
     return z.NEVER
   }
   return n.toFixed(2)
@@ -297,11 +310,18 @@ export const createInvoiceItemBody = z
     }
   })
 
-export const createInvoiceBody = z.object({
-  policyId: idParam,
-  note: z.string().trim().max(2000).nullable().optional(),
-  items: z.array(createInvoiceItemBody).min(1),
-})
+export const createInvoiceBody = z
+  .object({
+    policyId: idParam,
+    note: z.string().trim().max(2000).nullable().optional(),
+    items: z.array(createInvoiceItemBody).min(1),
+  })
+  // Each item fits numeric(12,2) on its own; their sum is the invoice total
+  // and must fit too.
+  .refine((body) => body.items.reduce((sum, item) => sum + Number(item.amount), 0) <= MAX_MONEY, {
+    path: ["items"],
+    message: `Invoice total exceeds the maximum of ${MAX_MONEY}`,
+  })
 
 export const recordPaymentBody = z.object({
   invoiceId: idParam,

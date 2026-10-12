@@ -637,6 +637,11 @@ and **may drop trailing zeros** (`"300"` == `"300.00"`); parse before comparing.
 Top-level computed fields (`total`, `amountPaid`, `amountApplied`, `changeGiven`,
 `amountDueAfter`, trust `balance`) always carry two decimals.
 
+Amounts sent in a body (`items[].amount`, payment `amount`) may be a JSON
+number or a decimal string. They must be positive, whole cents (at most two
+decimals: `0.004` and `"10.005"` are `400`), and at most `9999999999.99`, the
+column maximum; an invoice's items must also sum to no more than that.
+
 ### Invoices
 
 An invoice belongs to a policy and has one or more line items. Each item is one

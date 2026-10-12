@@ -488,3 +488,20 @@ describe("GET /payments and /receipts (searchable by client)", () => {
     )
   })
 })
+
+describe("POST /payments amount validation", () => {
+  it("rejects sub-cent and out-of-range amounts with 400", async () => {
+    const { cookie } = await authed("pay-badamount")
+    const policy = await ctx.policy()
+    const invoice = await makeInvoice(cookie, policy.id)
+    for (const amount of [0.004, "4.005", 10_000_000_000]) {
+      const res = await request(app)
+        .post("/payments")
+        .set("Cookie", cookie)
+        .send({ invoiceId: invoice.id, method: "cash", amount })
+      expect(res.status, String(amount)).toBe(400)
+    }
+    const inv = await request(app).get(`/invoices/${invoice.id}`).set("Cookie", cookie)
+    expect(inv.body.amountPaid).toBe("0.00")
+  })
+})

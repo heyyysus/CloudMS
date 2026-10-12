@@ -12,10 +12,12 @@ const owner: User = {
   isPlatformOwner: true,
 }
 
-const staff: User = {
+// An organization admin: the acceptance case. Admin of an org is a membership
+// role, and the guard must not read it as the platform flag.
+const orgAdmin: User = {
   id: 'usr-2',
-  email: 'staff@acme.test',
-  name: 'Staff Member',
+  email: 'admin@acme.test',
+  name: 'Org Admin',
   isPlatformOwner: false,
 }
 
@@ -65,8 +67,8 @@ export const RendersForAPlatformOwner: Story = {
   },
 }
 
-export const RedirectsHomeForNonOwner: Story = {
-  parameters: { auth: auth({ user: staff }) },
+export const RedirectsHomeForOrgAdmin: Story = {
+  parameters: { auth: auth({ user: orgAdmin, role: 'admin' }) },
   play: async ({ canvasElement }) => {
     await expect(await within(canvasElement).findByText('home page')).toBeInTheDocument()
   },

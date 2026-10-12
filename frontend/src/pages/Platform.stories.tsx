@@ -124,3 +124,33 @@ export const DuplicateSlugKeepsForm: Story = {
     await expect(within(canvasElement).getByLabelText('Slug')).toHaveValue('acme')
   },
 }
+
+export const CreateSucceedsButEmailFails: Story = {
+  args: {
+    createOrganizationFn: fn(async () => ({
+      ...createResult(),
+      email: { status: 'failed' as const, error: 'Resend rejected the address' },
+    })),
+  },
+  play: async ({ canvasElement }) => {
+    await screen.findByText('Acme Insurance')
+    await fillForm(canvasElement, {
+      name: 'New Org',
+      slug: 'new-org',
+      adminEmail: 'admin@neworg.test',
+    })
+
+    await expect(await within(canvasElement).findByRole('status')).toHaveTextContent(
+      'New Org was created, but the welcome email to admin@neworg.test failed: Resend rejected the address'
+    )
+  },
+}
+
+// The page lives outside AppLayout, so these two links are its only exits.
+export const HasExitLinks: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByRole('link', { name: /back to app/i })).toHaveAttribute('href', '/home')
+    await expect(canvas.getByRole('link', { name: /log out/i })).toHaveAttribute('href', '/logout')
+  },
+}

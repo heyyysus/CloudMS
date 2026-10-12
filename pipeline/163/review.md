@@ -7,7 +7,6 @@
 - Mounting `/platform` outside `RequireAuth` is correct: `RequireAuth.tsx` redirects to `/select-org` when `org` is null, which would trap a zero-membership platform owner.
 - Frontend `User` in `api/auth.ts` has no `isPlatformOwner` field yet and `App.tsx`'s only role gate is `RequireRole role="admin"` — plan's additions are additive, not a rewrite, matching scope.
 - Server-side enforcement already exists (`requireSession` + `requirePlatformOwner` on POST), so the plan's "client gate is convenience" framing is backed by real middleware, not aspirational.
-- Scope, tests (backend via `ctx.platformOwner`, frontend via stories mirroring `SelectOrg.stories.tsx`), and file list are all plausible and match existing conventions.
 
 ## Required changes (if rejected)
 N/A

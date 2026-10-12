@@ -25,10 +25,6 @@
   table (exempt: lists every org by design, not scoped to one) — that test
   fails for any unlisted route, and the plan didn't call it out.
 
-## For the docs stage / reviewer
-- `docs/API.md` and `docs/multitenancy.md` (item 7, History) already updated
-  here since the diff was small enough to do inline.
-
 ## Checks run
 | area | command | result |
 |---|---|---|

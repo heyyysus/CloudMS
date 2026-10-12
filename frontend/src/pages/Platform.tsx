@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
+import { Link } from 'react-router'
+import { ArrowLeft, LogOut } from 'lucide-react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
@@ -10,6 +12,7 @@ import {
   type CreateOrganizationResult,
   type ListOrganizationsFn,
 } from '@/api/organizations'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -66,16 +69,38 @@ function Platform({
     mutationFn: createOrganizationFn,
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['organizations'] })
-      toast.success(`${result.organization.name} created`)
+      // A failed welcome email is reported in the form below, not toasted:
+      // the org exists but its only admin has no invite yet.
+      if (result.email.status === 'sent') {
+        toast.success(
+          `${result.organization.name} created — welcome email sent to ${result.admin.email}`
+        )
+      }
       reset()
     },
   })
 
   return (
     <div className="mx-auto flex min-h-svh max-w-3xl flex-col gap-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Organizations</h1>
-        <p className="text-muted-foreground">Every organization on this deployment.</p>
+      {/* Rendered outside AppLayout (no sidebar, no user menu), so the page
+          carries its own way back and its own sign-out. */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Organizations</h1>
+          <p className="text-muted-foreground">Every organization on this deployment.</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/home">
+              <ArrowLeft /> Back to app
+            </Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/logout">
+              <LogOut /> Log out
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -158,6 +183,14 @@ function Platform({
               {mutation.isError && (
                 <div role="alert" className="text-sm text-destructive">
                   {mutation.error.message}
+                </div>
+              )}
+              {mutation.isSuccess && mutation.data.email.status === 'failed' && (
+                <div role="status" className="text-sm text-amber-600 dark:text-amber-400">
+                  {mutation.data.organization.name} was created, but the welcome email to{' '}
+                  {mutation.data.admin.email} failed
+                  {mutation.data.email.error ? `: ${mutation.data.email.error}` : ''}. They can
+                  still sign in with Google.
                 </div>
               )}
             </FieldGroup>

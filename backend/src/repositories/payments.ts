@@ -61,10 +61,14 @@ export async function recordPayment(
 ): Promise<RecordPaymentResult> {
   return withLogNumberRetry(async () =>
     db.transaction(async (tx): Promise<RecordPaymentResult> => {
+      // Locked for the rest of the transaction: two payments landing at once
+      // would otherwise both read the same amountPaid and both apply in full,
+      // over-paying the invoice and over-crediting the trust account.
       const [invoice] = await tx
         .select()
         .from(invoices)
         .where(and(eq(invoices.id, input.invoiceId), eq(invoices.orgId, orgId)))
+        .for("update")
       if (!invoice) return { status: "invoice_not_found" }
       if (invoice.status !== "open") return { status: "invoice_not_open" }
 
@@ -218,14 +222,22 @@ export async function voidPayment(
 ): Promise<VoidPaymentResult> {
   return withLogNumberRetry(async () =>
     db.transaction(async (tx): Promise<VoidPaymentResult> => {
+      // Both rows locked for the same reason as in recordPayment: a double
+      // void would reverse the money twice, and a void racing a payment would
+      // compute amountPaid from a stale read.
       const [payment] = await tx
         .select()
         .from(payments)
         .where(and(eq(payments.id, paymentId), eq(payments.orgId, orgId)))
+        .for("update")
       if (!payment) return { status: "not_found" }
       if (payment.voidedAt) return { status: "already_void" }
 
-      const [invoice] = await tx.select().from(invoices).where(eq(invoices.id, payment.invoiceId))
+      const [invoice] = await tx
+        .select()
+        .from(invoices)
+        .where(eq(invoices.id, payment.invoiceId))
+        .for("update")
 
       const appliedC = toCents(payment.amountApplied)
       if (appliedC > 0) {

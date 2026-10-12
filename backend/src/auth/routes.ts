@@ -19,6 +19,9 @@ import { SESSION_TTL_MS, generateSessionToken, hashToken } from "./tokens"
 
 const loginSchema = z.object({ idToken: z.string().min(1) })
 
+// `avatarVersion` is a cache-buster, not a URL: the picture itself is served
+// by GET /auth/avatar (see avatar.ts), and the frontend builds that URL. It
+// changes whenever the row does, so a fresh upload is never shown stale.
 function publicUser(user: User, role: string | null) {
   return {
     id: user.id,
@@ -26,13 +29,15 @@ function publicUser(user: User, role: string | null) {
     name: user.name,
     role,
     isPlatformOwner: user.isPlatformOwner,
+    avatarVersion:
+      user.avatarStorageKey || user.avatarUrl ? String(user.updatedAt.getTime()) : null,
   }
 }
 
 // The `{ user, org, memberships }` shape every auth route returns: a
 // superset of the old `{ user }` payload, and what the (future) org picker
 // needs. Factored into one helper so the three routes can't drift.
-async function meResponse(user: User, session: Session) {
+export async function meResponse(user: User, session: Session) {
   const memberships = await listActiveMembershipsWithOrg(user.id)
   const org = session.orgId === null ? null : await findOrganizationById(session.orgId)
   const role =
@@ -77,12 +82,24 @@ authRouter.post("/auth/google", async (req: Request, res: Response) => {
 
   if (!user.googleSub) {
     user =
-      (await updateUser(user.id, { googleSub: identity.sub, name: user.name ?? identity.name })) ??
-      user
+      (await updateUser(user.id, {
+        googleSub: identity.sub,
+        name: user.name ?? identity.name,
+        avatarUrl: identity.picture ?? null,
+      })) ?? user
   } else if (user.googleSub !== identity.sub) {
     req.log.warn({ userId: user.id }, "Google sub mismatch for user email")
     res.status(403).json({ error: "Account not authorized" })
     return
+  } else if (
+    !user.avatarStorageKey &&
+    identity.picture !== undefined &&
+    identity.picture !== user.avatarUrl
+  ) {
+    // Google's picture is the default only until the user uploads their own;
+    // after that it is never written again, so the upload can't be undone by
+    // a later login.
+    user = (await updateUser(user.id, { avatarUrl: identity.picture })) ?? user
   }
 
   const memberships = await listActiveMembershipsWithOrg(user.id)

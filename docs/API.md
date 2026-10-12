@@ -65,7 +65,7 @@ mechanics. What a frontend integration needs to know:
   request will 401.
 - There is no refresh-token flow; a session lasts 7 days and a fresh login
   is required after that (or after 401).
-- All three routes below use `requireSession` (authenticated, but no active
+- Every route below uses `requireSession` (authenticated, but no active
   org required), not `requireAuth` — they have to work for a session that
   isn't bound to an org yet. Every other route in this doc requires
   `requireAuth`.
@@ -76,6 +76,14 @@ mechanics. What a frontend integration needs to know:
 | GET | `/auth/me` | current `{ user, org, memberships }` for the session. `user.role` and `org` are `null` when the session has no org bound. |
 | POST | `/auth/org` | body `{ orgId }`. Re-binds the session to an org the caller has an active membership in; `403 Not a member of that organization` otherwise. Returns the same shape as the two above. This is how a multi-membership user (or one switching orgs) picks/changes which org their session is bound to. |
 | POST | `/auth/logout` | clears the cookie and deletes the session row. |
+| GET | `/auth/avatar` | `302` to the caller's profile picture: a short-lived signed R2 URL for an uploaded one, else the picture Google reported at sign-in. `404` when there is neither. Meant as an `<img src>`; the cookie authorizes it. |
+| PUT | `/auth/avatar` | body is the raw image bytes with an `image/*` `Content-Type`; JPEG, PNG, WebP or GIF, sniffed from the bytes, max 2 MB (`413`). Stored in the attachments bucket under `avatars/<userId>/`, replacing any previous upload. Returns the same `{ user, org, memberships }` shape as the routes above. `503` when R2 is not configured. |
+
+`user.avatarVersion` is `null` when the user has no picture, otherwise an
+opaque token that changes whenever the picture does - append it to the
+`/auth/avatar` URL as a query string so the browser never shows a stale one.
+Google's picture is recorded at every sign-in until the user uploads their
+own; after that the upload wins and sign-in never touches it again.
 
 `POST /auth/google` and `POST /auth/org` both return, and `GET /auth/me`
 always returns:

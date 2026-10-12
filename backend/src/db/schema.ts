@@ -83,6 +83,12 @@ export const users = pgTable("users", {
   // from PLATFORM_OWNER_EMAIL by ensurePlatformOwner() (db/platformOwner.ts);
   // never set by request input.
   isPlatformOwner: boolean("is_platform_owner").notNull().default(false),
+  // Profile picture. `avatar_storage_key` is an object the user uploaded
+  // (R2, under avatars/<user id>/) and wins when set; `avatar_url` is the
+  // picture Google reported at sign-in, refreshed on every login until the
+  // user uploads their own. Both org-independent, like the rest of the row.
+  avatarUrl: varchar("avatar_url", { length: 2048 }),
+  avatarStorageKey: varchar("avatar_storage_key", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 })

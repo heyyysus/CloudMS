@@ -1,6 +1,7 @@
 import cookieParser from "cookie-parser"
 import express, { Application, NextFunction, Request, Response } from "express"
 import pinoHttp from "pino-http"
+import { avatarRouter } from "./auth/avatar"
 import { authRouter } from "./auth/routes"
 import { logger } from "./logger"
 import { CrossOrgReferenceError } from "./repositories"
@@ -43,6 +44,7 @@ app.use(express.json())
 app.use(cookieParser())
 
 app.use(authRouter)
+app.use(avatarRouter)
 app.use(organizationsRouter)
 app.use(personsRouter)
 app.use(clientsRouter)
@@ -76,12 +78,20 @@ app.get("/health", (req: Request, res: Response) => {
 interface PgError extends Error {
   code?: string
   cause?: { code?: string }
+  // body-parser's errors carry a `type` instead of a Postgres code.
+  type?: string
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: PgError, req: Request, res: Response, next: NextFunction) => {
   if (err instanceof CrossOrgReferenceError) {
     res.status(409).json({ error: "Referenced by or references other records" })
+    return
+  }
+  // express.json / express.raw reject a body over their limit before any
+  // handler runs; that is the client's fault, not a server fault.
+  if (err.type === "entity.too.large") {
+    res.status(413).json({ error: "Request body is too large" })
     return
   }
   const code = err.code ?? err.cause?.code

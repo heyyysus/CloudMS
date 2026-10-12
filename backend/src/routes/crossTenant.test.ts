@@ -57,6 +57,18 @@ const ENTRIES: Entry[] = [
     kind: "exempt",
     reason: "pre-org by design: the org picker itself",
   },
+  {
+    method: "get",
+    path: "/auth/avatar",
+    kind: "exempt",
+    reason: "pre-org: the caller's own picture, a users row with no org column",
+  },
+  {
+    method: "put",
+    path: "/auth/avatar",
+    kind: "exempt",
+    reason: "pre-org: writes only the caller's own users row",
+  },
   { method: "get", path: "/persons", kind: "list" },
   { method: "get", path: "/persons/:id", kind: "detail" },
   {

@@ -4,6 +4,7 @@ export interface User {
   id: string
   email: string
   name: string | null
+  isPlatformOwner: boolean
   // Null when the user has no picture at all. Otherwise an opaque token that
   // changes with every change to the picture; see avatarUrl().
   avatarVersion: string | null

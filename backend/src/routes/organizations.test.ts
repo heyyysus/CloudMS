@@ -138,3 +138,42 @@ describe("POST /organizations", () => {
     expect(await findOrganizationBySlug(slug)).toBeUndefined()
   })
 })
+
+describe("GET /organizations", () => {
+  it("returns 401 without a cookie", async () => {
+    const res = await request(app).get("/organizations")
+    expect(res.status).toBe(401)
+  })
+
+  it("returns 403 for a signed-in user who is not a platform owner", async () => {
+    const staff = await ctx.user("org-list-staff", "staff")
+    const cookie = await ctx.cookie(staff.id)
+
+    const res = await request(app).get("/organizations").set("Cookie", cookie)
+
+    expect(res.status).toBe(403)
+  })
+
+  it("returns 403 for an org admin - membership admin grants no platform capability", async () => {
+    const org = await ctx.org()
+    const admin = await ctx.user("org-list-admin", "admin", org.id)
+    const cookie = await ctx.cookie(admin.id, org.id)
+
+    const res = await request(app).get("/organizations").set("Cookie", cookie)
+
+    expect(res.status).toBe(403)
+  })
+
+  it("lists every organization for a platform owner", async () => {
+    const owner = await ctx.platformOwner("org-list-owner")
+    const cookie = await ctx.unboundCookie(owner.id)
+    const org = await ctx.org()
+
+    const res = await request(app).get("/organizations").set("Cookie", cookie)
+
+    expect(res.status).toBe(200)
+    expect(res.body.organizations).toEqual(
+      expect.arrayContaining([{ id: org.id, name: org.name, slug: org.slug }])
+    )
+  })
+})

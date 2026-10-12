@@ -33,6 +33,12 @@ interface Entry {
 const ENTRIES: Entry[] = [
   { method: "get", path: "/health", kind: "exempt", reason: "no org data" },
   {
+    method: "get",
+    path: "/organizations",
+    kind: "exempt",
+    reason: "platform-owner action that lists every org by design - not scoped to one",
+  },
+  {
     method: "post",
     path: "/organizations",
     kind: "exempt",

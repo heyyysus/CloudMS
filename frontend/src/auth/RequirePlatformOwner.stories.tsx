@@ -1,0 +1,93 @@
+import type { Meta, StoryObj } from '@storybook/react-vite'
+import { MemoryRouter, Route, Routes } from 'react-router'
+import { expect, within } from 'storybook/test'
+import { RequirePlatformOwner } from './RequirePlatformOwner'
+import { AuthContext, type AuthContextValue } from './auth-context'
+import type { User } from '@/api/auth'
+
+const owner: User = {
+  id: 'usr-1',
+  email: 'owner@cloudms.dev',
+  name: 'Platform Owner',
+  isPlatformOwner: true,
+  avatarVersion: null,
+}
+
+// An organization admin: the acceptance case. Admin of an org is a membership
+// role, and the guard must not read it as the platform flag.
+const orgAdmin: User = {
+  id: 'usr-2',
+  email: 'admin@acme.test',
+  name: 'Org Admin',
+  isPlatformOwner: false,
+  avatarVersion: null,
+}
+
+function auth(overrides: Partial<AuthContextValue> = {}): AuthContextValue {
+  return {
+    user: owner,
+    org: null,
+    memberships: [],
+    role: null,
+    loading: false,
+    setMe: () => {},
+    setOrg: async () => {},
+    ...overrides,
+  }
+}
+
+// RequirePlatformOwner only reads auth from context, so each story fixes a
+// context value and observes which stand-in route rendered, the way
+// SelectOrg.stories.tsx exercises its own redirects.
+const meta = {
+  title: 'auth/RequirePlatformOwner',
+  component: RequirePlatformOwner,
+  parameters: { layout: 'fullscreen' },
+  decorators: [
+    (Story, { parameters }) => (
+      <AuthContext.Provider value={(parameters.auth as AuthContextValue) ?? auth()}>
+        <MemoryRouter initialEntries={['/platform']}>
+          <Routes>
+            <Route element={<Story />}>
+              <Route path="/platform" element={<p>platform page</p>} />
+            </Route>
+            <Route path="/login" element={<p>login page</p>} />
+            <Route path="/home" element={<p>home page</p>} />
+          </Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>
+    ),
+  ],
+} satisfies Meta<typeof RequirePlatformOwner>
+
+export default meta
+type Story = StoryObj<typeof meta>
+
+export const RendersForAPlatformOwner: Story = {
+  play: async ({ canvasElement }) => {
+    await expect(await within(canvasElement).findByText('platform page')).toBeInTheDocument()
+  },
+}
+
+export const RedirectsHomeForOrgAdmin: Story = {
+  parameters: { auth: auth({ user: orgAdmin, role: 'admin' }) },
+  play: async ({ canvasElement }) => {
+    await expect(await within(canvasElement).findByText('home page')).toBeInTheDocument()
+  },
+}
+
+export const RedirectsToLoginWithoutUser: Story = {
+  parameters: { auth: auth({ user: null }) },
+  play: async ({ canvasElement }) => {
+    await expect(await within(canvasElement).findByText('login page')).toBeInTheDocument()
+  },
+}
+
+export const LoadingRendersSpinner: Story = {
+  parameters: { auth: auth({ loading: true }) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.queryByText('platform page')).not.toBeInTheDocument()
+    await expect(canvas.queryByText('home page')).not.toBeInTheDocument()
+  },
+}

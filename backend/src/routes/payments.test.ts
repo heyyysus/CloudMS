@@ -42,6 +42,69 @@ async function policyLogs(policyId: string, cookie: string): Promise<LogRow[]> {
   return res.body
 }
 
+describe("POST /payments (concurrent)", () => {
+  it("applies at most the invoice total across parallel payments", async () => {
+    const { cookie } = await authed("pay-race")
+    const policy = await ctx.policy()
+    const invoice = await makeInvoice(cookie, policy.id, [
+      { category: "agency", type: "new_business_fee", amount: 10 },
+    ])
+
+    // Ten $4 payments at once against a $10 invoice. Serialized, the third
+    // settles it and the other seven find it closed.
+    const responses = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        request(app)
+          .post("/payments")
+          .set("Cookie", cookie)
+          .send({ invoiceId: invoice.id, method: "cash", amount: 4 })
+      )
+    )
+    const accepted = responses.filter((r) => r.status === 201)
+    expect(accepted).toHaveLength(3)
+    expect(responses.filter((r) => r.status === 409)).toHaveLength(7)
+    const applied = accepted.reduce((sum, r) => sum + Number(r.body.amountApplied), 0)
+    expect(applied).toBe(10)
+    expect(accepted.filter((r) => r.body.invoiceClosed)).toHaveLength(1)
+
+    const invAfter = await request(app).get(`/invoices/${invoice.id}`).set("Cookie", cookie)
+    expect(invAfter.body.status).toBe("closed")
+    expect(invAfter.body.amountPaid).toBe("10.00")
+
+    // +10 in, -10 fee: nothing left in trust, nothing over-credited.
+    const balance = await request(app)
+      .get(`/trust-balance?policyId=${policy.id}`)
+      .set("Cookie", cookie)
+    expect(balance.body.balance).toBe("0.00")
+  })
+
+  it("voids a payment once when the same void is sent in parallel", async () => {
+    const { cookie } = await authed("void-race", "admin")
+    const policy = await ctx.policy()
+    const invoice = await makeInvoice(cookie, policy.id, [
+      { category: "agency", type: "new_business_fee", amount: 10 },
+    ])
+    const paid = await request(app)
+      .post("/payments")
+      .set("Cookie", cookie)
+      .send({ invoiceId: invoice.id, method: "cash", amount: 10 })
+    expect(paid.status).toBe(201)
+
+    const responses = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        request(app).post(`/payments/${paid.body.payment.id}/void`).set("Cookie", cookie).send({})
+      )
+    )
+    expect(responses.filter((r) => r.status === 200)).toHaveLength(1)
+    expect(responses.filter((r) => r.status === 409)).toHaveLength(4)
+
+    const balance = await request(app)
+      .get(`/trust-balance?policyId=${policy.id}`)
+      .set("Cookie", cookie)
+    expect(balance.body.balance).toBe("0.00")
+  })
+})
+
 describe("POST /payments (full payment)", () => {
   it("closes the invoice, mints a receipt, and nets the trust account to zero", async () => {
     const { cookie } = await authed("pay-full")

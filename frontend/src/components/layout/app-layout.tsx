@@ -8,6 +8,8 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { AppSidebar } from './app-sidebar'
 import { UserMenu } from './user-menu'
 import { useAuth } from '@/auth/AuthContext'
+import { uploadAvatar } from '@/api/auth'
+import { prepareAvatar } from '@/lib/avatar-image'
 import { ClientTabsProvider, useClientTabs } from './client-tabs'
 import { useSearchShortcut } from '@/hooks/use-search-shortcut'
 import { useSubmitShortcut } from '@/hooks/use-submit-shortcut'
@@ -28,7 +30,7 @@ export function AppLayout() {
 }
 
 function AppLayoutInner() {
-  const { user, org, memberships, role, setOrg } = useAuth()
+  const { user, org, memberships, role, setOrg, setMe } = useAuth()
   const { tabs, openTab, closeTab, clearTabs } = useClientTabs()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -63,6 +65,15 @@ function AppLayoutInner() {
     navigate(`/clients/${policy.clientId}`)
   }
 
+  async function handleUploadPhoto(file: File) {
+    try {
+      setMe(await uploadAvatar(await prepareAvatar(file)))
+      toast.success('Profile photo updated.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't upload that photo.")
+    }
+  }
+
   function handleClientCreated(client: ClientDetail) {
     openTab({ id: client.id, label: clientDisplayName(client) })
     navigate(`/clients/${client.id}`)
@@ -88,7 +99,7 @@ function AppLayoutInner() {
             <AddClientDialog onCreated={handleClientCreated} />
             <div className="ml-auto flex items-center gap-1">
               <ThemeToggle />
-              {user && <UserMenu user={user} role={role} />}
+              {user && <UserMenu user={user} role={role} onUploadPhoto={handleUploadPhoto} />}
             </div>
           </header>
           <main className="flex-1 p-6">

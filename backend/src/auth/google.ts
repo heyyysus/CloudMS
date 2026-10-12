@@ -4,6 +4,7 @@ export interface GoogleIdentity {
   email: string
   sub: string
   name?: string
+  picture?: string
 }
 
 const client = new OAuth2Client()
@@ -18,5 +19,5 @@ export async function verifyGoogleIdToken(idToken: string): Promise<GoogleIdenti
   if (!payload?.email || !payload.email_verified) {
     throw new Error("Google token has no verified email")
   }
-  return { email: payload.email, sub: payload.sub, name: payload.name }
+  return { email: payload.email, sub: payload.sub, name: payload.name, picture: payload.picture }
 }

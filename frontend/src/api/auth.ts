@@ -1,9 +1,22 @@
-import { request } from './client'
+import { API_BASE, request } from './client'
 
 export interface User {
   id: string
   email: string
   name: string | null
+  // Null when the user has no picture at all. Otherwise an opaque token that
+  // changes with every change to the picture; see avatarUrl().
+  avatarVersion: string | null
+}
+
+// The picture is served by the API (which redirects to wherever it lives) so
+// the session cookie is what authorizes it, same as any other request. The
+// version in the query string is what stops the browser showing a cached
+// previous photo after an upload.
+export function avatarUrl(user: Pick<User, 'avatarVersion'>): string | null {
+  return user.avatarVersion === null
+    ? null
+    : `${API_BASE}/auth/avatar?v=${encodeURIComponent(user.avatarVersion)}`
 }
 
 export interface Org {
@@ -61,6 +74,16 @@ export function selectOrg(orgId: string): Promise<Me> {
   return request<MePayload>('/auth/org', {
     method: 'POST',
     body: JSON.stringify({ orgId }),
+  }).then(toMe)
+}
+
+// Raw image bytes as the body; the server sniffs the real type and caps the
+// size (2 MB), so send something already downscaled - see lib/avatar-image.
+export function uploadAvatar(image: Blob): Promise<Me> {
+  return request<MePayload>('/auth/avatar', {
+    method: 'PUT',
+    headers: { 'Content-Type': image.type || 'application/octet-stream' },
+    body: image,
   }).then(toMe)
 }
 

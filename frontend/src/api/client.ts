@@ -1,4 +1,7 @@
-const BASE = '/api/v1'
+// Exported for the one place that needs an API URL outside request(): the
+// <img src> of the profile picture, which the browser fetches itself.
+export const API_BASE = '/api/v1'
+const BASE = API_BASE
 
 // Registered by AuthProvider so any `request()` call - not just TanStack Query
 // ones - can react to a session losing its org (e.g. a membership was

@@ -76,7 +76,7 @@ describe("POST /vehicles", () => {
 
     const res = await request(app).post("/vehicles").set("Cookie", cookie).send({
       policyId: policy.id,
-      vin: "TESTVIN0000000001",
+      vin: "TESTVN00000000001",
       make: "Honda",
       model: "Accord",
       year: 2021,
@@ -118,6 +118,44 @@ describe("POST /vehicles", () => {
     })
     expect(res.status).toBe(201)
     ctx.track("vehicle", res.body.id)
+  })
+})
+
+describe("POST /vehicles VIN rules", () => {
+  it("rejects a VIN that is not 17 characters or carries I, O or Q", async () => {
+    const user = await ctx.user("vehicles-badvin")
+    const cookie = await ctx.cookie(user.id)
+    const policy = await ctx.policy()
+
+    for (const vin of ["ABC", "TESTVN000000000IO", "TESTVN0000000000001"]) {
+      const res = await request(app).post("/vehicles").set("Cookie", cookie).send({
+        policyId: policy.id,
+        vin,
+        make: "Honda",
+        model: "Accord",
+        year: 2021,
+        garagingZip: "90210",
+      })
+      expect(res.status, vin).toBe(400)
+    }
+  })
+
+  it("stores a lower-case VIN upper-cased", async () => {
+    const user = await ctx.user("vehicles-lowervin")
+    const cookie = await ctx.cookie(user.id)
+    const policy = await ctx.policy()
+
+    const res = await request(app).post("/vehicles").set("Cookie", cookie).send({
+      policyId: policy.id,
+      vin: "testvn00000000002",
+      make: "Honda",
+      model: "Accord",
+      year: 2021,
+      garagingZip: "90210",
+    })
+    expect(res.status).toBe(201)
+    ctx.track("vehicle", res.body.id)
+    expect(res.body.vin).toBe("TESTVN00000000002")
   })
 })
 

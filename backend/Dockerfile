@@ -41,8 +41,10 @@ COPY package*.json ./
 #   push                  - the schema diff through drizzle-kit's API (see
 #                           push.ts), with its constraint introspection
 #                           ordered so a correct schema diffs as empty.
-# Then (re)grant the app role and bootstrap PLATFORM_OWNER_EMAIL if set,
-# before serving. push.ts imports schema.ts from dist, so nothing here needs
+# Then (re)grant the app role, re-apply row-level security (push drops the
+# policies every boot because schema.ts does not declare them, so rls.js has
+# to follow it or production runs with isolation layer 1 only), and bootstrap
+# PLATFORM_OWNER_EMAIL if set, before serving. push.ts imports schema.ts from dist, so nothing here needs
 # the sources; drizzle-kit itself is resolvable because it's a runtime
 # dependency (see package.json).
-CMD ["sh", "-c", "node dist/db/extensions.js && node dist/db/backfillOrgIds.js && node dist/db/backfillDocumentNumbers.js && node dist/db/ensureUniqueConstraints.js && node dist/db/push.js && node dist/db/roles.js && node dist/db/bootstrap.js && node dist/index.js"]
+CMD ["sh", "-c", "node dist/db/extensions.js && node dist/db/backfillOrgIds.js && node dist/db/backfillDocumentNumbers.js && node dist/db/ensureUniqueConstraints.js && node dist/db/push.js && node dist/db/roles.js && node dist/db/rls.js && node dist/db/bootstrap.js && node dist/index.js"]

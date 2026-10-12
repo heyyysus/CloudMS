@@ -141,7 +141,9 @@ both touch every table's columns.
   every repository filtering by an explicit `orgId`; layer 2 is Postgres
   itself refusing to show the non-superuser `app` role rows outside the
   current org, so a repository call that forgot its `where` still can't leak
-  data. `backend/src/db/rls.ts` runs after `roles.ts` on every `db:push` and,
+  data. `backend/src/db/rls.ts` runs after `roles.ts` on every `db:push` and on
+  every container boot (Dockerfile `CMD`, where push has just dropped the
+  policies it does not know about) and,
   for each of the 21 tenant tables listed there, idempotently enables and
   *forces* row-level security and creates a `FOR ALL` policy of `org_id =
   current_setting('app.org_id', true)` for both `USING` and `WITH CHECK`. A

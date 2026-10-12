@@ -186,6 +186,70 @@ describe("POST /invoices", () => {
     expect(res.status).toBe(400)
   })
 
+  it("rejects an amount finer than a cent", async () => {
+    const { cookie } = await authed("inv-subcent")
+    const policy = await ctx.policy()
+    for (const amount of [0.004, "10.005", 1e-7]) {
+      const res = await request(app)
+        .post("/invoices")
+        .set("Cookie", cookie)
+        .send({
+          policyId: policy.id,
+          items: [{ category: "agency", type: "new_business_fee", amount }],
+        })
+      expect(res.status, String(amount)).toBe(400)
+      expect(res.body.error).toMatch(/whole cents/)
+    }
+  })
+
+  it("rejects an amount the numeric(12,2) column cannot hold", async () => {
+    const { cookie } = await authed("inv-overflow")
+    const policy = await ctx.policy()
+    const res = await request(app)
+      .post("/invoices")
+      .set("Cookie", cookie)
+      .send({
+        policyId: policy.id,
+        items: [{ category: "agency", type: "new_business_fee", amount: 10_000_000_000 }],
+      })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/maximum/)
+  })
+
+  it("rejects items whose total the numeric(12,2) column cannot hold", async () => {
+    const { cookie } = await authed("inv-total-overflow")
+    const policy = await ctx.policy()
+    const res = await request(app)
+      .post("/invoices")
+      .set("Cookie", cookie)
+      .send({
+        policyId: policy.id,
+        items: [
+          { category: "sweep", type: "new_business_sweep", amount: 9_999_999_999 },
+          { category: "agency", type: "new_business_fee", amount: 1 },
+        ],
+      })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/total exceeds/)
+  })
+
+  it("accepts whole-cent amounts as numbers or strings", async () => {
+    const { cookie } = await authed("inv-cents")
+    const policy = await ctx.policy()
+    const res = await request(app)
+      .post("/invoices")
+      .set("Cookie", cookie)
+      .send({
+        policyId: policy.id,
+        items: [
+          { category: "sweep", type: "new_business_sweep", amount: 19.99 },
+          { category: "agency", type: "new_business_fee", amount: ".5" },
+        ],
+      })
+    expect(res.status).toBe(201)
+    expect(res.body.total).toBe("20.49")
+  })
+
   it("appends a policy log recording the invoice, authored by the session user", async () => {
     const { user, cookie } = await authed("inv-log")
     const carrier = await ctx.carrier({ name: "Geico" })

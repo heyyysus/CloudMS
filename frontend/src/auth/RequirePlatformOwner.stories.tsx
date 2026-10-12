@@ -10,6 +10,7 @@ const owner: User = {
   email: 'owner@cloudms.dev',
   name: 'Platform Owner',
   isPlatformOwner: true,
+  avatarVersion: null,
 }
 
 // An organization admin: the acceptance case. Admin of an org is a membership
@@ -19,6 +20,7 @@ const orgAdmin: User = {
   email: 'admin@acme.test',
   name: 'Org Admin',
   isPlatformOwner: false,
+  avatarVersion: null,
 }
 
 function auth(overrides: Partial<AuthContextValue> = {}): AuthContextValue {

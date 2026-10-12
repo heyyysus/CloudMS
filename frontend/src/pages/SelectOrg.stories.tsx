@@ -12,6 +12,7 @@ const user: User = {
   email: 'jane@acme.test',
   name: 'Jane Doe',
   isPlatformOwner: false,
+  avatarVersion: null,
 }
 
 const memberships: Membership[] = [

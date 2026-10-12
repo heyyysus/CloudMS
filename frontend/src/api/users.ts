@@ -18,7 +18,9 @@ export interface InviteEmailResult {
 // completed a Google sign-in from one who has. `role` here is that user's
 // role on the admin's active org (from their membership row), not the
 // current session's own role - unrelated to `Me.role`.
-export interface AdminUser extends User {
+// Omits avatarVersion: the admin list is about accounts, not pictures, and
+// GET /users doesn't send one.
+export interface AdminUser extends Omit<User, 'avatarVersion'> {
   role: 'admin' | 'staff'
   isActive: boolean
   hasSignedIn: boolean

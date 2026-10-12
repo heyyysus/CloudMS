@@ -78,8 +78,10 @@ app.get("/health", (req: Request, res: Response) => {
 interface PgError extends Error {
   code?: string
   cause?: { code?: string }
-  // body-parser's errors carry a `type` instead of a Postgres code.
+  // body-parser's errors carry a `type` and an HTTP `status` instead of a
+  // Postgres code.
   type?: string
+  status?: number
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -92,6 +94,17 @@ app.use((err: PgError, req: Request, res: Response, next: NextFunction) => {
   // handler runs; that is the client's fault, not a server fault.
   if (err.type === "entity.too.large") {
     res.status(413).json({ error: "Request body is too large" })
+    return
+  }
+  if (err.type === "entity.parse.failed") {
+    res.status(400).json({ error: "Malformed JSON body" })
+    return
+  }
+  // Any other body-parser rejection (unsupported charset or encoding, an
+  // aborted upload) already carries the right 4xx; only its message is not
+  // worth exposing.
+  if (err.type && err.status !== undefined && err.status >= 400 && err.status < 500) {
+    res.status(err.status).json({ error: "Invalid request body" })
     return
   }
   const code = err.code ?? err.cause?.code

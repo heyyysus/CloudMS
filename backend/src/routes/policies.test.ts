@@ -164,6 +164,25 @@ describe("POST /policies", () => {
     expect(res.status).toBe(400)
   })
 
+  it("returns 400 when expirationDate is not after effectiveDate", async () => {
+    const user = await ctx.user("policies-dateorder")
+    const cookie = await ctx.cookie(user.id)
+    const client = await ctx.client()
+    const carrier = await ctx.carrier()
+
+    for (const expirationDate of ["2025-12-31", "2026-01-01"]) {
+      const res = await request(app).post("/policies").set("Cookie", cookie).send({
+        clientId: client.id,
+        carrierId: carrier.id,
+        policyNumber: "TESTPOL-003",
+        effectiveDate: "2026-01-01",
+        expirationDate,
+      })
+      expect(res.status, expirationDate).toBe(400)
+      expect(res.body.error).toBe("Expiration date must be after the effective date")
+    }
+  })
+
   it("treats a blank dlNumber for a new driver as not provided", async () => {
     const user = await ctx.user("policies-create-blankdl")
     const cookie = await ctx.cookie(user.id)
@@ -217,6 +236,33 @@ describe("PATCH /policies/:id", () => {
     expect(res.body.vehicles).toEqual([])
   })
 
+  it("returns 400 when one patched date crosses the stored other one", async () => {
+    const user = await ctx.user("policies-update-dateorder")
+    const cookie = await ctx.cookie(user.id)
+    // Fixture term: 2026-01-01 to 2027-01-01.
+    const policy = await ctx.policy()
+
+    const early = await request(app)
+      .patch(`/policies/${policy.id}`)
+      .set("Cookie", cookie)
+      .send({ expirationDate: "2025-12-31" })
+    expect(early.status).toBe(400)
+    expect(early.body.error).toBe("Expiration date must be after the effective date")
+
+    const late = await request(app)
+      .patch(`/policies/${policy.id}`)
+      .set("Cookie", cookie)
+      .send({ effectiveDate: "2027-06-01" })
+    expect(late.status).toBe(400)
+
+    const both = await request(app)
+      .patch(`/policies/${policy.id}`)
+      .set("Cookie", cookie)
+      .send({ effectiveDate: "2027-06-01", expirationDate: "2028-06-01" })
+    expect(both.status).toBe(200)
+    expect(both.body.expirationDate).toBe("2028-06-01")
+  })
+
   it("replaces vehicles and drivers when both keys are present", async () => {
     const user = await ctx.user("policies-update-nested")
     const cookie = await ctx.cookie(user.id)
@@ -230,7 +276,7 @@ describe("PATCH /policies/:id", () => {
       .send({
         vehicles: [
           {
-            vin: "PATCHVIN00000001",
+            vin: "PATCHVN0000000001",
             make: "Ford",
             model: "Focus",
             year: 2019,
@@ -242,7 +288,7 @@ describe("PATCH /policies/:id", () => {
 
     expect(res.status).toBe(200)
     expect(res.body.vehicles).toHaveLength(1)
-    expect(res.body.vehicles[0].vin).toBe("PATCHVIN00000001")
+    expect(res.body.vehicles[0].vin).toBe("PATCHVN0000000001")
     expect(res.body.policyDrivers).toHaveLength(1)
     expect(res.body.policyDrivers[0].driver.person.id).toBe(person.id)
   })
@@ -294,14 +340,14 @@ describe("PATCH /policies/:id", () => {
       .send({
         vehicles: [
           {
-            vin: "PATCHVIN00000002",
+            vin: "PATCHVN0000000002",
             make: "Ford",
             model: "Focus",
             year: 2019,
             garagingZip: "10001",
           },
           {
-            vin: "PATCHVIN00000002",
+            vin: "PATCHVN0000000002",
             make: "Ford",
             model: "Focus",
             year: 2019,

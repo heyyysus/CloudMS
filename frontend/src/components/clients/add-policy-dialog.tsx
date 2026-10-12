@@ -164,7 +164,12 @@ const addPolicySchema = z
       z.object({
         // Empty or partial VINs are allowed - not every vehicle is fully
         // identified at entry time.
-        vin: z.string().trim().max(17, 'Max 17 characters'),
+        vin: z
+          .string()
+          .trim()
+          .toUpperCase()
+          .length(17, 'A VIN is 17 characters')
+          .regex(/^[A-HJ-NPR-Z0-9]+$/, 'Invalid VIN'),
         make: z.string().trim().min(1, 'Make is required').max(100, 'Max 100 characters'),
         model: z.string().trim().min(1, 'Model is required').max(100, 'Max 100 characters'),
         year: z.string().trim().regex(/^\d{4}$/, 'Enter a 4-digit year'),

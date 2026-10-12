@@ -36,14 +36,14 @@ export const searchQuery = z.object({ q: z.string().trim().min(2).max(100) })
 
 // A VIN is exactly 17 characters and never contains I, O, or Q (excluded by the
 // standard so they can't be misread as 1 and 0).
-export const vinDecodeQuery = z.object({
-  vin: z
-    .string()
-    .trim()
-    .toUpperCase()
-    .length(17, "A VIN is 17 characters")
-    .regex(/^[A-HJ-NPR-Z0-9]+$/, "Invalid VIN"),
-})
+const vin = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .length(17, "A VIN is 17 characters")
+  .regex(/^[A-HJ-NPR-Z0-9]+$/, "Invalid VIN")
+
+export const vinDecodeQuery = z.object({ vin })
 
 const omitMeta = { id: true, orgId: true, createdAt: true, updatedAt: true } as const
 
@@ -89,10 +89,9 @@ const policyCoreBody = insertAutoPolicySchema.omit(omitMeta).extend({
 // Nested create: vehicles get policyId injected server-side; a driver either
 // references an existing person (reusing their drivers row when one exists)
 // or creates a new person + driver in the same transaction.
-export const createPolicyVehicle = insertVehicleSchema.omit({
-  ...omitMeta,
-  policyId: true,
-})
+export const createPolicyVehicle = insertVehicleSchema
+  .omit({ ...omitMeta, policyId: true })
+  .extend({ vin })
 
 // dlNumber is optional on both branches — an agency may not have it yet
 // (e.g. a prospect client), so drivers can be recorded without one. A form
@@ -159,9 +158,25 @@ function checkPolicyChildren(
   })
 }
 
+// A policy expiring on or before its effective date has no term. The PATCH
+// route reuses this against the stored dates when only one of them is sent.
+export function policyDateOrderError(effectiveDate: string, expirationDate: string): string | null {
+  return expirationDate <= effectiveDate ? "Expiration date must be after the effective date" : null
+}
+
+function checkPolicyDates(
+  body: { effectiveDate?: string; expirationDate?: string },
+  ctx: z.RefinementCtx
+) {
+  if (body.effectiveDate === undefined || body.expirationDate === undefined) return
+  const message = policyDateOrderError(body.effectiveDate, body.expirationDate)
+  if (message) ctx.addIssue({ code: "custom", path: ["expirationDate"], message })
+}
+
 export const createPolicyBody = policyCoreBody
   .extend(policyChildren)
   .superRefine(checkPolicyChildren)
+  .superRefine(checkPolicyDates)
 
 // Partial like other update bodies, but vehicles/drivers are replace-all: key
 // absent leaves that collection untouched, [] clears it, [...] replaces it.
@@ -172,8 +187,11 @@ export const updatePolicyBody = policyCoreBody
   .partial()
   .extend({ ...policyChildren, endorsementEffectiveDate: z.iso.date().optional() })
   .superRefine(checkPolicyChildren)
+  .superRefine(checkPolicyDates)
 
-export const createVehicleBody = insertVehicleSchema.omit(omitMeta)
+// drizzle-zod only caps vin at the column's 17 characters; the VIN rules
+// (exact length, no I/O/Q) are the same ones the decoder enforces.
+export const createVehicleBody = insertVehicleSchema.omit(omitMeta).extend({ vin })
 export const updateVehicleBody = createVehicleBody.partial()
 
 // logNumber and authorId are assigned server-side (a per-policy counter and

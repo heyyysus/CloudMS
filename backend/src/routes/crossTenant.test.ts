@@ -503,7 +503,7 @@ describe("cross-tenant isolation", () => {
     const orgAPolicy = await ctx.policy()
     const vehicleRes = await request(app).post("/vehicles").set("Cookie", cookieA).send({
       policyId: b.policy.id,
-      vin: "XTVIN0000000001",
+      vin: "XTVN0000000000001",
       make: "Honda",
       model: "Civic",
       year: 2021,

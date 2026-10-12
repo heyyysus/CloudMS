@@ -21,7 +21,13 @@ import {
   updateAutoPolicyWithDetails,
 } from "../repositories"
 import { firstIssue, isPgForeignKeyViolation, isPgUniqueViolation, parseId } from "./helpers"
-import { createPolicyBody, idParam, searchQuery, updatePolicyBody } from "./schemas"
+import {
+  createPolicyBody,
+  idParam,
+  policyDateOrderError,
+  searchQuery,
+  updatePolicyBody,
+} from "./schemas"
 
 // Best-effort: the policy update is not yet committed (it commits when the
 // request's transaction does, at response end - db/context.ts), but this
@@ -206,6 +212,17 @@ policiesRouter.patch("/policies/:id", requireAuth, async (req: Request, res: Res
   const before = await getPolicyWithDetails(req.orgId!, id)
   if (!before) {
     res.status(404).json({ error: "Policy not found" })
+    return
+  }
+
+  // The schema only compares the dates when both are sent; a single date
+  // still has to land on the right side of the stored one.
+  const dateError = policyDateOrderError(
+    parsed.data.effectiveDate ?? before.effectiveDate,
+    parsed.data.expirationDate ?? before.expirationDate
+  )
+  if (dateError) {
+    res.status(400).json({ error: dateError })
     return
   }
 

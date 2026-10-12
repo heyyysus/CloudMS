@@ -285,8 +285,10 @@ Example response (`GET /clients/:id`, `POST /clients`, and `PATCH
 
 Body fields: `clientId`, `carrierId`, `policyNumber` (unique),
 `policyAddress1`, `policyAddress2`, `policyCity`, `policyState`, `policyZip`
-(all optional), `effectiveDate`, `expirationDate` (`YYYY-MM-DD`), `status`
-(optional; `pending`/`active`/`cancelled`/`expired`, default `pending`).
+(all optional), `effectiveDate`, `expirationDate` (`YYYY-MM-DD`; expiration
+must be after the effective date, on PATCH checked against the stored date
+when only one is sent), `status` (optional;
+`pending`/`active`/`cancelled`/`expired`, default `pending`).
 
 Both POST and PATCH additionally accept:
 
@@ -361,7 +363,10 @@ below.
 | PATCH | `/vehicles/:id` | any | partial |
 | DELETE | `/vehicles/:id` | any (no admin restriction) | |
 
-Body fields: `policyId`, `vin` (unique, 17 chars), `make`, `model`, `year`,
+Body fields: `policyId`, `vin` (unique per policy; exactly 17 characters,
+`A-Z`/`0-9` excluding `I`, `O`, `Q`, upcased on save — the same rule as
+`/vin-decode`, also applied to nested `vehicles` on `/policies`), `make`,
+`model`, `year`,
 `garagingZip`, plus ten optional coverage limit strings: `coverageBi`,
 `coveragePd`, `coverageUmbi`, `coverageUmpd`, `coverageCdw`,
 `coverageMedpay`, `coverageColl`, `coverageComp`,

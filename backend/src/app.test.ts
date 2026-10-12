@@ -18,3 +18,25 @@ describe("GET /health", () => {
     expect(res.headers["etag"]).toBeUndefined()
   })
 })
+
+describe("malformed request bodies", () => {
+  it("answers 400 for JSON that does not parse", async () => {
+    const res = await request(app)
+      .post("/carriers")
+      .set("Content-Type", "application/json")
+      .send('{"name": ')
+
+    expect(res.status).toBe(400)
+    expect(res.body).toEqual({ error: "Malformed JSON body" })
+  })
+
+  it("answers 415 for a charset the body parser cannot read", async () => {
+    const res = await request(app)
+      .post("/carriers")
+      .set("Content-Type", "application/json; charset=x-unknown")
+      .send('{"name": "x"}')
+
+    expect(res.status).toBe(415)
+    expect(res.body).toEqual({ error: "Invalid request body" })
+  })
+})

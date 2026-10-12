@@ -36,12 +36,15 @@ depth — this doc assumes that context and focuses on the resource routes.
   of these tables hold secrets, unlike `users`/`sessions`, so no field
   whitelisting is needed.
 - **Errors**: `{ "error": string }`. Status codes:
-  - `400` — request body/query failed validation (Zod)
+  - `400` — request body/query failed validation (Zod), or the body is not
+    valid JSON (`{ "error": "Malformed JSON body" }`)
   - `401` — no/invalid/expired session
   - `403` — authenticated but wrong role
   - `404` — no row with that id
   - `409` — a Postgres constraint would be violated (duplicate unique value,
     or a foreign key still referencing the row being deleted)
+  - `413` / `415` — body too large, or in a charset or encoding the body
+    parser cannot read
   - `500` — unexpected error (logged server-side, no detail leaked to the client)
 - **Row ids**: every id and foreign key, in every route's params/body/
   response, is an opaque 22-character base64url string

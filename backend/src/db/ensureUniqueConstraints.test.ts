@@ -83,6 +83,40 @@ describe("ensureUniqueConstraints", () => {
     await expect(ensureUniqueConstraints()).resolves.toBe(0)
   })
 
+  // The production case: a release narrowed or widened a unique, leaving the
+  // new name attached to the old column list. Matching on the name alone
+  // reads that as "already there" and hands push the prompt that stops the
+  // boot, so the columns have to be compared too.
+  it("replaces a constraint whose name matches but whose columns do not", async () => {
+    const stale = "receipts_org_id_receipt_number_unique"
+    await adminDb.execute(sql`alter table receipts drop constraint ${sql.identifier(stale)}`)
+    await adminDb.execute(
+      sql`alter table receipts add constraint ${sql.identifier(stale)} unique (receipt_number)`
+    )
+
+    try {
+      await expect(ensureUniqueConstraints()).resolves.toBeGreaterThan(0)
+
+      const cols = await adminDb.execute<{ column_name: string }>(
+        sql`select a.attname as column_name
+            from pg_constraint c
+            join pg_class t on t.oid = c.conrelid
+            join unnest(c.conkey) with ordinality as k(attnum, ord) on true
+            join pg_attribute a on a.attrelid = t.oid and a.attnum = k.attnum
+            where t.relname = 'receipts' and c.conname = ${stale} and c.contype = 'u'
+            order by k.ord`
+      )
+      expect(cols.rows.map((r) => r.column_name)).toEqual(["org_id", "receipt_number"])
+    } finally {
+      await adminDb.execute(
+        sql`alter table receipts drop constraint if exists ${sql.identifier(stale)}`
+      )
+      await adminDb.execute(
+        sql`alter table receipts add constraint ${sql.identifier(stale)} unique (org_id, receipt_number)`
+      )
+    }
+  })
+
   // The whole point of the boot step: whatever it leaves behind, the
   // constraint push would have prompted about is in place.
   it("leaves the org-scoped receipt constraint in place", async () => {

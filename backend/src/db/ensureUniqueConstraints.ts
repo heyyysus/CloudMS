@@ -9,9 +9,8 @@ import * as schema from "./schema"
 // rows without asking first: pgSuggestions prompts "do you want to truncate
 // <table>?" for every create_unique_constraint statement, and it does so
 // before --force is ever consulted, so --force does not suppress it. With no
-// TTY the prompt throws, and push then exits 0 anyway - the boot sails past
-// it and the constraint is never created (see push.ts, which turns that
-// swallowed failure into a hard stop).
+// TTY the prompt throws and the boot stops there (push.ts drives the same
+// diff through drizzle-kit's API, which runs the same prompt).
 //
 // Creating the constraints here first means push has no such statement left
 // to prompt about. It is the only interactive prompt on push's path, so once
@@ -69,28 +68,72 @@ async function tableExists(name: string): Promise<boolean> {
   return result.rows[0]?.exists === true
 }
 
-// Matched on name rather than on columns, because that is what push itself
-// diffs on: a same-columns constraint under a different name would still
-// leave push wanting to create this one.
-async function constraintExists(tableName: string, constraintName: string): Promise<boolean> {
-  const result = await db.execute<{ exists: boolean }>(
-    sql`select exists (
-      select 1
-      from pg_constraint c
-      join pg_class t on t.oid = c.conrelid
-      join pg_namespace n on n.oid = t.relnamespace
-      where n.nspname = 'public'
-        and t.relname = ${tableName}
-        and c.conname = ${constraintName}
-        and c.contype = 'u'
-    ) as exists`
+// The columns a unique constraint of this name actually covers, in order, or
+// null when there is no such constraint. The columns matter as much as the
+// name: a release that narrows or widens a unique (auto_policies went from a
+// column-level unique on policy_number to an org-scoped one on (org_id,
+// policy_number) in 2e9c815) can leave the new name attached to the old
+// column list, and push still wants to create the real one. Checking the name
+// alone reports that as "already there", skips it, and hands push the prompt
+// this whole script exists to avoid.
+// drizzle-kit does not read unique constraints from pg_constraint - it reads
+// them through information_schema.table_constraints joined to
+// constraint_column_usage (see its pgIntrospect). The two can disagree about
+// the same table, and it is push's view that decides whether push emits a
+// create_unique_constraint and stalls the boot on a prompt. So ask the
+// question the way push asks it, and treat that as the source of truth.
+async function constraintColumnsAsPushSeesThem(tableName: string): Promise<Map<string, string[]>> {
+  const result = await db.execute<{ constraint_name: string; column_name: string }>(
+    sql`select tc.constraint_name, c.column_name
+        from information_schema.table_constraints tc
+        join information_schema.constraint_column_usage as ccu
+          using (constraint_schema, constraint_name)
+        join information_schema.columns as c
+          on c.table_schema = tc.constraint_schema
+          and tc.table_name = c.table_name
+          and ccu.column_name = c.column_name
+        where tc.table_name = ${tableName}
+          and tc.constraint_schema = 'public'
+          and tc.constraint_type = 'UNIQUE'
+        order by c.ordinal_position`
   )
-  return result.rows[0]?.exists === true
+  const byName = new Map<string, string[]>()
+  for (const row of result.rows) {
+    const columns = byName.get(row.constraint_name)
+    if (columns) columns.push(row.column_name)
+    else byName.set(row.constraint_name, [row.column_name])
+  }
+  return byName
+}
+
+async function existingConstraintColumns(
+  tableName: string,
+  constraintName: string
+): Promise<string[] | null> {
+  const result = await db.execute<{ column_name: string }>(
+    sql`select a.attname as column_name
+        from pg_constraint c
+        join pg_class t on t.oid = c.conrelid
+        join pg_namespace n on n.oid = t.relnamespace
+        join unnest(c.conkey) with ordinality as k(attnum, ord) on true
+        join pg_attribute a on a.attrelid = t.oid and a.attnum = k.attnum
+        where n.nspname = 'public'
+          and t.relname = ${tableName}
+          and c.conname = ${constraintName}
+          and c.contype = 'u'
+        order by k.ord`
+  )
+  if (result.rows.length === 0) return null
+  return result.rows.map((row) => row.column_name)
 }
 
 // Drizzle wraps driver errors in DrizzleQueryError with the pg error on
 // `cause`, so the SQLSTATE is never on the error actually thrown here - walk
 // the chain for it, the same way repositories/policyLogs.ts does.
+function sameColumns(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((column, i) => column === b[i])
+}
+
 export function isUniqueViolation(err: unknown): boolean {
   let current = err
   while (typeof current === "object" && current !== null) {
@@ -101,8 +144,25 @@ export function isUniqueViolation(err: unknown): boolean {
   return false
 }
 
-async function ensure(tableName: string, constraint: UniqueConstraint): Promise<boolean> {
-  if (await constraintExists(tableName, constraint.name)) return false
+async function ensure(
+  tableName: string,
+  constraint: UniqueConstraint,
+  asPushSeesIt: Map<string, string[]>
+): Promise<boolean> {
+  // Two views, and both have to agree before this constraint is left alone:
+  // pg_constraint decides whether ALTER TABLE ... ADD would collide, and
+  // push's view decides whether push still wants to create it.
+  const actual = await existingConstraintColumns(tableName, constraint.name)
+  const visible = asPushSeesIt.get(constraint.name) ?? null
+  if (
+    actual !== null &&
+    visible !== null &&
+    sameColumns(actual, constraint.columns) &&
+    sameColumns(visible, constraint.columns)
+  ) {
+    return false
+  }
+  const existing = actual
 
   const columns = sql.join(
     constraint.columns.map((column) => sql.identifier(column)),
@@ -110,12 +170,24 @@ async function ensure(tableName: string, constraint: UniqueConstraint): Promise<
   )
   const nullsNotDistinct = constraint.nullsNotDistinct ? sql` nulls not distinct` : sql``
 
+  // A stale definition under the right name is replaced, not left alone -
+  // push would drop it too. Both statements go in one transaction so a
+  // failure to add the new one puts the old one back rather than leaving the
+  // table with neither.
   try {
-    await db.execute(
-      sql`alter table ${sql.identifier(tableName)}
-          add constraint ${sql.identifier(constraint.name)}
-          unique${nullsNotDistinct} (${columns})`
-    )
+    await db.transaction(async (tx) => {
+      if (existing !== null) {
+        await tx.execute(
+          sql`alter table ${sql.identifier(tableName)}
+              drop constraint ${sql.identifier(constraint.name)}`
+        )
+      }
+      await tx.execute(
+        sql`alter table ${sql.identifier(tableName)}
+            add constraint ${sql.identifier(constraint.name)}
+            unique${nullsNotDistinct} (${columns})`
+      )
+    })
   } catch (err) {
     if (!isUniqueViolation(err)) throw err
     const columnList = constraint.columns.join(", ")
@@ -142,10 +214,30 @@ export async function ensureUniqueConstraints(): Promise<number> {
       console.log(`Skipped ${tableName} (table does not exist yet)`)
       continue
     }
+    const asPushSeesIt = await constraintColumnsAsPushSeesThem(tableName)
     for (const constraint of constraints) {
-      if (await ensure(tableName, constraint)) {
-        console.log(`Added missing unique constraint ${constraint.name} on ${tableName}`)
+      const before = await existingConstraintColumns(tableName, constraint.name)
+      const seen = asPushSeesIt.get(constraint.name) ?? null
+      if (await ensure(tableName, constraint, asPushSeesIt)) {
+        const how =
+          before === null
+            ? "Added missing"
+            : `Replaced stale (pg_constraint had ${before.join(", ")}; push saw ${
+                seen === null ? "nothing" : seen.join(", ")
+              })`
+        console.log(`${how} unique constraint ${constraint.name} on ${tableName}`)
         created++
+      } else {
+        // Logged for every constraint, not just the ones changed. When push
+        // stalls on a prompt for a constraint this step believes is already
+        // correct, "0 added" is not enough to tell anyone why - this line is
+        // what says which of the two views disagrees, and how.
+        console.log(
+          `Unique constraint ${constraint.name} on ${tableName} ok ` +
+            `(declared ${constraint.columns.join(", ")}; ` +
+            `pg_constraint ${before === null ? "nothing" : before.join(", ")}; ` +
+            `push ${seen === null ? "nothing" : seen.join(", ")})`
+        )
       }
     }
   }
